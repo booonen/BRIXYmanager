@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BRIXYmanager</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=JetBrains+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,400&family=Hammersmith+One&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="styles.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+</head>
+<body>
+
+<div id="app">
+  <header>
+    <div class="logo"><div class="icon">⬡</div>BRIXYmanager <span id="system-name-header" style="font-weight:400;opacity:0.6;margin-left:4px"></span></div>
+    <div class="actions">
+      <button class="btn btn-sm" onclick="openSaveManager()">💾 <span data-t="btn.saves">Saves</span></button>
+    </div>
+  </header>
+  <main>
+    <nav id="sidebar">
+      <div class="nav-section" data-t="nav_section.network">Network</div>
+      <div class="nav-item active" data-tab="dashboard" onclick="switchTab('dashboard')"><span class="nav-icon">◫</span> <span data-t="nav.dashboard">Dashboard</span></div>
+      <div class="nav-item" data-tab="nodes" onclick="switchTab('nodes')"><span class="nav-icon">◉</span> <span data-t="nav.nodes">Nodes</span><span class="badge" id="badge-nodes">0</span></div>
+      <div class="nav-item" data-tab="segments" onclick="switchTab('segments')"><span class="nav-icon">─</span> <span data-t="nav.segments">Segments</span><span class="badge" id="badge-segments">0</span></div>
+      <div class="nav-section" data-t="nav_section.operations">Operations</div>
+      <div class="nav-item" data-tab="modes" onclick="switchTab('modes')"><span class="nav-icon">◆</span> <span data-t="nav.modes">Modes</span><span class="badge" id="badge-modes">0</span></div>
+      <div class="nav-item" data-tab="lines" onclick="switchTab('lines')"><span class="nav-icon">≡</span> <span data-t="nav.lines">Lines</span><span class="badge" id="badge-lines">0</span></div>
+      <div class="nav-item" data-tab="services" onclick="switchTab('services')"><span class="nav-icon">▷</span> <span data-t="nav.services">Services</span><span class="badge" id="badge-services">0</span></div>
+      <div class="nav-item" data-tab="schedule" onclick="switchTab('schedule')"><span class="nav-icon">◷</span> <span data-t="nav.schedule">Schedule</span></div>
+      <div class="nav-item" data-tab="stock" onclick="switchTab('stock')"><span class="nav-icon">🚃</span> <span data-t="nav.stock">Stock</span><span class="badge" id="badge-stock">0</span></div>
+      <div class="nav-section" data-t="nav_section.views">Views</div>
+      <div class="nav-item" data-tab="map" onclick="switchTab('map')"><span class="nav-icon">🗺</span> <span data-t="nav.geomap">Geomap</span></div>
+      <div class="nav-item" data-tab="schematic" onclick="switchTab('schematic')"><span class="nav-icon">⬡</span> <span data-t="nav.railmap">Railmap</span></div>
+      <div class="nav-item" data-tab="departures" onclick="switchTab('departures')"><span class="nav-icon">▤</span> <span data-t="nav.departures">Departures</span></div>
+      <div class="nav-item" data-tab="journey" onclick="switchTab('journey')"><span class="nav-icon">⇄</span> <span data-t="nav.journey">Journey</span></div>
+      <div class="nav-item" data-tab="issues" onclick="switchTab('issues')"><span class="nav-icon">⚠</span> <span data-t="nav.issues">Issues</span><span class="badge" id="badge-issues" style="color:var(--warn)">0</span></div>
+      <div class="nav-section" data-t="nav_section.system">System</div>
+      <div class="nav-item" data-tab="settings" onclick="switchTab('settings')"><span class="nav-icon">⚙</span> <span data-t="nav.settings">Settings</span></div>
+      <div class="spacer"></div>
+      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.15.1.0</div>
+    </nav>
+    <div class="content">
+      <!-- DASHBOARD -->
+      <div class="tab-panel active" id="panel-dashboard">
+        <div class="page-header"><div><h1 data-t="page.dashboard">Dashboard</h1><div class="subtitle" data-t="subtitle.dashboard">Network overview at a glance</div></div></div>
+        <div class="stats-row" id="dashboard-stats"></div>
+        <div id="dashboard-content"></div>
+      </div>
+      <!-- NODES -->
+      <div class="tab-panel" id="panel-nodes">
+        <div id="nodes-header">
+          <div class="page-header"><div><h1 data-t="page.nodes">Nodes</h1><div class="subtitle" data-t="subtitle.nodes">Stations, junctions, waypoints, depots and freight yards</div></div>
+          <div class="flex gap-8">
+            <button class="btn" onclick="fetchAllOgfCoords()" data-t-title="tooltip.fetch_ogf" title="Fetch coordinates from OGF for all nodes with OGF IDs">🌐 <span data-t="btn.update_coords">Update Coords</span></button>
+            <button class="btn btn-primary" onclick="openNodeModal()" data-t="btn.add_node">+ Add Node</button>
+          </div></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="node-search" placeholder="Search nodes..." data-t-placeholder="placeholder.search_nodes" oninput="renderNodes()"></div>
+        </div>
+        <div id="nodes-list"></div>
+        <div id="node-detail"></div>
+      </div>
+      <!-- SEGMENTS -->
+      <div class="tab-panel" id="panel-segments">
+        <div id="segments-header">
+          <div class="page-header"><div><h1 data-t="page.segments">Segments</h1><div class="subtitle" data-t="subtitle.segments">Track connections between nodes</div></div>
+          <button class="btn btn-primary" onclick="openSegmentModal()" data-t="btn.add_segment">+ Add Segment</button></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="segment-search" placeholder="Search segments..." data-t-placeholder="placeholder.search_segments" oninput="renderSegments()"></div>
+        </div>
+        <div id="segments-list"></div>
+        <div id="segment-detail"></div>
+      </div>
+      <!-- LINES -->
+      <div class="tab-panel" id="panel-lines">
+        <div id="lines-header">
+          <div class="page-header"><div><h1 data-t="page.lines">Lines</h1><div class="subtitle" data-t="subtitle.lines">Service lines with color coding and route coverage</div></div>
+          <button class="btn btn-primary" onclick="openLineModal()" data-t="btn.add_line">+ Add Line</button></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="line-search" placeholder="Search lines..." data-t-placeholder="placeholder.search_lines" oninput="renderLines()"></div>
+        </div>
+        <div id="lines-list"></div>
+        <div id="line-detail"></div>
+      </div>
+      <!-- CATEGORIES -->
+      <div class="tab-panel" id="panel-modes">
+        <div class="page-header"><div><h1 data-t="page.modes">Service Modes</h1><div class="subtitle" data-t="subtitle.modes">Define types of rail services</div></div>
+        <button class="btn btn-primary" onclick="openCategoryModal()" data-t="btn.add_mode">+ Add Mode</button></div>
+        <div id="modes-list"></div>
+      </div>
+      <!-- ROLLING STOCK -->
+      <div class="tab-panel" id="panel-stock">
+        <div class="page-header"><div><h1 data-t="page.stock">Rolling Stock</h1><div class="subtitle" data-t="subtitle.stock">Train types and their properties</div></div>
+        <button class="btn btn-primary" onclick="openStockModal()" data-t="btn.add_stock">+ Add Stock Type</button></div>
+        <div id="stock-list"></div>
+        <div id="stock-matrix"></div>
+      </div>
+      <!-- SERVICES -->
+      <div class="tab-panel" id="panel-services">
+        <div id="services-header">
+          <div class="page-header"><div><h1 data-t="page.services">Services</h1><div class="subtitle" data-t="subtitle.services">Route templates defining train paths</div></div>
+          <button class="btn btn-primary" onclick="openServiceModal()" data-t="btn.add_service">+ Add Service</button></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="service-search" placeholder="Search services..." data-t-placeholder="placeholder.search_services" oninput="renderServices()"></div>
+        </div>
+        <div id="services-list"></div>
+        <div id="service-detail"></div>
+      </div>
+      <!-- SCHEDULE -->
+      <div class="tab-panel" id="panel-schedule">
+        <div class="page-header"><div><h1 data-t="page.schedule">Schedule</h1><div class="subtitle" data-t="subtitle.schedule">Generate and manage departures</div></div>
+        <button class="btn" onclick="recalcAllAndRefresh()">↻ <span data-t="btn.recalc_all">Recalculate All</span></button></div>
+        <div id="schedule-content"></div>
+      </div>
+      <!-- MAP -->
+      <div class="tab-panel" id="panel-map">
+        <div class="page-header"><div><h1 data-t="page.geomap">Geomap</h1><div class="subtitle" data-t="subtitle.geomap">Geographic view of the network</div></div>
+        <div class="flex gap-8">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);cursor:pointer;user-select:none">
+            <input type="checkbox" id="map-tiles-toggle" checked onchange="toggleMapTiles()"> <span data-t="btn.show_map_tiles">Show map tiles</span>
+          </label>
+          <button class="btn btn-sm" onclick="mapFitBounds()" data-t-title="tooltip.fit_map" title="Fit map to all nodes">⊞ <span data-t="btn.fit">Fit</span></button>
+        </div></div>
+        <div id="map-warnings"></div>
+        <div id="network-map" style="height:calc(100vh - 180px);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);background:var(--bg)"></div>
+      </div>
+      <!-- SCHEMATIC MAP -->
+      <div class="tab-panel" id="panel-schematic" style="padding:0;overflow:hidden">
+        <div style="display:flex;height:100%">
+          <!-- Sidebar: unplaced stations -->
+          <div id="schem-sidebar" style="width:220px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden">
+            <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+                <strong style="font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em" data-t="label.unplaced">Unplaced</strong>
+                <button class="btn btn-sm" onclick="document.getElementById('schem-sidebar').style.display='none';document.getElementById('schem-sidebar-show').style.display=''" style="font-size:10px;padding:2px 6px">◀</button>
+              </div>
+              <input type="text" id="schem-sidebar-search" placeholder="Search..." data-t-placeholder="placeholder.search" oninput="renderSchemSidebar()" style="width:100%;font-size:12px;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+              <details style="margin-top:4px"><summary style="font-size:10px;color:var(--text-muted);cursor:pointer;user-select:none">Line filter</summary><div id="schem-sidebar-filter" style="width:100%;font-size:11px;margin-top:2px"></div></details>
+            </div>
+            <div id="schem-sidebar-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
+            <div id="schem-edge-panel" style="display:none;border-top:1px solid var(--border);background:var(--bg-raised);flex-shrink:0"></div>
+          </div>
+          <!-- Canvas -->
+          <div id="schem-canvas-wrap" style="position:relative;flex:1;overflow:hidden;background:#fff">
+            <svg id="schem-svg" style="position:absolute;top:0;left:0;width:100%;height:100%"></svg>
+            <!-- Sidebar show button (when collapsed) -->
+            <button id="schem-sidebar-show" class="btn btn-sm" onclick="document.getElementById('schem-sidebar').style.display='';this.style.display='none'" style="display:none;position:absolute;left:4px;top:50%;z-index:10;transform:translateY(-50%);padding:8px 4px;font-size:10px">▶</button>
+            <div id="schem-hud" style="position:absolute;top:12px;right:12px;display:flex;flex-direction:column;gap:4px;z-index:10">
+              <button class="schem-btn" onclick="schemZoom(1.25)" title="Zoom in">+</button>
+              <button class="schem-btn" onclick="schemZoom(0.8)" title="Zoom out">−</button>
+              <button class="schem-btn" onclick="schemFitAll()" title="Fit all nodes">⊞</button>
+              <button class="schem-btn" onclick="_schemState.debug=!_schemState.debug;renderSchematic()" title="Toggle debug overlay" style="font-size:9px">DBG</button>
+              <button class="schem-btn" onclick="schemResetMap()" title="Reset map data" style="font-size:9px">RST</button>
+              <button class="schem-btn" onclick="schemExportSVG()" title="Export SVG" style="font-size:9px">SVG</button>
+              <button class="schem-btn" onclick="schemImportOGF()" title="Import from OGF geo data" style="font-size:9px">GEO</button>
+            </div>
+            <div id="schem-coords" style="position:absolute;bottom:8px;right:12px;font-family:'Hammersmith One',sans-serif;font-size:11px;color:#999;z-index:10"></div>
+          </div>
+        </div>
+      </div>
+      <!-- DEPARTURES -->
+      <div class="tab-panel" id="panel-departures">
+        <div class="page-header"><div><h1 data-t="page.departures">Station Board</h1><div class="subtitle" data-t="subtitle.departures">View departures and arrivals at any station</div></div></div>
+        <div class="flex gap-8 items-center mb-16" style="flex-wrap:wrap">
+          <div class="form-group" style="max-width:300px;margin-bottom:0">
+            <label data-t="label.station">Station</label>
+            <div id="departure-station-picker"></div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label data-t="label.date">Date</label>
+            <input type="date" id="board-date" required onchange="renderDepartures()" style="width:150px">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label data-t="label.time">Time</label>
+            <div class="flex gap-4 items-center">
+              <input type="time" id="board-time" required onchange="renderDepartures()" style="width:110px">
+              <button class="btn btn-sm" onclick="boardSetNow()" data-t-title="tooltip.set_current_time" title="Set to current time" data-t="btn.now">Now</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label data-t="label.board">Board</label>
+            <div class="flex gap-4">
+              <button class="btn btn-sm" id="btn-dep-mode" onclick="setBoardMode('departures')" style="background:var(--accent);border-color:var(--accent);color:#fff" data-t="btn.departures">Departures</button>
+              <button class="btn btn-sm" id="btn-arr-mode" onclick="setBoardMode('arrivals')" data-t="btn.arrivals">Arrivals</button>
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label data-t="label.platform">Platform</label>
+            <select id="board-platform" onchange="renderDepartures()" style="width:130px">
+              <option value="" data-t="label.all_platforms">All platforms</option>
+            </select>
+          </div>
+        </div>
+        <div id="departures-board"></div>
+      </div>
+      <!-- CONFLICTS -->
+      <!-- JOURNEY PLANNER -->
+      <div class="tab-panel" id="panel-journey">
+        <div class="page-header"><div><h1 data-t="page.journey">Journey Planner</h1><div class="subtitle" data-t="subtitle.journey">Find routes between stations</div></div></div>
+        <div style="max-width:700px">
+          <div style="display:flex;align-items:end;gap:8px;margin-bottom:12px">
+            <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="label.from">From</label><div id="jp-origin-picker"></div></div>
+            <button class="btn btn-sm" onclick="jpSwapStations()" data-t-title="tooltip.swap_stations" title="Swap" style="padding:6px 10px;margin-bottom:2px">⇄</button>
+            <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="label.to">To</label><div id="jp-dest-picker"></div></div>
+          </div>
+          <div style="display:flex;align-items:end;gap:12px">
+            <div class="form-group" style="margin-bottom:0"><label data-t="label.date">Date</label><input type="date" id="jp-date" required style="width:150px"></div>
+            <div class="form-group" style="margin-bottom:0"><label data-t="label.depart_after">Depart after</label><input type="time" id="jp-time" required></div>
+            <button class="btn btn-sm" onclick="jpSetNow()" data-t="btn.now">Now</button>
+            <button class="btn btn-primary" onclick="jpSearch()" data-t="btn.search">Search</button>
+          </div>
+        </div>
+        <div id="jp-results"></div>
+      </div>
+      <!-- ISSUES -->
+      <div class="tab-panel" id="panel-issues">
+        <div class="page-header"><div><h1 data-t="page.issues">Issues</h1><div class="subtitle" data-t="subtitle.issues">Scheduling conflicts, warnings and data quality checks</div></div>
+        <button class="btn" onclick="runIssueDetection()">↻ <span data-t="btn.recheck">Re-check</span></button></div>
+        <div id="issues-list"></div>
+      </div>
+      <!-- SETTINGS -->
+      <div class="tab-panel" id="panel-settings">
+        <div class="page-header"><div><h1 data-t="page.settings">Settings</h1><div class="subtitle" data-t="subtitle.settings">System configuration and defaults</div></div></div>
+        <div id="settings-content"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay" id="modal-overlay" onmousedown="_modalMouseDownTarget=event.target" onclick="closeModalOnOverlay(event)">
+  <div class="modal" id="modal">
+    <div class="modal-header"><h2 id="modal-title">Modal</h2><button class="close-btn" onclick="closeModal()">✕</button></div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+<input type="file" id="file-input" accept=".json" style="display:none" onchange="handleImport(event)">
+
+<script src="js/l10n.js"></script>
+<script src="lang/en.js"></script>
+<script src="lang/hs.js"></script>
+<script src="js/core.js"></script>
+<script src="js/persistence.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/entities.js"></script>
+<script src="js/scheduling.js"></script>
+<script src="js/departures.js"></script>
+<script src="js/journey.js"></script>
+<script src="js/views.js"></script>
+<script src="js/beckmap.js"></script>
+<script>
+(async () => {
+  await load();
+  _lang = data.settings?.language || 'en';
+  l10nHydrate();
+  refreshAll();
+  renderDashboard();
+  updateSystemName();
+})();
+</script>
+</body>
+</html>
