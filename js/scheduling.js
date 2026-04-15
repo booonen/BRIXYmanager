@@ -12,7 +12,7 @@ function openScheduleModal(svcId) {
   window._helperOccExclude = getExistingOccupations(svcId, svcId);
   window._helperOccInclude = getExistingOccupations(null, svcId);
 
-  const singleTrackCount = routeProfile.profile.filter(p => p.tracks === 1).length;
+  const singleTrackCount = routeProfile.profile.filter(p => p.trackCount === 1).length;
   const platformCount = routeProfile.platformProfile.length;
   const existingDeps = data.departures.filter(d => d.serviceId === svcId).length;
 
@@ -400,12 +400,17 @@ function buildRouteProfile(svc) {
     }
 
     if (i < svc.stops.length - 1) {
-      const seg = findSeg(stop.nodeId, svc.stops[i+1].nodeId);
+      const nextStop = svc.stops[i+1];
+      const seg = findSegByTrack(stop.nodeId, nextStop.nodeId, nextStop?.trackId);
       if (seg) {
         const travel = travelTimeInContext(svc.stops, i, stock);
+        const stopTrackId = nextStop?.trackId || null;
+        const tc = segTrackCount(seg);
+        // Auto-resolve trackId for single-track segments
+        const resolvedTrackId = stopTrackId || (tc === 1 && Array.isArray(seg.tracks) && seg.tracks[0] ? seg.tracks[0].id : null);
         profile.push({
           segId: seg.id, enterOffset: t, exitOffset: t + travel,
-          tracks: seg.tracks, nodeA: seg.nodeA, nodeB: seg.nodeB
+          trackCount: tc, trackId: resolvedTrackId, nodeA: seg.nodeA, nodeB: seg.nodeB
         });
         t += travel;
       }
@@ -416,9 +421,9 @@ function buildRouteProfile(svc) {
 }
 
 function getExistingOccupations(svcIdToExclude, forSvcId) {
-  // Build occupation maps for all single-track segments and all platforms
+  // Build occupation maps for segments (per-track) and all platforms
   // If forSvcId is provided, only include departures from services whose patterns overlap
-  const segOcc = {}; // segId -> [{enter, exit}]
+  const segOcc = {}; // "segId::trackId" -> [{enter, exit}]
   const platOcc = {}; // "nodeId::platId" -> [{arrive, depart}]
   const forPat = forSvcId ? getSvc(forSvcId)?.schedulePattern : undefined;
 
@@ -426,16 +431,22 @@ function getExistingOccupations(svcIdToExclude, forSvcId) {
     if (dep.serviceId === svcIdToExclude) continue;
     const svc = getSvc(dep.serviceId);
     if (!svc || dep.times.length < 2) continue;
-    // Pattern overlap filter: skip departures from services that never run on the same day
     if (forPat !== undefined && !patternsOverlap(forPat, svc.schedulePattern)) continue;
 
     for (let i = 0; i < dep.times.length - 1; i++) {
       const from = dep.times[i], to = dep.times[i+1];
       if (from.depart == null || to.arrive == null) continue;
-      const seg = findSeg(from.nodeId, to.nodeId);
-      if (seg && seg.tracks === 1) {
-        if (!segOcc[seg.id]) segOcc[seg.id] = [];
-        segOcc[seg.id].push({ enter: from.depart, exit: to.arrive });
+      const nextStop = svc.stops[i+1];
+      const stopTrackId = nextStop?.trackId || null;
+      const seg = findSegByTrack(from.nodeId, to.nodeId, stopTrackId);
+      if (!seg) continue;
+      const tc = segTrackCount(seg);
+      const trackId = stopTrackId || (tc === 1 && Array.isArray(seg.tracks) && seg.tracks[0] ? seg.tracks[0].id : null);
+      // Only track occupancy when trackId is resolved (single-track auto-resolves, multi-track needs explicit assignment)
+      if (trackId) {
+        const key = `${seg.id}::${trackId}`;
+        if (!segOcc[key]) segOcc[key] = [];
+        segOcc[key].push({ enter: from.depart, exit: to.arrive });
       }
     }
 
@@ -457,12 +468,13 @@ function getExistingOccupations(svcIdToExclude, forSvcId) {
 function findConflictsForStartTime(startMin, routeProfile, existingOcc, myCategoryId) {
   const conflicts = [];
 
-  // Check single-track segments
+  // Check per-track segment conflicts
   for (const rp of routeProfile.profile) {
-    if (rp.tracks > 1) continue;
+    if (!rp.trackId) continue; // No track resolved — can't check (multi-track, unassigned)
     const enter = startMin + rp.enterOffset;
     const exit = startMin + rp.exitOffset;
-    const occs = existingOcc.segOcc[rp.segId] || [];
+    const key = `${rp.segId}::${rp.trackId}`;
+    const occs = existingOcc.segOcc[key] || [];
     for (const occ of occs) {
       if (enter < occ.exit && occ.enter < exit) {
         conflicts.push({ type: 'track', segId: rp.segId, nodeA: rp.nodeA, nodeB: rp.nodeB,
@@ -517,7 +529,7 @@ function showTrainSchedule(depId) {
     if (stop?.passThrough && !isFirst && !isLast) continue;
 
     const isStation = isPassengerStop(node);
-    const platform = depPlatName(dep, svc, i);
+    const platform = platDisplayName(depPlatName(dep, svc, i));
 
     // Timeline dot style
     const dotClass = (isFirst || isLast) ? 'background:var(--accent);' : 'background:var(--text-dim);';

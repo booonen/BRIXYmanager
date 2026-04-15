@@ -78,6 +78,7 @@ async function load() {
   if (_activeSaveId) {
     const slot = await dbGet('saves', _activeSaveId);
     if (slot?.data) data = { ...data, ...slot.data };
+    migrateSegmentTracks();
   }
   if (!_activeSaveId) {
     _activeSaveId = uid();
@@ -93,6 +94,7 @@ async function loadSlot(id) {
   localStorage.setItem('railmanager:active', id);
   const slot = await dbGet('saves', id);
   if (slot?.data) data = { ...data, ...slot.data };
+  migrateSegmentTracks();
   if (_map) { _map.remove(); _map = null; }
   refreshAll(); renderDashboard(); updateSystemName();
   toast(t('toast.loaded', { name: data.settings?.systemName || t('save_mgr.unnamed') }), 'success');
@@ -178,6 +180,8 @@ function handleImport(e) {
       const imported = JSON.parse(ev.target.result);
       delete imported.lines;
       const tempData = { nodes: [], segments: [], categories: [], services: [], serviceGroups: [], departures: [], rollingStock: [], stockModeMatrix: {}, settings: {}, ...imported };
+      // Run migration on imported data before storing
+      const prevData = data; data = tempData; migrateSegmentTracks(); data = prevData;
       const newId = uid();
       await dbPut('saves', { id: newId, data: tempData });
       await dbPut('registry', { id: newId, name: tempData.settings?.systemName || file.name.replace(/\.json$/i, ''), modified: new Date().toISOString(),
@@ -233,6 +237,50 @@ async function openSaveManager() {
     </div>`,
     `<button class="btn" onclick="closeModal()">${t('btn.close')}</button>`);
 }
+
+// ---- Saves Dropdown ----
+function toggleSavesDropdown(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('saves-dropdown-menu');
+  if (menu.classList.contains('open')) { menu.classList.remove('open'); return; }
+  renderSavesDropdown();
+  menu.classList.add('open');
+}
+
+async function renderSavesDropdown() {
+  const menu = document.getElementById('saves-dropdown-menu');
+  if (!menu) return;
+  const reg = await dbGetAll('registry');
+  reg.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+  let html = '';
+  for (const r of reg) {
+    const isActive = r.id === _activeSaveId;
+    const st = r.stats || {};
+    html += `<div class="saves-dropdown-item${isActive ? ' active' : ''}" onclick="${isActive ? '' : `closeSavesDropdown();loadSlot('${r.id}')`}" ${isActive ? 'style="cursor:default"' : ''}>
+      <div style="font-weight:${isActive ? '600' : '400'}">${isActive ? '● ' : ''}${esc(r.name)}</div>
+      <div style="font-size:11px;color:var(--text-muted)">${st.nodes||0}n · ${st.services||0}s · ${st.departures||0}d</div>
+    </div>`;
+  }
+  html += `<div class="saves-dropdown-divider"></div>`;
+  html += `<div class="saves-dropdown-item" onclick="closeSavesDropdown();newSystem()"><span style="color:var(--accent)">+ ${t('btn.new_system')}</span></div>`;
+  menu.innerHTML = html;
+}
+
+function closeSavesDropdown() {
+  const menu = document.getElementById('saves-dropdown-menu');
+  if (menu) menu.classList.remove('open');
+}
+
+function updateSavesDropdownLabel() {
+  const el = document.getElementById('saves-dropdown-label');
+  if (el) el.textContent = data.settings?.systemName || t('btn.saves');
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('saves-dropdown');
+  if (dd && !dd.contains(e.target)) closeSavesDropdown();
+});
 
 // Relocated from Settings — fundamentally a persistence operation
 async function newSystem() {

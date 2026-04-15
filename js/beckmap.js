@@ -1618,6 +1618,7 @@ function schemRenderStationMenu(el) {
   const myGroupId = schemGetGroup(lsKey);
   let groupLabelKey = lsKey;
   if (myGroupId) groupLabelKey = `group:${myGroupId}|${nodeDisplayName(nid)}`;
+  const groupLabelKeyEsc = groupLabelKey.replace(/'/g, "\\'");
   const labelOv = data.beckmap.labelOverrides?.[groupLabelKey] || 'auto';
   const ls = data.beckmap.lineStations || {};
 
@@ -1642,21 +1643,22 @@ function schemRenderStationMenu(el) {
     for (const d of row) {
       const active = (labelOv === d || (labelOv === 'auto' && d === 'auto')) ? ' active' : '';
       const title = d === 'auto' ? 'Auto' : d.toUpperCase();
-      html += `<span class="schem-ctx-style${active}" style="text-align:center;padding:4px 0" onclick="schemSetLabelOverride('${groupLabelKey}','${d}')" title="${title}">${arrows[d]}</span>`;
+      html += `<span class="schem-ctx-style${active}" style="text-align:center;padding:4px 0" onclick="schemSetLabelOverride('${groupLabelKeyEsc}','${d}')" title="${title}">${arrows[d]}</span>`;
     }
   }
   html += `</div>`;
   // Off checkbox
   html += `<label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:11px;cursor:pointer">`;
-  html += `<input type="checkbox" ${labelOv === 'none' ? 'checked' : ''} onchange="schemSetLabelOverride('${groupLabelKey}',this.checked?'none':'auto')"/>`;
+  html += `<input type="checkbox" ${labelOv === 'none' ? 'checked' : ''} onchange="schemSetLabelOverride('${groupLabelKeyEsc}',this.checked?'none':'auto')"/>`;
   html += `<span>Hide label</span></label>`;
   const wrapKey = groupLabelKey;
+  const wrapKeyEsc = groupLabelKeyEsc;
   const wrapVal = data.beckmap.labelWrap?.[wrapKey] || 'auto'; // 'auto' | 'single' | 'split'
   html += `<div style="display:flex;gap:2px;margin-top:3px">`;
   for (const w of ['auto', 'single', 'split']) {
     const active = wrapVal === w ? ' active' : '';
     const label = w === 'auto' ? 'Auto' : w === 'single' ? '1 line' : '2 lines';
-    html += `<span class="schem-ctx-style${active}" style="font-size:10px;padding:2px 6px" onclick="schemSetLabelWrap('${wrapKey}','${w}')">${label}</span>`;
+    html += `<span class="schem-ctx-style${active}" style="font-size:10px;padding:2px 6px" onclick="schemSetLabelWrap('${wrapKeyEsc}','${w}')">${label}</span>`;
   }
   html += `</div>`;
   html += `</div>`;

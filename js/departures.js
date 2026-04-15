@@ -153,21 +153,21 @@ function renderDepartures() {
   const totalCount = entries.length;
 
   if (!visible.length) {
-    const platName = platFilter ? (() => { const n = getNode(sid); const p = (n?.platforms||[]).find(x=>x.id===platFilter); return p ? p.name : 'selected platform'; })() : '';
+    const platName = platFilter ? (() => { const n = getNode(sid); const p = (n?.platforms||[]).find(x=>x.id===platFilter); return p ? platDisplayName(p.name) : 'selected platform'; })() : '';
     board.innerHTML = `<div class="text-dim mt-16" style="font-size:13px;">${t('empty.no_services_at_time', { mode: isArr ? t('btn.arrivals').toLowerCase() : t('btn.departures').toLowerCase(), time: toTime(boardTime) })}</div>`;
     return;
   }
 
   const headerLabel = isArr ? t('btn.arrivals').toUpperCase() : t('btn.departures').toUpperCase();
   const dirLabel = isArr ? t('dep_board.col_origin') : t('dep_board.col_destination');
-  const platLabel = platFilter ? (() => { const n = getNode(sid); const p = (n?.platforms||[]).find(x=>x.id===platFilter); return p ? ' · ' + esc(p.name) : ''; })() : '';
+  const platLabel = platFilter ? (() => { const n = getNode(sid); const p = (n?.platforms||[]).find(x=>x.id===platFilter); return p ? ' · ' + esc(platDisplayName(p.name)) : ''; })() : '';
 
   board.innerHTML = `<div class="departure-board">
     <div class="departure-board-header"><h3>${headerLabel} — ${esc(nodeDisplayName(sid)).toUpperCase()}${platLabel}</h3>
       <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${t('dep_board.showing', { n: visible.length + (totalCount > BOARD_LIMIT ? ' / ' + totalCount : ''), time: toTime(boardTime) })}</span></div>
     <div class="departure-row departure-row-header"><div>${t('dep_board.col_time')}</div><div>${t('dep_board.col_mode')}</div><div>${dirLabel}</div><div>${t('dep_board.col_line')}</div><div>${t('dep_board.col_plt')}</div></div>
     ${visible.map(d => {
-      const platDisplay = d.platform.replace(/^[Pp]latform\s*/i, '');
+      const platDisplay = platDisplayName(d.platform);
       return `<div class="departure-row" onclick="showTrainSchedule('${d.depId}')">
       <div class="dep-time">${toTime(d.time)}</div>
       <div style="font-size:12px;color:var(--text-dim)">${esc(d.catAbbr)}</div>
@@ -325,9 +325,8 @@ function renderBoardMap() {
     // Draw highlighted line segments
     for (const [segId, color] of highlightSegs) {
       const s = getSeg(segId); if (!s) continue;
-      const a = getNode(s.nodeA), b = getNode(s.nodeB);
-      if (!a || !b || a.lat == null || b.lat == null) continue;
-      const coords = [[a.lat, a.lon], [b.lat, b.lon]];
+      const coords = segmentCoords(s);
+      if (coords.length < 2) continue;
       L.polyline(coords, { color: '#000', weight: 6, opacity: 0.8 }).addTo(map);
       L.polyline(coords, { color, weight: 4, opacity: 1 }).addTo(map);
     }

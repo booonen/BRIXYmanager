@@ -151,8 +151,8 @@ function showNodeDetail(id) {
 
   html += '<div class="detail-map-clear"></div>';
 
-  // Schematic (stations only)
-  if ((node.type === 'station' || node.type === 'junction') && conns.length > 0) {
+  // Schematic (stations, junctions, waypoints)
+  if ((node.type === 'station' || node.type === 'junction' || node.type === 'waypoint') && conns.length > 0) {
     const sch = node.schematic;
     html += `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('th.schematic')}</strong>`;
     if (sch && sch.tracks && sch.tracks.length > 0) {
@@ -183,38 +183,56 @@ function showNodeDetail(id) {
 
   // Init detail map
   if (hasGeo) {
-    // Find nearby passenger stops — look through junctions/waypoints
-    const nearbyStops = [];
+    // Find nearby passenger stops — BFS through junctions/waypoints, tracking segment paths
+    const nearbyStops = []; // { node, pathSegs: [seg, ...] }
     const visited = new Set([id]);
-    const queue = conns.map(c => c.nodeId);
-    while (queue.length) {
-      const nid = queue.shift();
+    const bfsQueue = connectedNodes(id).map(c => ({ nodeId: c.nodeId, segId: c.segId, pathSegs: [c.segId] }));
+    while (bfsQueue.length) {
+      const { nodeId: nid, pathSegs } = bfsQueue.shift();
       if (visited.has(nid)) continue;
       visited.add(nid);
       const n = getNode(nid);
       if (!n) continue;
-      if (isPassengerStop(n)) { nearbyStops.push(n); continue; }
+      if (isPassengerStop(n)) { nearbyStops.push({ node: n, pathSegs }); continue; }
       // Non-passenger node — look through it
-      for (const c of connectedNodes(nid)) { if (!visited.has(c.nodeId)) queue.push(c.nodeId); }
+      for (const c of connectedNodes(nid)) {
+        if (!visited.has(c.nodeId)) bfsQueue.push({ nodeId: c.nodeId, segId: c.segId, pathSegs: [...pathSegs, c.segId] });
+      }
     }
-    const adjNodes = nearbyStops.filter(n => n.lat != null);
+    const adjEntries = nearbyStops.filter(e => e.node.lat != null);
     detailMapInitGeo('dm-node', map => {
       _dmDrawBackground(map);
       // Highlight segments from focal node toward nearby stops
-      for (const adj of adjNodes) {
+      for (const entry of adjEntries) {
+        const adj = entry.node;
         if (node.lat == null) continue;
         // Find line color from services connecting these nodes
         const lineColors = data.services.filter(s => {
           const stops = s.stops.map(st => st.nodeId);
           return stops.includes(id) && stops.includes(adj.id);
         }).map(s => getGroup(s.groupId)?.color).filter(Boolean);
-        const color = lineColors.length ? lineColors[0] : '#888';
-        const coords = [[node.lat, node.lon], [adj.lat, adj.lon]];
+        // Concatenate segment geometries along the BFS path
+        let coords = [];
+        for (const segId of entry.pathSegs) {
+          const seg = getSeg(segId);
+          if (!seg) continue;
+          const sc = segmentCoords(seg);
+          if (!coords.length) { coords = [...sc]; }
+          else {
+            // Orient: if last coord of path is closer to sc's end, reverse sc
+            const last = coords[coords.length - 1];
+            const d0 = _ptDist(last, sc[0]);
+            const dE = _ptDist(last, sc[sc.length - 1]);
+            const oriented = dE < d0 ? [...sc].reverse() : sc;
+            coords.push(...oriented.slice(1));
+          }
+        }
+        if (coords.length < 2) coords = [[node.lat, node.lon], [adj.lat, adj.lon]];
         L.polyline(coords, { color: '#000', weight: 6, opacity: 0.8 }).addTo(map);
         L.polyline(coords, { color: '#fff', weight: 4, opacity: 0.95 }).addTo(map);
       }
       // Adjacent station dots + labels
-      for (const adj of adjNodes) { _dmStationDot(map, adj, {}); _dmLabel(map, adj); }
+      for (const entry of adjEntries) { _dmStationDot(map, entry.node, {}); _dmLabel(map, entry.node); }
       // Focal node (large, accent)
       _dmStationDot(map, node, { radius: 9, fill: '#ffc917', stroke: '#000', weight: 3 });
       _dmLabel(map, node);
@@ -225,7 +243,7 @@ function showNodeDetail(id) {
     const nodeSvcNodeIds = new Set([id]);
     for (const svc of data.services) {
       if (svc.stops.some(st => st.nodeId === id)) {
-        const stops = svc.stops.map(st => st.nodeId);
+        const stops = svc.stops.map(st => ({ nodeId: st.nodeId, passThrough: !!st.passThrough }));
         nodeSvcStopsList.push({ groupId: svc.groupId, stops });
         stops.forEach(nid => nodeSvcNodeIds.add(nid));
       }
@@ -237,7 +255,7 @@ function showNodeDetail(id) {
     const nodeSvcNodeIds2 = new Set([id]);
     for (const svc of data.services) {
       if (svc.stops.some(st => st.nodeId === id)) {
-        const stops = svc.stops.map(st => st.nodeId);
+        const stops = svc.stops.map(st => ({ nodeId: st.nodeId, passThrough: !!st.passThrough }));
         nodeSvcStopsList2.push({ groupId: svc.groupId, stops });
         stops.forEach(nid => nodeSvcNodeIds2.add(nid));
       }
@@ -288,6 +306,10 @@ function openNodeModal(id, hField) {
       </div>` : ''}
     </div>
     ${n && n.type === 'junction' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.junction_schematic")}</label>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
+      ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
+    </div>` : ''}
+    ${n && n.type === 'waypoint' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.waypoint_schematic")}</label>
       <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}`,
@@ -474,32 +496,33 @@ function schMultiSegSelect(sideSegs, selected, trackIdx, sideKey, nodeId) {
   let html = '';
   for (const sid of sideSegs) {
     const seg = getSeg(sid);
-    const nTracks = seg ? seg.tracks : 1;
+    const trkArr = Array.isArray(seg?.tracks) ? seg.tracks : [];
     const label = schSegLabel(sid, nodeId);
-    if (nTracks <= 1) {
+    if (trkArr.length <= 1) {
+      const tid = trkArr[0]?.id || '';
       const checked = (selected || []).some(s => s.segId === sid);
       html += `<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;margin-top:2px">
-        <input type="checkbox" ${checked ? 'checked' : ''} onchange="schToggleSeg(${trackIdx},'${sideKey}','${sid}',1,this.checked)">${esc(label)}</label>`;
+        <input type="checkbox" ${checked ? 'checked' : ''} onchange="schToggleSeg(${trackIdx},'${sideKey}','${sid}','${tid}',this.checked)">${esc(label)}</label>`;
     } else {
-      for (let tn = 1; tn <= nTracks; tn++) {
-        const checked = (selected || []).some(s => s.segId === sid && s.trackNum === tn);
+      for (const tk of trkArr) {
+        const checked = (selected || []).some(s => s.segId === sid && s.trackId === tk.id);
         html += `<label style="font-size:12px;display:flex;align-items:center;gap:4px;cursor:pointer;margin-top:2px">
-          <input type="checkbox" ${checked ? 'checked' : ''} onchange="schToggleSeg(${trackIdx},'${sideKey}','${sid}',${tn},this.checked)">${esc(label)} <span class="text-muted" style="font-size:10px">trk ${tn}</span></label>`;
+          <input type="checkbox" ${checked ? 'checked' : ''} onchange="schToggleSeg(${trackIdx},'${sideKey}','${sid}','${tk.id}',this.checked)">${esc(label)} <span class="text-muted" style="font-size:10px">${esc(tk.name)}</span></label>`;
       }
     }
   }
   return html;
 }
 
-function schToggleSeg(trackIdx, sideKey, segId, trackNum, checked) {
+function schToggleSeg(trackIdx, sideKey, segId, trackId, checked) {
   const trk = window._schData.tracks[trackIdx];
   if (!trk[sideKey]) trk[sideKey] = [];
   if (checked) {
-    if (!trk[sideKey].some(s => s.segId === segId && s.trackNum === trackNum)) {
-      trk[sideKey].push({ segId, trackNum });
+    if (!trk[sideKey].some(s => s.segId === segId && s.trackId === trackId)) {
+      trk[sideKey].push({ segId, trackId });
     }
   } else {
-    trk[sideKey] = trk[sideKey].filter(s => !(s.segId === segId && s.trackNum === trackNum));
+    trk[sideKey] = trk[sideKey].filter(s => !(s.segId === segId && s.trackId === trackId));
   }
 }
 
@@ -578,7 +601,7 @@ function schRenderSVG(node, sch, nodeId) {
   const MARGIN_R = Math.max(100, maxLabelB * 7 + 50);
 
   // For multi-track segments, determine how many tracks each segment has
-  const segTrackCount = (sid) => { const s = getSeg(sid); return s ? s.tracks : 1; };
+  const segTrackCountById = (sid) => segTrackCount(getSeg(sid));
 
   // Build platform regions — platforms on different tracks get stacked side-by-side, not overlapping
   // First, collect which track index each platform is on
@@ -662,7 +685,7 @@ function schRenderSVG(node, sch, nodeId) {
     const seg = getSeg(sid);
     const label = seg ? nodeName(seg.nodeA === nodeId ? seg.nodeB : seg.nodeA) : '?';
     const y = sideAYMap[sid] || MARGIN_T + 20;
-    const nTracks = segTrackCount(sid);
+    const nTracks = segTrackCountById(sid);
     // Draw multi-track stub lines
     for (let t = 0; t < nTracks; t++) {
       const offset = (t - (nTracks - 1) / 2) * SEG_TRACK_GAP;
@@ -676,7 +699,7 @@ function schRenderSVG(node, sch, nodeId) {
     const seg = getSeg(sid);
     const label = seg ? nodeName(seg.nodeA === nodeId ? seg.nodeB : seg.nodeA) : '?';
     const y = sideBYMap[sid] || MARGIN_T + 20;
-    const nTracks = segTrackCount(sid);
+    const nTracks = segTrackCountById(sid);
     for (let t = 0; t < nTracks; t++) {
       const offset = (t - (nTracks - 1) / 2) * SEG_TRACK_GAP;
       svg += `<line x1="${xStubB}" y1="${y + offset}" x2="${xStubB + STUB_LEN}" y2="${y + offset}" stroke="var(--text)" stroke-width="2" opacity="0.5"/>`;
@@ -732,16 +755,20 @@ function schRenderSVG(node, sch, nodeId) {
     // Branch lines to Side A segment tracks
     for (const conn of sideAConns) {
       const segY = sideAYMap[conn.segId] || y;
-      const nTracks = segTrackCount(conn.segId);
-      const offset = ((conn.trackNum - 1) - (nTracks - 1) / 2) * SEG_TRACK_GAP;
+      const cSeg = getSeg(conn.segId);
+      const nTracks = segTrackCount(cSeg);
+      const tIdx = Array.isArray(cSeg?.tracks) ? cSeg.tracks.findIndex(tk => tk.id === conn.trackId) : 0;
+      const offset = (Math.max(0, tIdx) - (nTracks - 1) / 2) * SEG_TRACK_GAP;
       svg += `<line x1="${xBranchA}" y1="${segY + offset}" x2="${xTrackStart}" y2="${y}" stroke="var(--text)" stroke-width="2" opacity="0.5"/>`;
     }
 
     // Branch lines to Side B segment tracks
     for (const conn of sideBConns) {
       const segY = sideBYMap[conn.segId] || y;
-      const nTracks = segTrackCount(conn.segId);
-      const offset = ((conn.trackNum - 1) - (nTracks - 1) / 2) * SEG_TRACK_GAP;
+      const cSeg = getSeg(conn.segId);
+      const nTracks = segTrackCount(cSeg);
+      const tIdx = Array.isArray(cSeg?.tracks) ? cSeg.tracks.findIndex(tk => tk.id === conn.trackId) : 0;
+      const offset = (Math.max(0, tIdx) - (nTracks - 1) / 2) * SEG_TRACK_GAP;
       svg += `<line x1="${xTrackEnd}" y1="${y}" x2="${xStubB}" y2="${segY + offset}" stroke="var(--text)" stroke-width="2" opacity="0.5"/>`;
     }
   }
@@ -755,7 +782,7 @@ function schRenderSVG(node, sch, nodeId) {
 // ============================================================
 const _segPrefixMap = {
   type: s => s.interchangeType || 'track',
-  tracks: s => s.interchangeType ? null : s.tracks,
+  tracks: s => s.interchangeType ? null : segTrackCount(s),
   speed: s => s.interchangeType ? null : s.maxSpeed,
   dist: s => s.distance,
   elec: s => s.interchangeType ? null : !!s.electrification,
@@ -781,7 +808,7 @@ function _segTraffic(s) {
 }
 const _segSortDefs = {
   from: s => nodeName(s.nodeA), to: s => nodeName(s.nodeB),
-  tracks: s => s.interchangeType ? null : s.tracks,
+  tracks: s => s.interchangeType ? null : segTrackCount(s),
   speed: s => s.interchangeType ? null : s.maxSpeed,
   distance: s => s.distance || 0,
   traffic: s => _segTraffic(s)
@@ -829,7 +856,7 @@ function renderSegments() {
       <td><strong class="clickable" onclick="showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))}</strong></td>
       <td><strong class="clickable" onclick="showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeB))}</strong></td>
       <td>${typeChip}</td>
-      <td class="mono">${ich || road ? '—' : s.tracks}</td>
+      <td class="mono">${ich || road ? '—' : segTrackCount(s)}</td>
       <td class="mono">${ich ? t('seg_detail.walk_time', { n: walkMins }) : s.maxSpeed + ' km/h'}</td>
       <td class="mono">${s.distance} km</td>
       <td>${ich || road ? '—' : (s.electrification?'⚡ '+t('seg_detail.electrified'):t('seg_detail.not_electrified'))}</td>
@@ -874,13 +901,16 @@ function showSegmentDetail(segId) {
           (from.nodeId === seg.nodeB && to.nodeId === seg.nodeA)) {
         const first = dep.times[0], last = dep.times[dep.times.length - 1];
         const cat = getCat(svc.categoryId);
+        const stopTrackId = svc.stops[i+1]?.trackId || null;
+        const tkName = stopTrackId && Array.isArray(seg.tracks) ? seg.tracks.find(tk => tk.id === stopTrackId)?.name : null;
         trains.push({
           depId: dep.id, svcId: svc.id, service: svc.name,
           enter: from.depart, exit: to.arrive,
           direction: `${nodeName(from.nodeId)} → ${nodeName(to.nodeId)}`,
           route: `${nodeName(first.nodeId)} → ${nodeName(last.nodeId)}`,
           catAbbr: cat?.abbreviation || cat?.name || '',
-          catColor: svcLineColor(svc)
+          catColor: svcLineColor(svc),
+          trackName: tkName
         });
       }
     }
@@ -910,11 +940,14 @@ function showSegmentDetail(segId) {
     <button class="close-detail" onclick="closeSegmentDetail()">✕</button></h3>
     ${seg.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(seg.description)}</p>` : ''}
     <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
-      ${road ? '' : `<span class="chip">${seg.tracks} track${seg.tracks>1?'s':''}</span>`}
+      ${road ? '' : `<span class="chip" title="${Array.isArray(seg.tracks) ? seg.tracks.map(tk => tk.name).join(', ') : ''}">${segTrackCount(seg)} track${segTrackCount(seg)>1?'s':''}</span>`}
+      ${!road && Array.isArray(seg.tracks) && seg.tracks.length > 0 ? seg.tracks.map(tk => `<span class="chip" style="font-size:10px">${esc(tk.name)}</span>`).join('') : ''}
       <span class="chip">${seg.maxSpeed} km/h</span>
       <span class="chip">${seg.distance} km</span>
       <span class="chip">~${travelMins} min</span>
       ${road ? '' : `<span class="chip">${seg.electrification?'⚡ '+t('seg_detail.electrified'):t('seg_detail.not_electrified')}</span>`}
+      ${seg.ogfWayIds?.length ? `<span class="chip" title="${esc(seg.ogfWayIds.join(', '))}">${t('seg_detail.ogf_ways', { n: seg.ogfWayIds.length, pts: seg.wayGeometry?.length || 0 })}</span>` : ''}
+      ${seg.allowedModes?.length ? seg.allowedModes.map(mid => { const c = getCat(mid); return c ? `<span class="chip" style="font-size:10px">${esc(c.name)}</span>` : ''; }).join('') : ''}
     </div>
     ${detailMapContainerHTML('dm-seg', nA?.lat != null && nB?.lat != null, detailMapHasBeck(segLineIds))}
     <button class="btn btn-sm mb-16" onclick="promptInsertWaypoint('${segId}')" title="${t('tooltip.insert_waypoint')}">✂ ${t('modal.insert_waypoint')}</button>`;
@@ -938,20 +971,25 @@ function showSegmentDetail(segId) {
         if (!svcSet.has(svc.id)) {
           const cat = getCat(svc.categoryId);
           const depCount = data.departures.filter(d => d.serviceId === svc.id).length;
+          const stopTkId = svc.stops[i+1]?.trackId;
+          const tkName = stopTkId && Array.isArray(seg.tracks) ? seg.tracks.find(tk => tk.id === stopTkId)?.name : null;
           svcSet.set(svc.id, { svc, cat, depCount,
             direction: `${nodeName(a)} → ${nodeName(b)}`,
-            route: `${nodeName(svc.stops[0].nodeId)} → ${nodeName(svc.stops[svc.stops.length-1].nodeId)}`
+            route: `${nodeName(svc.stops[0].nodeId)} → ${nodeName(svc.stops[svc.stops.length-1].nodeId)}`,
+            trackName: tkName
           });
         }
       }
     }
   }
 
+  const hasMultiTrack = segTrackCount(seg) > 1;
   if (svcSet.size) {
-    html += `<table class="schedule-table mt-8 mb-16"><thead><tr><th>Service</th><th>Cat.</th><th>${t("th.route")}</th><th>${t("th.direction")}</th><th>${t("th.depart")}</th></tr></thead><tbody>` +
+    html += `<table class="schedule-table mt-8 mb-16"><thead><tr><th>Service</th><th>Cat.</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("th.route")}</th><th>${t("th.direction")}</th><th>${t("th.depart")}</th></tr></thead><tbody>` +
       Array.from(svcSet.values()).map(s => `<tr>
         <td><span class="clickable" onclick="showServiceDetail('${s.svc.id}')">${esc(s.svc.name)}</span></td>
         <td>${s.cat ? `<span class="chip" style="font-size:10px"><span class="dot" style="background:${svcLineColor(s.svc)}"></span>${esc(s.cat.abbreviation||s.cat.name)}</span>` : '—'}</td>
+        ${hasMultiTrack ? `<td class="mono" style="font-size:11px">${s.trackName ? esc(s.trackName) : '—'}</td>` : ''}
         <td class="text-dim" style="font-size:12px">${esc(s.route)}</td>
         <td class="text-dim" style="font-size:12px">${esc(s.direction)}</td>
         <td class="mono">${s.depCount}</td>
@@ -961,12 +999,13 @@ function showSegmentDetail(segId) {
   html += `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Trains on this segment (${trains.length})</strong>`;
 
   if (trains.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>Enter</th><th>Exit</th><th>Cat.</th><th>Service</th><th>${t("th.direction")}</th><th>${t("th.route")}</th></tr></thead><tbody>` +
+    html += `<table class="schedule-table mt-8"><thead><tr><th>Enter</th><th>Exit</th><th>Cat.</th><th>Service</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("th.direction")}</th><th>${t("th.route")}</th></tr></thead><tbody>` +
       trains.map(t => `<tr>
         <td style="color:var(--warn)">${toTime(t.enter)}</td>
         <td>${toTime(t.exit)}</td>
         <td><span class="chip" style="font-size:10px"><span class="dot" style="background:${t.catColor}"></span>${esc(t.catAbbr)}</span></td>
         <td><span class="clickable" onclick="showServiceDetail('${t.svcId}')">${esc(t.service)}</span></td>
+        ${hasMultiTrack ? `<td class="mono" style="font-size:11px">${t.trackName ? esc(t.trackName) : '—'}</td>` : ''}
         <td class="text-dim">${esc(t.direction)}</td>
         <td class="text-dim" style="font-size:11px">${esc(t.route)}</td>
       </tr>`).join('') + '</tbody></table>';
@@ -980,10 +1019,10 @@ function showSegmentDetail(segId) {
   if (nA?.lat != null && nB?.lat != null) {
     const segLines = [...segLineIds].map(gid => getGroup(gid)).filter(Boolean);
     const segColor = segLines.length ? segLines[0].color : '#ffc917';
-    const _segA = nA, _segB = nB, _segColor = segColor || '#ffc917', _segId = seg.id;
+    const _seg = seg, _segA = nA, _segB = nB, _segColor = segColor || '#ffc917', _segId = seg.id;
     detailMapInitGeo('dm-seg', map => {
       _dmDrawBackground(map, [_segId]);
-      L.polyline([[_segA.lat, _segA.lon], [_segB.lat, _segB.lon]], { color: _segColor, weight: 6, opacity: 1 }).addTo(map);
+      L.polyline(segmentCoords(_seg), { color: _segColor, weight: 6, opacity: 1 }).addTo(map);
       _dmStationDot(map, _segA, { radius: 8, fill: '#fff', stroke: '#222', weight: 3 });
       _dmStationDot(map, _segB, { radius: 8, fill: '#fff', stroke: '#222', weight: 3 });
       _dmLabel(map, _segA); _dmLabel(map, _segB);
@@ -1003,11 +1042,17 @@ function closeSegmentDetail() { detailMapDestroy('dm-seg'); document.getElementB
 // Sticky segment defaults — remembered per segment type
 let _lastSegType = ''; // '' = track, 'road', 'osi'
 const _lastSegDefaults = {
-  track: { tracks: '', maxSpeed: '', electrification: true, refCode: '' },
+  track: { trackCount: 2, maxSpeed: '', electrification: true, refCode: '' },
   road: { maxSpeed: '', refCode: '' },
   interchange: { ichType: 'osi' }
 };
 
+function addSegTrackRow() {
+  const list = document.getElementById('seg-track-list'); const num = list.children.length + 1;
+  list.insertAdjacentHTML('beforeend', `<div class="flex items-center gap-8 mb-4">
+    <input type="text" value="Track ${num}" class="seg-track-name" style="flex:1">
+    <button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">✕</button></div>`);
+}
 function segTypeChanged(val) {
   const trackFields = document.getElementById('seg-track-fields');
   const ichFields = document.getElementById('seg-interchange-fields');
@@ -1035,7 +1080,11 @@ function openSegmentModal(id, hField) {
   const td = _lastSegDefaults.track;
   const rd = _lastSegDefaults.road;
   const id_ = _lastSegDefaults.interchange;
-  const defTracks = s?.tracks ?? td.tracks ?? '';
+  const defTrackCount = s ? segTrackCount(s) : (td.trackCount ?? 2);
+  const defTrackRows = s && Array.isArray(s.tracks) ? s.tracks.map(tk =>
+    `<div class="flex items-center gap-8 mb-4"><input type="text" value="${esc(tk.name)}" class="seg-track-name" style="flex:1" data-tid="${esc(tk.id)}"><button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">✕</button></div>`).join('')
+    : Array.from({length: defTrackCount}, (_, i) =>
+    `<div class="flex items-center gap-8 mb-4"><input type="text" value="Track ${i+1}" class="seg-track-name" style="flex:1"><button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">✕</button></div>`).join('');
   const defSpeed = s?.maxSpeed ?? (segTypeVal === 'road' ? rd.maxSpeed : td.maxSpeed) ?? '';
   const defElec = s ? s.electrification : td.electrification;
   const defRef = s?.refCode ?? (segTypeVal === 'road' ? rd.refCode : td.refCode) ?? '';
@@ -1052,8 +1101,7 @@ function openSegmentModal(id, hField) {
       <div class="form-group"><label>${t('field.to_node')}</label><div id="seg-node-b-picker"></div></div>
     </div>
     <div id="seg-track-fields" style="${isInterchange==='osi'||isInterchange==='isi'?'display:none':''}">
-      <div class="form-row-3">
-        <div class="form-group" id="seg-tracks-group"><label>${t('field.tracks')}</label><input type="number" id="f-sTr" value="${defTracks}" min="1" max="10"></div>
+      <div class="form-row">
         <div class="form-group"><label>${t('field.max_speed')}</label><input type="number" id="f-sSp" value="${defSpeed}" min="1"></div>
         <div class="form-group"><label>${t('field.distance')}</label><input type="number" id="f-sDi" value="${s?.distance||''}" min="0.1" step="0.1"></div>
       </div>
@@ -1063,6 +1111,30 @@ function openSegmentModal(id, hField) {
             <input type="checkbox" id="f-sEl" ${defElec?'checked':''}>${t('field.electrified_label')}</label>
         </div>
         <div class="form-group"><label>${t('field.ref_code')}</label><input type="text" id="f-sRef" value="${esc(s ? (s.refCode||'') : defRef)}" placeholder="${t('placeholder.eg_seg_ref')}"></div>
+      </div>
+      <div class="form-group">
+        <label>${t('field.ogf_way_ids')}</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="f-sOgfWays" value="${esc(s?.ogfWayIds?.length ? s.ogfWayIds.join(', ') : '')}" placeholder="${t('placeholder.eg_ogf_ways')}" style="flex:1" oninput="this.value=this.value.replace(/\\bway\\s*/gi,'')">
+          <button type="button" class="btn btn-sm" onclick="fetchSegWayGeometry()">Fetch</button>
+        </div>
+        <p class="text-dim" style="font-size:11px;margin-top:4px" id="seg-way-status">${s?.wayGeometry?.length ? t('seg_detail.ogf_ways', { n: s.ogfWayIds?.length || '?', pts: s.wayGeometry.length }) : ''}</p>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:6px;cursor:pointer;text-transform:none;font-weight:400">
+          <input type="checkbox" id="f-sAutoTrim" checked>${t('field.auto_trim')}</label>
+      </div>
+      ${data.categories.length ? `<div class="form-group">
+        <label>${t('field.allowed_modes')}</label>
+        <div style="display:flex;flex-wrap:wrap;gap:8px">${data.categories.map(c => {
+          const checked = s?.allowedModes?.length ? s.allowedModes.includes(c.id) : false;
+          return `<label style="font-size:12px;display:flex;align-items:center;gap:3px;cursor:pointer">
+            <input type="checkbox" class="seg-allowed-mode" value="${c.id}" ${checked?'checked':''}>${esc(c.name)}</label>`;
+        }).join('')}</div>
+        <p class="text-dim" style="font-size:11px;margin-top:4px">${t('field.allowed_modes_help')}</p>
+      </div>` : ''}
+      <div class="form-group" id="seg-tracks-group">
+        <label>${t('field.tracks')}</label>
+        <div id="seg-track-list">${defTrackRows}</div>
+        <button type="button" class="btn btn-sm mt-4" onclick="addSegTrackRow()">+ ${t('btn.add_track')}</button>
       </div>
     </div>
     <div id="seg-interchange-fields" style="${isInterchange==='osi'||isInterchange==='isi'?'':'display:none'}">
@@ -1081,6 +1153,9 @@ function openSegmentModal(id, hField) {
      <button class="btn btn-primary" onclick="saveSegment()">${s?t('btn.save'):t('btn.add_segment')}</button>`);
   if (hField) highlightField(hField);
   segTypeChanged(document.getElementById('f-sType').value);
+
+  // Init way geometry temp state (preserve existing if editing)
+  window._segWayGeometry = s?.wayGeometry || null;
 
   // Walk time calculator
   const walkInput = document.getElementById('f-sIDi');
@@ -1116,13 +1191,74 @@ function openSegmentModal(id, hField) {
       filterFn: getFilter(typeSelect.value), onEnterSelect: segEnterB });
   });
 }
-function saveSegment() {
+async function fetchSegWayGeometry() {
+  const raw = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '');
+  const ids = raw.split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
+  if (!ids.length) { toast(t('toast.way_fetch_none'), 'error'); return false; }
+  toast(t('toast.way_fetching'), 'success');
+  try {
+    const result = await fetchWayGeometry(ids);
+    if (!result || !result.coords?.length) { toast(t('toast.way_fetch_none'), 'error'); return false; }
+    let coords = result.coords;
+
+    // Auto-trim: snap endpoints to polyline and slice
+    const autoTrim = document.getElementById('f-sAutoTrim')?.checked;
+    if (autoTrim) {
+      const nAId = nodePickerGetValue('np-segA'), nBId = nodePickerGetValue('np-segB');
+      const nA = nAId ? getNode(nAId) : null, nB = nBId ? getNode(nBId) : null;
+      if (nA?.lat != null && nB?.lat != null) {
+        const snapA = _snapToPolyline([nA.lat, nA.lon], coords);
+        const snapB = _snapToPolyline([nB.lat, nB.lon], coords);
+        // Warn if snap distance > 50m
+        if (snapA.dist > 0.05) toast(t('toast.snap_warn', { name: nA.name, m: Math.round(snapA.dist * 1000) }), 'error');
+        if (snapB.dist > 0.05) toast(t('toast.snap_warn', { name: nB.name, m: Math.round(snapB.dist * 1000) }), 'error');
+        coords = _slicePolyline(coords, snapA, snapB);
+      }
+    }
+
+    window._segWayGeometry = coords;
+    // Auto-fill distance and speed only if empty (preserve user-entered values)
+    const km = haversineDistance(coords);
+    const distInput = document.getElementById('f-sDi');
+    if (distInput && !parseFloat(distInput.value)) distInput.value = km;
+    if (result.maxSpeed) {
+      const speedInput = document.getElementById('f-sSp');
+      if (speedInput && !parseInt(speedInput.value)) speedInput.value = result.maxSpeed;
+    }
+    if (result.speedsConflict) {
+      toast(t('toast.way_speed_conflict'), 'error');
+    }
+    // Update status label
+    const status = document.getElementById('seg-way-status');
+    if (status) status.textContent = t('toast.way_fetch_ok', { n: coords.length, km });
+    toast(t('toast.way_fetch_ok', { n: coords.length, km }), 'success');
+    return true;
+  } catch (err) {
+    console.error('Way fetch error:', err);
+    toast(t('toast.way_fetch_error', { msg: err.message }), 'error');
+    return false;
+  }
+}
+async function saveSegment() {
   const nodeA = nodePickerGetValue('np-segA'), nodeB = nodePickerGetValue('np-segB');
   if (!nodeA || !nodeB) { toast(t('toast.select_both_nodes'), 'error'); return; }
   if (nodeA === nodeB) { toast(t('toast.nodes_must_differ'), 'error'); return; }
   const segType = document.getElementById('f-sType').value;
   _lastSegType = segType;
   const description = document.getElementById('f-sDesc').value.trim();
+
+  // Collect allowed modes (empty = all allowed)
+  const allowedModes = [];
+  document.querySelectorAll('.seg-allowed-mode:checked').forEach(cb => allowedModes.push(cb.value));
+
+  // Auto-fetch way geometry if IDs present but not yet fetched
+  if (segType !== 'osi') {
+    const wayRaw = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '');
+    const hasWayIds = wayRaw.split(/[,\n\s]+/).some(s => parseInt(s.trim()) > 0);
+    if (hasWayIds && !window._segWayGeometry) {
+      await fetchSegWayGeometry();
+    }
+  }
 
   if (segType === 'osi') {
     // Interchange segment
@@ -1131,7 +1267,7 @@ function saveSegment() {
     const ichType = document.getElementById('f-sIchType')?.value || 'osi';
     _lastSegDefaults.interchange.ichType = ichType;
     const existing = editingId ? getSeg(editingId) : null;
-    const obj = { nodeA, nodeB, distance, interchangeType: ichType, tracks: existing?.tracks || 0, maxSpeed: existing?.maxSpeed || 0, electrification: existing?.electrification || false, refCode: existing?.refCode || '', description };
+    const obj = { nodeA, nodeB, distance, interchangeType: ichType, tracks: existing?.tracks || [], maxSpeed: existing?.maxSpeed || 0, electrification: existing?.electrification || false, refCode: existing?.refCode || '', description };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.interchange_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.interchange_added'), 'success'); }
   } else if (segType === 'road') {
@@ -1143,21 +1279,31 @@ function saveSegment() {
     const refCode = document.getElementById('f-sRef').value.trim();
     _lastSegDefaults.road.maxSpeed = maxSpeed;
     _lastSegDefaults.road.refCode = refCode;
-    const obj = { nodeA, nodeB, tracks: 0, maxSpeed, distance, electrification: false, refCode, description, interchangeType: 'road' };
+    const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
+    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
+    const obj = { nodeA, nodeB, tracks: [], maxSpeed, distance, electrification: false, refCode, description, interchangeType: 'road', ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
   } else {
-    // Track segment
-    const tracks = parseInt(document.getElementById('f-sTr').value) || 2;
+    // Track segment — collect named tracks from list editor
+    const existing = editingId ? getSeg(editingId) : null;
+    const tracks = [];
+    document.querySelectorAll('#seg-track-list .seg-track-name').forEach((inp, idx) => {
+      const name = inp.value.trim(); if (!name) return;
+      const tid = inp.dataset.tid || (existing?.tracks?.[idx]?.id) || uid();
+      tracks.push({ id: tid, name });
+    });
+    if (tracks.length < 1) { toast(t('toast.tracks_min_one'), 'error'); return; }
     const maxSpeed = parseInt(document.getElementById('f-sSp').value) || 120;
     const distance = parseFloat(document.getElementById('f-sDi').value) || 0;
     if (distance <= 0) { toast(t('toast.dist_positive'), 'error'); return; }
-    if (tracks < 1) { toast(t('toast.tracks_min_one'), 'error'); return; }
     if (maxSpeed < 1) { toast(t('toast.speed_positive'), 'error'); return; }
     const electrification = document.getElementById('f-sEl').checked;
     const refCode = document.getElementById('f-sRef').value.trim();
-    _lastSegDefaults.track = { tracks, maxSpeed, electrification, refCode };
-    const obj = { nodeA, nodeB, tracks, maxSpeed, distance, electrification, refCode, description, interchangeType: null };
+    _lastSegDefaults.track = { trackCount: tracks.length, maxSpeed, electrification, refCode };
+    const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
+    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
+    const obj = { nodeA, nodeB, tracks, maxSpeed, distance, electrification, refCode, description, interchangeType: null, ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
   }
@@ -1232,7 +1378,7 @@ function insertWaypoint(segId) {
   const newSegId = uid();
   data.segments.push({
     id: newSegId, nodeA: wpId, nodeB: origNodeB,
-    tracks: seg.tracks, maxSpeed: seg.maxSpeed, distance: remainDist,
+    tracks: Array.isArray(seg.tracks) ? seg.tracks.map(tk => ({ id: uid(), name: tk.name })) : [], maxSpeed: seg.maxSpeed, distance: remainDist,
     electrification: seg.electrification, interchangeType: seg.interchangeType,
     refCode: '', description: ''
   });
@@ -1423,9 +1569,8 @@ function showLineDetail(id) {
       // Draw line segments highlighted
       for (const sid of _segIds) {
         const s = getSeg(sid); if (!s) continue;
-        const a = getNode(s.nodeA), b = getNode(s.nodeB);
-        if (!a || !b || a.lat == null || b.lat == null) continue;
-        const coords = [[a.lat, a.lon], [b.lat, b.lon]];
+        const coords = segmentCoords(s);
+        if (coords.length < 2) continue;
         L.polyline(coords, { color: '#000', weight: 6, opacity: 0.8 }).addTo(map);
         L.polyline(coords, { color: lineColor, weight: 4, opacity: 1 }).addTo(map);
       }
@@ -1750,8 +1895,8 @@ const _svcPrefixMap = {
   stop: s => s.stops.map(st => nodeName(st.nodeId)).join(' '),
   deps: s => data.departures.filter(d => d.serviceId === s.id).length,
   desc: s => s.description,
-  length: s => { let d = 0; for (let i = 0; i < s.stops.length - 1; i++) { const seg = findSeg(s.stops[i].nodeId, s.stops[i+1].nodeId); if (seg) d += seg.distance; } return Math.round(d * 10) / 10; },
-  duration: s => { let t = 0; for (let i = 0; i < s.stops.length - 1; i++) { t += travelTime(s.stops[i].nodeId, s.stops[i+1].nodeId); } return Math.round(t); }
+  length: s => { let d = 0; for (let i = 0; i < s.stops.length - 1; i++) { const seg = findSegByTrack(s.stops[i].nodeId, s.stops[i+1].nodeId, s.stops[i+1]?.trackId); if (seg) d += seg.distance; } return Math.round(d * 10) / 10; },
+  duration: s => { let t = 0; for (let i = 0; i < s.stops.length - 1; i++) { const seg = findSegByTrack(s.stops[i].nodeId, s.stops[i+1].nodeId, s.stops[i+1]?.trackId); if (seg) t += calcSegmentTime(seg.distance, seg.maxSpeed, 0, 0, DEFAULT_ACCEL()); } return Math.round(t); }
 };
 const _svcSortDefs = {
   name: s => s.name,
@@ -1978,8 +2123,8 @@ function showServiceDetail(svcId) {
       const dwell = (!st.passThrough && st.dwell) ? ` <span class="text-muted">${st.dwell}s</span>` : '';
       let segInfo = '';
       if (i < svc.stops.length - 1) {
-        const seg = findSeg(st.nodeId, svc.stops[i+1].nodeId);
-        if (seg) segInfo = `<div style="padding:2px 0 2px 16px;font-size:11px;color:var(--text-muted)">│ ${seg.distance}km · ${seg.maxSpeed}km/h · ~${travelTime(st.nodeId, svc.stops[i+1].nodeId).toFixed(1)}min</div>`;
+        const seg = findSegByTrack(st.nodeId, svc.stops[i+1].nodeId, svc.stops[i+1]?.trackId);
+        if (seg) segInfo = `<div style="padding:2px 0 2px 16px;font-size:11px;color:var(--text-muted)">│ ${seg.distance}km · ${seg.maxSpeed}km/h · ~${(calcSegmentTime(seg.distance, seg.maxSpeed, 0, 0, DEFAULT_ACCEL())).toFixed(1)}min</div>`;
       }
       return `<div style="font-size:13px"><span class="mono text-muted" style="margin-right:6px">${i+1}.</span><strong>${esc(label)}</strong>${plat}${pass}${dwell}</div>${segInfo}`;
     }).join('') + '</div></div>';
@@ -2018,9 +2163,12 @@ function showServiceDetail(svcId) {
       _dmDrawBackground(map);
       // Draw service route
       for (let i = 0; i < svc.stops.length - 1; i++) {
-        const a = getNode(svc.stops[i].nodeId), b = getNode(svc.stops[i+1].nodeId);
-        if (!a || !b || a.lat == null || b.lat == null) continue;
-        const coords = [[a.lat, a.lon], [b.lat, b.lon]];
+        const seg = findSegByTrack(svc.stops[i].nodeId, svc.stops[i+1].nodeId, svc.stops[i+1]?.trackId);
+        const coords = seg ? segmentCoordsDirected(seg, svc.stops[i].nodeId) : (() => {
+          const a = getNode(svc.stops[i].nodeId), b = getNode(svc.stops[i+1].nodeId);
+          return (a?.lat != null && b?.lat != null) ? [[a.lat, a.lon], [b.lat, b.lon]] : [];
+        })();
+        if (coords.length < 2) continue;
         L.polyline(coords, { color: '#000', weight: 6, opacity: 0.8 }).addTo(map);
         L.polyline(coords, { color: svcColor, weight: 4, opacity: 1 }).addTo(map);
       }
@@ -2040,12 +2188,12 @@ function showServiceDetail(svcId) {
       _dmFitNodes(map, svcStopNodes);
     });
     const svcNodeSet = new Set(svc.stops.map(st => st.nodeId));
-    const svcStopsList = [{ groupId: svc.groupId, stops: svc.stops.map(st => st.nodeId) }];
+    const svcStopsList = [{ groupId: svc.groupId, stops: svc.stops.map(st => ({ nodeId: st.nodeId, passThrough: !!st.passThrough })) }];
     if (svcBeck) detailMapSetBeck('dm-svc', svcGroupSet, svcNodeSet, 'service', svcStopsList);
   } else if (svcBeck) {
     _detailMaps['dm-svc'] = {};
     const svcNodeSet2 = new Set(svc.stops.map(st => st.nodeId));
-    const svcStopsList2 = [{ groupId: svc.groupId, stops: svc.stops.map(st => st.nodeId) }];
+    const svcStopsList2 = [{ groupId: svc.groupId, stops: svc.stops.map(st => ({ nodeId: st.nodeId, passThrough: !!st.passThrough })) }];
     detailMapSetBeck('dm-svc', svcGroupSet, svcNodeSet2, 'service', svcStopsList2);
     const svgEl = document.getElementById('dm-svc-beck');
     if (svgEl) renderMiniBeck(svgEl, { focusGroupIds: svcGroupSet, focusNodeIds: svcNodeSet2, mode: 'service', svcStopsList: svcStopsList2 });
@@ -2276,11 +2424,7 @@ function renderRouteBuilder() {
     if (connToFirst.length) {
       prependContainer.innerHTML = `<select onchange="prependRouteStop(this.value);this.value='';" style="width:100%">
         <option value="">— Prepend before ${esc(nodeName(firstNodeId))}… —</option>
-        ${connToFirst.map(c => {
-          const seg = getSeg(c.segId);
-          const n = getNode(c.nodeId);
-          return `<option value="${c.nodeId}">${esc(n?.name||'???')} (${n?.type ? t('type.'+n.type) : '?'}) via ${seg.distance}km segment</option>`;
-        }).join('')}
+        ${_routeTrackOptions(connToFirst)}
       </select>`;
     }
   }
@@ -2324,13 +2468,29 @@ function renderRouteBuilder() {
       })()}
     </div>`;
 
-    // Show segment info between stops
+    // Show segment info between stops (track-focused, with reassignment dropdown)
     if (i < stops.length - 1) {
-      const seg = findSeg(stop.nodeId, stops[i+1].nodeId);
+      const nextStop = stops[i+1];
+      const allSegs = findSegs(stop.nodeId, nextStop.nodeId).filter(s => !isInterchange(s));
+      const seg = nextStop.trackId ? findSegByTrack(stop.nodeId, nextStop.nodeId, nextStop.trackId) : allSegs[0];
       if (seg) {
-        html += `<div class="route-step" style="border:none;padding:2px 0;">
-          <span class="step-num" style="font-size:10px">│</span>
-          <div class="text-muted" style="font-size:11px">${esc(nodeName(seg.nodeA))} — ${esc(nodeName(seg.nodeB))} · ${seg.distance}km · ${seg.maxSpeed}km/h · ~${travelTime(stop.nodeId, stops[i+1].nodeId).toFixed(1)}min</div>
+        const trkArr = Array.isArray(seg.tracks) ? seg.tracks : [];
+        let trackLabel;
+        if (trkArr.length <= 1) {
+          const tkName = trkArr[0]?.name;
+          trackLabel = tkName ? `<span style="color:var(--accent);font-weight:500">${esc(tkName)}</span>` : '';
+        } else {
+          // Dropdown to reassign track
+          trackLabel = `<select onchange="window._routeStops[${i+1}].trackId=this.value;renderRouteBuilder()" style="font-size:11px;padding:1px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--accent);font-weight:500">`;
+          trackLabel += `<option value="" ${!nextStop.trackId ? 'selected' : ''}>${t('field.no_track_assigned')}</option>`;
+          for (const tk of trkArr) {
+            trackLabel += `<option value="${tk.id}" ${nextStop.trackId === tk.id ? 'selected' : ''}>${esc(tk.name)}</option>`;
+          }
+          trackLabel += `</select>`;
+        }
+        html += `<div class="route-step" style="border:none;padding:2px 0 2px 4px;">
+          <span class="step-num" style="font-size:10px;opacity:0.4">↓</span>
+          <div style="font-size:11px">${trackLabel}${trackLabel ? ' · ' : ''}${seg.distance}km · ${seg.maxSpeed}km/h · <span class="text-muted">~${calcSegmentTime(seg.distance, seg.maxSpeed, 0, 0, DEFAULT_ACCEL()).toFixed(1)}min</span></div>
         </div>`;
       }
     }
@@ -2348,34 +2508,79 @@ function renderRouteBuilder() {
   if (connected.length) {
     addContainer.innerHTML = `<select onchange="addRouteStop(this.value);this.value='';" style="width:100%">
       <option value="">${t('seg.extend_to')}</option>
-      ${connected.map(c => {
-        const seg = getSeg(c.segId);
-        const n = getNode(c.nodeId);
-        return `<option value="${c.nodeId}">${esc(n?.name||'???')} (${n?.type ? t('type.'+n.type) : '?'}) via ${seg.distance}km segment</option>`;
-      }).join('')}
+      ${_routeTrackOptions(connected)}
     </select>`;
   } else {
     addContainer.innerHTML = '<div class="text-dim" style="font-size:12px">No further connections from this node.</div>';
   }
 }
 
-function addRouteStop(nodeId) {
-  if (!nodeId) return;
+// Build dropdown options with per-track entries for multi-track segments
+// Filters out segments that don't allow the current service's mode
+function _routeTrackOptions(connections) {
+  const currentModeId = document.getElementById('f-svC')?.value || '';
+  const opts = [];
+  for (const c of connections) {
+    const seg = getSeg(c.segId);
+    // Skip segments that restrict this mode
+    if (currentModeId && seg?.allowedModes?.length && !seg.allowedModes.includes(currentModeId)) continue;
+    const n = getNode(c.nodeId);
+    const nLabel = esc(n?.name || '???');
+    const nType = n?.type ? t('type.' + n.type) : '?';
+    const trkArr = Array.isArray(seg?.tracks) ? seg.tracks : [];
+    if (trkArr.length <= 1) {
+      // Single-track or no tracks: one option, auto-assign track
+      const tid = trkArr[0]?.id || '';
+      opts.push(`<option value="${c.nodeId}::${c.segId}::${tid}">${nLabel} (${nType}) via ${seg.distance}km</option>`);
+    } else {
+      // Multi-track: one option per track
+      for (const tk of trkArr) {
+        opts.push(`<option value="${c.nodeId}::${c.segId}::${tk.id}">${nLabel} (${nType}) via ${esc(tk.name)} · ${seg.distance}km</option>`);
+      }
+    }
+  }
+  return opts.join('');
+}
+
+// Find eligible platforms based on schematic connection to incoming track
+function _autoSelectPlatform(node, segId, trackId) {
+  if (!node || !isPassengerStop(node)) return null;
+  const plats = node.platforms || [];
+  if (plats.length === 1) return plats[0].id;
+  if (!node.schematic?.tracks?.length || !segId || !trackId) return null;
+  // Find station tracks connected to this segment track, collect their platforms
+  const eligible = new Set();
+  for (const trk of node.schematic.tracks) {
+    for (const side of ['sideA', 'sideB', 'sideC', 'sideD']) {
+      for (const c of (trk[side] || [])) {
+        if (c.segId === segId && c.trackId === trackId) {
+          for (const pid of (trk.platformIds || [])) eligible.add(pid);
+        }
+      }
+    }
+  }
+  if (eligible.size === 1) return [...eligible][0];
+  return null; // Multiple or none — let user choose
+}
+
+function addRouteStop(encoded) {
+  if (!encoded) return;
+  const [nodeId, segId, trackId] = encoded.split('::');
   const node = getNode(nodeId);
   const autoPass = node && !isPassengerStop(node);
-  const autoPlatform = (node?.platforms?.length === 1) ? node.platforms[0].id : null;
-  window._routeStops.push({ nodeId, platformId: autoPlatform, dwell: null, passThrough: autoPass });
+  const autoPlatform = _autoSelectPlatform(node, segId, trackId);
+  window._routeStops.push({ nodeId, platformId: autoPlatform, dwell: null, passThrough: autoPass, trackId: trackId || null });
   renderRouteBuilder();
-  // Scroll modal to the bottom so the "extend to" dropdown is fully visible
   const modalBody = document.querySelector('.modal-body');
   if (modalBody) modalBody.scrollTop = modalBody.scrollHeight;
 }
-function prependRouteStop(nodeId) {
-  if (!nodeId) return;
+function prependRouteStop(encoded) {
+  if (!encoded) return;
+  const [nodeId, segId, trackId] = encoded.split('::');
   const node = getNode(nodeId);
   const autoPass = node && !isPassengerStop(node);
-  const autoPlatform = (node?.platforms?.length === 1) ? node.platforms[0].id : null;
-  window._routeStops.unshift({ nodeId, platformId: autoPlatform, dwell: null, passThrough: autoPass });
+  const autoPlatform = _autoSelectPlatform(node, segId, trackId);
+  window._routeStops.unshift({ nodeId, platformId: autoPlatform, dwell: null, passThrough: autoPass, trackId: trackId || null });
   renderRouteBuilder();
 }
 function removeRouteStop(idx) {
@@ -2435,8 +2640,54 @@ function reverseService(id) {
   reversed.id = uid();
   reversed.name = svc.name + ' (rev)';
   reversed.stops = reversed.stops.slice().reverse();
-  // Clear platform assignments on reverse (they may not apply in the other direction)
-  reversed.stops.forEach(s => { s.platformId = null; });
+
+  // Track assignment: trackId lives on the DESTINATION stop of each segment.
+  // Original A→B→C→D: stops[1].trackId = A→B track, stops[2] = B→C, stops[3] = C→D.
+  // Reversed D→C→B→A: leg 0 (D→C) needs opposite of C→D track = stops[3].trackId.
+  // Leg i destination in reversed needs opposite of original stops[len-1-i].trackId.
+  for (let i = 0; i < reversed.stops.length - 1; i++) {
+    const revDest = reversed.stops[i + 1]; // destination of this leg in reversed
+    const origIdx = svc.stops.length - 1 - i; // original stop that held this leg's track
+    const origTrackId = origIdx >= 1 ? svc.stops[origIdx]?.trackId : null;
+
+    const segs = findSegs(reversed.stops[i].nodeId, revDest.nodeId).filter(s => !isInterchange(s));
+    if (segs.length === 1) {
+      const trkArr = Array.isArray(segs[0].tracks) ? segs[0].tracks : [];
+      if (trkArr.length === 2 && origTrackId) {
+        const opposite = trkArr.find(tk => tk.id !== origTrackId);
+        revDest.trackId = opposite ? opposite.id : trkArr[0].id;
+      } else if (trkArr.length === 1) {
+        revDest.trackId = trkArr[0].id;
+      } else {
+        revDest.trackId = null;
+      }
+    } else {
+      revDest.trackId = null;
+    }
+  }
+
+  // Platform assignment
+  for (let i = 0; i < reversed.stops.length; i++) {
+    const stop = reversed.stops[i];
+    const origStop = svc.stops[svc.stops.length - 1 - i];
+    const node = getNode(stop.nodeId);
+    if (node && isPassengerStop(node)) {
+      const plats = node.platforms || [];
+      if (plats.length === 2 && origStop.platformId) {
+        const opposite = plats.find(p => p.id !== origStop.platformId);
+        stop.platformId = opposite ? opposite.id : null;
+      } else if (plats.length === 1) {
+        stop.platformId = plats[0].id;
+      } else {
+        const nextStop = i < reversed.stops.length - 1 ? reversed.stops[i + 1] : null;
+        const seg = nextStop ? findSegByTrack(stop.nodeId, nextStop.nodeId, nextStop.trackId) : null;
+        stop.platformId = seg ? (_autoSelectPlatform(node, seg.id, nextStop?.trackId) || null) : null;
+      }
+    } else {
+      stop.platformId = null;
+    }
+  }
+
   data.services.push(reversed);
   save(); renderServices(); updateBadges();
   toast(t('toast.reversed_created', { name: reversed.name }), 'success');

@@ -15,7 +15,10 @@
   <header>
     <div class="logo"><div class="icon">⬡</div>BRIXYmanager <span id="system-name-header" style="font-weight:400;opacity:0.6;margin-left:4px"></span></div>
     <div class="actions">
-      <button class="btn btn-sm" onclick="openSaveManager()">💾 <span data-t="btn.saves">Saves</span></button>
+      <div class="saves-dropdown" id="saves-dropdown">
+        <button class="btn btn-sm" onclick="toggleSavesDropdown(event)">💾 <span id="saves-dropdown-label" data-t="btn.saves">Saves</span> <span style="font-size:10px;opacity:0.5">▾</span></button>
+        <div class="saves-dropdown-menu" id="saves-dropdown-menu"></div>
+      </div>
     </div>
   </header>
   <main>
@@ -38,8 +41,9 @@
       <div class="nav-item" data-tab="issues" onclick="switchTab('issues')"><span class="nav-icon">⚠</span> <span data-t="nav.issues">Issues</span><span class="badge" id="badge-issues" style="color:var(--warn)">0</span></div>
       <div class="nav-section" data-t="nav_section.system">System</div>
       <div class="nav-item" data-tab="settings" onclick="switchTab('settings')"><span class="nav-icon">⚙</span> <span data-t="nav.settings">Settings</span></div>
+      <div class="nav-item" data-tab="import-export" onclick="switchTab('import-export')"><span class="nav-icon">⇅</span> <span data-t="nav.import_export">Import / Export</span></div>
       <div class="spacer"></div>
-      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.15.1.0</div>
+      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.17.3.0</div>
     </nav>
     <div class="content">
       <!-- DASHBOARD -->
@@ -221,6 +225,11 @@
         <div class="page-header"><div><h1 data-t="page.settings">Settings</h1><div class="subtitle" data-t="subtitle.settings">System configuration and defaults</div></div></div>
         <div id="settings-content"></div>
       </div>
+      <!-- IMPORT/EXPORT -->
+      <div class="tab-panel" id="panel-import-export">
+        <div class="page-header"><div><h1 data-t="page.import_export">Import / Export</h1><div class="subtitle" data-t="subtitle.import_export">Import and export network data</div></div></div>
+        <div id="import-export-content"></div>
+      </div>
     </div>
   </main>
 </div>
@@ -242,6 +251,7 @@
 <script src="js/core.js"></script>
 <script src="js/persistence.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/import.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/scheduling.js"></script>
 <script src="js/departures.js"></script>

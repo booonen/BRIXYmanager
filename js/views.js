@@ -22,6 +22,8 @@ function renderSettings() {
     { key: 'orphan_departures', sev: 'medium' },
     { key: 'pass_through_terminus', sev: 'medium' },
     { key: 'stale_departure', sev: 'medium' },
+    { key: 'segment_overlap', sev: 'medium' },
+    { key: 'suspicious_segment', sev: 'medium' },
     { key: 'waypoint_connection_count', sev: 'medium' },
     { key: 'auto_generated_name', sev: 'low' },
     { key: 'cross_cutoff_journey', sev: 'low' },
@@ -179,6 +181,7 @@ function updateSystemName() {
   const headerEl = document.getElementById('system-name-header');
   if (headerEl) headerEl.textContent = name ? '— ' + name : '';
   document.title = name ? `BRIXYmanager — ${name}` : 'BRIXYmanager';
+  if (typeof updateSavesDropdownLabel === 'function') updateSavesDropdownLabel();
 }
 
 function applyTheme() {
@@ -191,20 +194,118 @@ function applyTheme() {
 // ============================================================
 // ISSUE DETECTION
 // ============================================================
+
+function showOverlapResolutionModal(segAId, segBId) {
+  const segA = getSeg(segAId), segB = getSeg(segBId);
+  if (!segA || !segB) { toast(t('resolve.error'), 'error'); return; }
+  if (!segA.wayGeometry?.length || !segB.wayGeometry?.length) { toast(t('resolve.no_geometry'), 'error'); return; }
+
+  const divergence = findDivergencePoint(segA, segB, 0.05);
+  if (!divergence) { toast(t('resolve.no_divergence'), 'error'); return; }
+
+  const proposal = buildOverlapResolution(segA, segB, divergence);
+  const sharedName = nodeName(proposal.sharedNode);
+  const farAName = nodeName(proposal.farNodeA);
+  const farBName = nodeName(proposal.farNodeB);
+  const sharedM = Math.round(proposal.sharedDist * 1000);
+
+  const mapId = 'resolve-map-' + uid();
+  const body = `
+    <div style="margin-bottom:16px">
+      <div id="${mapId}" style="height:280px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg)"></div>
+    </div>
+    <div style="margin-bottom:16px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">${t('resolve.proposed')}</div>
+      <ul style="font-size:13px;color:var(--text-dim);margin-left:16px;line-height:1.8">
+        <li>${t('resolve.insert_junction', { lat: divergence.coord[0].toFixed(4), lon: divergence.coord[1].toFixed(4) })}</li>
+        <li>${t('resolve.create_shared', { from: sharedName, dist: sharedM })}</li>
+        <li>${t('resolve.modify_seg', { from: 'Junction', to: farAName, dist: Math.round(proposal.remainderADist * 1000) })}</li>
+        <li>${t('resolve.modify_seg', { from: 'Junction', to: farBName, dist: Math.round(proposal.remainderBDist * 1000) })}</li>
+        <li>${t('resolve.update_services', { n: proposal.affectedServices.length })}</li>
+      </ul>
+    </div>`;
+
+  openModal(t('resolve.title'), body,
+    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
+     <button class="btn btn-primary" onclick="_executeOverlapResolution('${segAId}','${segBId}')">${t('resolve.apply')}</button>`);
+
+  // Render map after modal is open
+  setTimeout(() => {
+    const mapEl = document.getElementById(mapId);
+    if (!mapEl) return;
+    const map = L.map(mapEl, { zoomControl: true, attributionControl: false });
+    if (data.settings?.jpMapTiles !== false) {
+      L.tileLayer('https://tile.opengeofiction.net/ogf-carto/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+    }
+
+    // Draw original segments
+    L.polyline(segA.wayGeometry, { color: '#e05555', weight: 4, opacity: 0.7, dashArray: '8,4' }).addTo(map).bindTooltip(sharedName + ' \u2014 ' + farAName);
+    L.polyline(segB.wayGeometry, { color: '#5b8af5', weight: 4, opacity: 0.7, dashArray: '8,4' }).addTo(map).bindTooltip(sharedName + ' \u2014 ' + farBName);
+
+    // Draw proposed segments
+    L.polyline(proposal.sharedGeo, { color: '#55c07a', weight: 5, opacity: 1 }).addTo(map).bindTooltip(t('resolve.shared_label'));
+    L.polyline(proposal.remainderA, { color: '#e05555', weight: 3, opacity: 1 }).addTo(map);
+    L.polyline(proposal.remainderB, { color: '#5b8af5', weight: 3, opacity: 1 }).addTo(map);
+
+    // Mark junction point
+    L.circleMarker(divergence.coord, { radius: 7, fillColor: '#ffc917', color: '#333', weight: 2, fillOpacity: 1 }).addTo(map).bindTooltip(t('resolve.junction_label'));
+
+    // Mark endpoints
+    const endNodes = [proposal.sharedNode, proposal.farNodeA, proposal.farNodeB].map(getNode).filter(n => n?.lat);
+    for (const n of endNodes) {
+      L.circleMarker([n.lat, n.lon], { radius: 5, fillColor: '#fff', color: '#333', weight: 2, fillOpacity: 1 }).addTo(map);
+    }
+
+    // Fit bounds
+    const allCoords = [...segA.wayGeometry, ...segB.wayGeometry];
+    map.fitBounds(L.latLngBounds(allCoords), { padding: [30, 30] });
+  }, 150);
+}
+
+function _executeOverlapResolution(segAId, segBId) {
+  const segA = getSeg(segAId), segB = getSeg(segBId);
+  if (!segA || !segB) return;
+
+  const divergence = findDivergencePoint(segA, segB, 0.05);
+  if (!divergence) return;
+
+  const proposal = buildOverlapResolution(segA, segB, divergence);
+  const result = applyOverlapResolution(proposal);
+
+  closeModal();
+  refreshAll();
+  toast(t('resolve.success', { n: result.servicesUpdated }), 'success');
+}
+
+function verifySegment(segId) {
+  if (!data.settings.verifiedSegments) data.settings.verifiedSegments = [];
+  if (!data.settings.verifiedSegments.includes(segId)) {
+    data.settings.verifiedSegments.push(segId);
+    save();
+  }
+  runIssueDetection();
+}
+
 function runIssueDetection() {
   const issues = []; // { severity: 'high'|'medium'|'low', type, desc, detail }
 
-  // ---- HIGH: Scheduling conflicts ----
+  // ---- HIGH: Scheduling conflicts (per-track) ----
   const segOcc = {}, platOcc = {};
   for (const dep of data.departures) {
     const svc = getSvc(dep.serviceId); if (!svc || dep.times.length < 2) continue;
     for (let i = 0; i < dep.times.length - 1; i++) {
       const from = dep.times[i], to = dep.times[i + 1];
       if (from.depart == null || to.arrive == null) continue;
-      const seg = findSeg(from.nodeId, to.nodeId);
-      if (seg && seg.tracks === 1) {
-        if (!segOcc[seg.id]) segOcc[seg.id] = [];
-        segOcc[seg.id].push({ depId: dep.id, svcId: dep.serviceId, enter: from.depart, exit: to.arrive });
+      const nextStop = svc.stops[i+1];
+      const stopTrackId = nextStop?.trackId || null;
+      const seg = findSegByTrack(from.nodeId, to.nodeId, stopTrackId);
+      if (!seg) continue;
+      const tc = segTrackCount(seg);
+      const trackId = stopTrackId || (tc === 1 && Array.isArray(seg.tracks) && seg.tracks[0] ? seg.tracks[0].id : null);
+      if (trackId) {
+        const occKey = `${seg.id}::${trackId}`;
+        if (!segOcc[occKey]) segOcc[occKey] = [];
+        segOcc[occKey].push({ depId: dep.id, svcId: dep.serviceId, enter: from.depart, exit: to.arrive, segId: seg.id, trackId });
       }
     }
     for (let i = 0; i < dep.times.length; i++) {
@@ -218,15 +319,16 @@ function runIssueDetection() {
       platOcc[key].push({ depId: dep.id, svcId: dep.serviceId, arrive: arr, depart: dept, categoryId: svc.categoryId });
     }
   }
-  for (const [segId, occs] of Object.entries(segOcc)) {
+  for (const [occKey, occs] of Object.entries(segOcc)) {
+    const [segId, trackId] = occKey.split('::');
     const seg = getSeg(segId);
+    const tkName = seg && Array.isArray(seg.tracks) ? seg.tracks.find(tk => tk.id === trackId)?.name : null;
     for (let i = 0; i < occs.length; i++) for (let j = i + 1; j < occs.length; j++) {
       const a = occs[i], b = occs[j];
-      // Pattern overlap check: skip if services never run on the same day
       if (!patternsOverlap(getSvc(a.svcId)?.schedulePattern, getSvc(b.svcId)?.schedulePattern)) continue;
       if (a.enter < b.exit && b.enter < a.exit)
         issues.push({ severity: 'high', type: t('issue.type.single_track_conflict'), typeKey: 'single_track_conflict',
-          desc: t('issue.desc.single_track_conflict', { a: getSvc(a.svcId)?.name||'?', b: getSvc(b.svcId)?.name||'?', from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
+          desc: t('issue.desc.single_track_conflict', { a: getSvc(a.svcId)?.name||'?', b: getSvc(b.svcId)?.name||'?', from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }) + (tkName ? ' (' + tkName + ')' : ''),
           detail: t('issue.detail.single_track_conflict', { a_time: toTime(a.enter)+'–'+toTime(a.exit), b_time: toTime(b.enter)+'–'+toTime(b.exit) }),
           action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${segId}')` });
     }
@@ -314,7 +416,7 @@ function runIssueDetection() {
     if (!cat) continue;
     const modeInfra = cat.infrastructureType || 'rail';
     for (let i = 0; i < svc.stops.length - 1; i++) {
-      const seg = findSeg(svc.stops[i].nodeId, svc.stops[i+1].nodeId);
+      const seg = findSegByTrack(svc.stops[i].nodeId, svc.stops[i+1].nodeId, svc.stops[i+1]?.trackId);
       if (!seg) continue;
       const segInfra = isRoad(seg) ? 'road' : 'rail';
       if (modeInfra !== segInfra) {
@@ -322,6 +424,23 @@ function runIssueDetection() {
           desc: t('issue.desc.infra_mismatch', { name: svc.name, mode: cat.name, modeInfra, segInfra, from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
           detail: t('issue.detail.infra_mismatch'),
           action: `openServiceModal('${svc.id}')` });
+        break;
+      }
+    }
+  }
+
+  // Mode-segment allowedModes mismatch
+  for (const svc of data.services) {
+    if (!svc.categoryId) continue;
+    for (let i = 0; i < svc.stops.length - 1; i++) {
+      const seg = findSegByTrack(svc.stops[i].nodeId, svc.stops[i+1].nodeId, svc.stops[i+1]?.trackId);
+      if (!seg || !seg.allowedModes?.length) continue;
+      if (!seg.allowedModes.includes(svc.categoryId)) {
+        const cat = getCat(svc.categoryId);
+        issues.push({ severity: 'medium', type: t('issue.type.mode_not_allowed'), typeKey: 'mode_not_allowed',
+          desc: t('issue.desc.mode_not_allowed', { name: svc.name, mode: cat?.name || '?', from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
+          detail: t('issue.detail.mode_not_allowed'),
+          action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${seg.id}')` });
         break;
       }
     }
@@ -517,12 +636,24 @@ function runIssueDetection() {
     const problems = [];
     if (!s.distance || s.distance <= 0) problems.push('distance');
     if (!s.maxSpeed || s.maxSpeed <= 0) problems.push('max speed');
-    if (!isRoad(s) && (!s.tracks || s.tracks <= 0)) problems.push('track count');
+    if (!isRoad(s) && segTrackCount(s) <= 0) problems.push('track count');
     if (problems.length) {
       issues.push({ severity: 'low', type: t('issue.type.incomplete_segment'), typeKey: 'incomplete_segment',
         desc: t('issue.desc.incomplete_segment', { from: nodeName(s.nodeA), to: nodeName(s.nodeB), problems: problems.join(', ') }),
         detail: t('issue.detail.incomplete_segment'),
         action: `openSegmentModal('${s.id}')` });
+    }
+    // Distance mismatch: stored distance vs way geometry distance
+    if (s.wayGeometry && s.wayGeometry.length >= 2 && s.distance > 0) {
+      const geoDist = haversineDistance(s.wayGeometry);
+      const diff = Math.abs(geoDist - s.distance);
+      const pct = diff / geoDist * 100;
+      if (pct > 15 && diff > 0.2) {
+        issues.push({ severity: 'low', type: t('issue.type.distance_mismatch'), typeKey: 'distance_mismatch',
+          desc: t('issue.desc.distance_mismatch', { from: nodeName(s.nodeA), to: nodeName(s.nodeB), stored: s.distance, geo: geoDist }),
+          detail: t('issue.detail.distance_mismatch', { pct: Math.round(pct) }),
+          action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${s.id}')` });
+      }
     }
   }
 
@@ -542,7 +673,7 @@ function runIssueDetection() {
           action: `setSearchValue('node-search','');switchTab('nodes');showNodeDetail('${n.id}')` });
       }
     }
-    if (!n.ogfNode) {
+    if (!n.ogfNode && n.lat == null) {
       issues.push({ severity: 'low', type: t('issue.type.missing_ogf_node'), typeKey: 'missing_ogf_node',
         desc: t('issue.desc.missing_ogf_node', { name: n.name }),
         detail: t('issue.detail.missing_ogf_node'),
@@ -569,17 +700,21 @@ function runIssueDetection() {
       const platTracks = node.schematic.tracks.filter(t => (t.platformIds || []).includes(stop.platformId));
       if (!platTracks.length) continue;
 
-      // Check if any of those tracks connect to the arriving/departing segments
-      const valid = platTracks.some(t => {
-        const tSegs = ['A','B','C','D'].flatMap(s => (t['side'+s]||[]).map(x => typeof x === 'string' ? x : x.segId));
-        const arrOk = !arrSeg || tSegs.includes(arrSeg.id);
-        const depOk = !depSeg || tSegs.includes(depSeg.id);
+      // Check if any of those tracks connect to the arriving/departing segments (track-aware)
+      const arrTrackId = stop.trackId || null;
+      const depTrackId = (i < svc.stops.length - 1) ? svc.stops[i + 1]?.trackId : null;
+      const valid = platTracks.some(trk => {
+        const tConns = ['A','B','C','D'].flatMap(s => (trk['side'+s]||[]));
+        // Check arriving segment+track
+        const arrOk = !arrSeg || tConns.some(c => c.segId === arrSeg.id && (!arrTrackId || !c.trackId || c.trackId === arrTrackId));
+        // Check departing segment+track
+        const depOk = !depSeg || tConns.some(c => c.segId === depSeg.id && (!depTrackId || !c.trackId || c.trackId === depTrackId));
         return arrOk && depOk;
       });
 
       if (!valid) {
         const platName = (node.platforms || []).find(p => p.id === stop.platformId)?.name || '?';
-        issues.push({ severity: 'low', type: t('issue.type.schematic_mismatch'), typeKey: 'schematic_mismatch',
+        issues.push({ severity: 'medium', type: t('issue.type.schematic_mismatch'), typeKey: 'schematic_mismatch',
           desc: t('issue.desc.schematic_mismatch', { name: svc.name, platform: platName, station: node.name }),
           detail: t('issue.detail.schematic_mismatch'),
           action: `openServiceModal('${svc.id}')` });
@@ -608,16 +743,18 @@ function runIssueDetection() {
       const platTracks = node.schematic.tracks.filter(t => (t.platformIds || []).includes(platId));
       if (!platTracks.length) continue;
 
-      const valid = platTracks.some(t => {
-        const tSegs = ['A','B','C','D'].flatMap(s => (t['side'+s]||[]).map(x => typeof x === 'string' ? x : x.segId));
-        const arrOk = !arrSeg || tSegs.includes(arrSeg.id);
-        const depOk = !depSeg || tSegs.includes(depSeg.id);
+      const arrTrackId2 = stop.trackId || null;
+      const depTrackId2 = (i < svc.stops.length - 1) ? svc.stops[i + 1]?.trackId : null;
+      const valid = platTracks.some(trk => {
+        const tConns = ['A','B','C','D'].flatMap(s => (trk['side'+s]||[]));
+        const arrOk = !arrSeg || tConns.some(c => c.segId === arrSeg.id && (!arrTrackId2 || !c.trackId || c.trackId === arrTrackId2));
+        const depOk = !depSeg || tConns.some(c => c.segId === depSeg.id && (!depTrackId2 || !c.trackId || c.trackId === depTrackId2));
         return arrOk && depOk;
       });
 
       if (!valid) {
         const platName = (node.platforms || []).find(p => p.id === platId)?.name || '?';
-        issues.push({ severity: 'low', type: t('issue.type.departure_schematic_mismatch'), typeKey: 'departure_schematic_mismatch',
+        issues.push({ severity: 'medium', type: t('issue.type.departure_schematic_mismatch'), typeKey: 'departure_schematic_mismatch',
           desc: t('issue.desc.departure_schematic_mismatch', { name: svc.name, time: toTime(dep.startTime), platform: platName, station: node.name }),
           detail: t('issue.detail.departure_schematic_mismatch'),
           action: `openDepEditModal('${dep.id}')` });
@@ -646,22 +783,22 @@ function runIssueDetection() {
     for (const conn of conns) {
       const seg = getSeg(conn.segId);
       if (!seg) continue;
-      const nTracks = seg.tracks || 1;
-      // Collect all segment track connections across all station tracks
-      const connectedSegTracks = new Set();
+      const segTracks = Array.isArray(seg.tracks) ? seg.tracks : [];
+      if (!segTracks.length) continue;
+      // Collect all connected segment trackIds across all station tracks
+      const connectedTrackIds = new Set();
       for (const trk of node.schematic.tracks) {
         for (const key of ['sideA','sideB','sideC','sideD']) {
           for (const c of (trk[key] || [])) {
-            const cObj = typeof c === 'string' ? { segId: c, trackNum: 1 } : c;
-            if (cObj.segId === conn.segId) connectedSegTracks.add(cObj.trackNum);
+            if (c.segId === conn.segId && c.trackId) connectedTrackIds.add(c.trackId);
           }
         }
       }
-      for (let tn = 1; tn <= nTracks; tn++) {
-        if (!connectedSegTracks.has(tn)) {
+      for (const tk of segTracks) {
+        if (!connectedTrackIds.has(tk.id)) {
           const segLabel = nodeName(seg.nodeA === node.id ? seg.nodeB : seg.nodeA);
           issues.push({ severity: 'low', type: t('issue.type.unconnected_segment_track'), typeKey: 'unconnected_segment_track',
-            desc: t('issue.desc.unconnected_segment_track', { n: tn, label: segLabel, station: node.name }),
+            desc: t('issue.desc.unconnected_segment_track', { n: tk.name, label: segLabel, station: node.name }),
             detail: t('issue.detail.unconnected_segment_track'),
             action: `openSchematicEditor('${node.id}')` });
         }
@@ -749,10 +886,190 @@ function runIssueDetection() {
   }
   for (const [key, segs] of Object.entries(segPairs)) {
     if (segs.length > 1) {
-      issues.push({ severity: 'medium', type: t('issue.type.duplicate_segment'), typeKey: 'duplicate_segment',
-        desc: t('issue.desc.duplicate_segment', { n: segs.length, type: segs[0].interchangeType ? segs[0].interchangeType.toUpperCase() : t('seg.type_track_display'), from: nodeName(segs[0].nodeA), to: nodeName(segs[0].nodeB) }),
-        detail: t('issue.detail.duplicate_segment'),
-        action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${segs[0].id}')` });
+      // Don't flag parallel segments that have different allowedModes (intentionally parallel)
+      const allSameOrEmpty = segs.every(s => !s.allowedModes?.length) ||
+        (segs.every(s => s.allowedModes?.length) && segs.every(s => JSON.stringify(s.allowedModes?.sort()) === JSON.stringify(segs[0].allowedModes?.sort())));
+      if (allSameOrEmpty) {
+        issues.push({ severity: 'medium', type: t('issue.type.duplicate_segment'), typeKey: 'duplicate_segment',
+          desc: t('issue.desc.duplicate_segment', { n: segs.length, type: segs[0].interchangeType ? segs[0].interchangeType.toUpperCase() : t('seg.type_track_display'), from: nodeName(segs[0].nodeA), to: nodeName(segs[0].nodeB) }),
+          detail: t('issue.detail.duplicate_segment'),
+          action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${segs[0].id}')` });
+      }
+    }
+  }
+
+  // Shared state for suspicious segment + overlap detection
+  const _suspFlagged = new Set();
+
+  // Suspicious segments: near-identical geometry (same endpoints OR chain match)
+  {
+    const verified = data.settings?.verifiedSegments || [];
+    const geoSegs = data.segments.filter(s => !isInterchange(s) && s.wayGeometry?.length >= 2);
+    const THRESHOLD = 0.05; // 50m average distance = suspicious
+
+    function _modesCompatible(sA, sB) {
+      const modesA = (sA.allowedModes || []).slice().sort().join(',');
+      const modesB = (sB.allowedModes || []).slice().sort().join(',');
+      return !modesA || !modesB || modesA === modesB;
+    }
+
+    // Case 1: Same endpoints, near-identical geometry
+    const pairGroups = {};
+    for (const s of geoSegs) {
+      const key = [s.nodeA, s.nodeB].sort().join('::');
+      if (!pairGroups[key]) pairGroups[key] = [];
+      pairGroups[key].push(s);
+    }
+    for (const [, segs] of Object.entries(pairGroups)) {
+      if (segs.length < 2) continue;
+      for (let a = 0; a < segs.length; a++) {
+        for (let b = a + 1; b < segs.length; b++) {
+          const sA = segs[a], sB = segs[b];
+          if (verified.includes(sA.id) || verified.includes(sB.id)) continue;
+          if (!_modesCompatible(sA, sB)) continue;
+          const sim = polylineSimilarity(sA.wayGeometry, sB.wayGeometry);
+          if (sim < THRESHOLD) {
+            const avgM = Math.round(sim * 1000);
+            const fk = [sA.id, sB.id].sort().join('::');
+            if (_suspFlagged.has(fk)) continue;
+            _suspFlagged.add(fk);
+            issues.push({ severity: 'medium', type: t('issue.type.suspicious_segment'), typeKey: 'suspicious_segment',
+              desc: t('issue.desc.suspicious_segment', { from: nodeName(sA.nodeA), to: nodeName(sA.nodeB), dist: avgM }),
+              detail: t('issue.detail.suspicious_segment'),
+              action: `switchTab('segments');showSegmentDetail('${sA.id}')`,
+              extraActions: `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${sA.id}');verifySegment('${sB.id}')">${t('issue.verify_btn')}</button>`
+            });
+          }
+        }
+      }
+    }
+
+    // Case 2: Segment A→Z matches a chain A→...→Z (express covering existing stops)
+    // Build adjacency from segments with geometry
+    const adj = {};
+    for (const s of geoSegs) {
+      if (!adj[s.nodeA]) adj[s.nodeA] = [];
+      if (!adj[s.nodeB]) adj[s.nodeB] = [];
+      adj[s.nodeA].push(s);
+      adj[s.nodeB].push(s);
+    }
+    for (const seg of geoSegs) {
+      if (verified.includes(seg.id)) continue;
+      // BFS from seg.nodeA to seg.nodeB, max 8 hops, avoiding seg itself
+      const target = seg.nodeB;
+      const queue = [{ node: seg.nodeA, path: [], geom: [] }];
+      const visited = new Set([seg.nodeA]);
+      let foundChain = null;
+      while (queue.length && !foundChain) {
+        const { node, path, geom } = queue.shift();
+        if (path.length > 8) continue;
+        for (const s of (adj[node] || [])) {
+          if (s.id === seg.id) continue; // don't use the segment itself
+          if (!_modesCompatible(seg, s)) continue;
+          const next = s.nodeA === node ? s.nodeB : s.nodeA;
+          if (visited.has(next)) continue;
+          const newPath = [...path, { seg: s, from: node, to: next }];
+          // Orient this sub-segment's geometry correctly
+          const subGeo = s.nodeA === node ? [...(s.wayGeometry||[])] : [...(s.wayGeometry||[])].reverse();
+          const newGeom = geom.length ? [...geom, ...subGeo.slice(1)] : [...subGeo];
+          if (next === target && newPath.length >= 2) {
+            foundChain = { path: newPath, geom: newGeom };
+            break;
+          }
+          visited.add(next);
+          queue.push({ node: next, path: newPath, geom: newGeom });
+        }
+      }
+      if (foundChain) {
+        // Only flag if this segment covers roughly the same ground as the whole chain.
+        // An express segment A→Z ≈ total distance of chain A→B→...→Z.
+        // A short segment like B→C is much shorter than its chain B→A→...→C, so it gets filtered.
+        const segDist = seg.distance || haversineDistance(seg.wayGeometry);
+        const chainTotalDist = foundChain.path.reduce((sum, e) => sum + (e.seg.distance || 0), 0);
+        if (chainTotalDist > 0 && segDist < chainTotalDist * 0.7) foundChain = null;
+      }
+      if (foundChain) {
+        const sim = polylineSimilarity(seg.wayGeometry, foundChain.geom);
+        if (sim < THRESHOLD) {
+          const avgM = Math.round(sim * 1000);
+          const chainIds = foundChain.path.map(e => e.seg.id);
+          const fk = [seg.id, ...chainIds].sort().join('::');
+          if (_suspFlagged.has(fk)) continue;
+          _suspFlagged.add(fk);
+          // Also suppress pairwise overlap checks between the express segment and each chain segment
+          for (const cid of chainIds) _suspFlagged.add([seg.id, cid].sort().join('::'));
+          const chainNames = foundChain.path.map(e => nodeName(e.from) + ' \u2192 ' + nodeName(e.to)).join(', ');
+          issues.push({ severity: 'medium', type: t('issue.type.suspicious_segment'), typeKey: 'suspicious_segment',
+            desc: t('issue.desc.suspicious_chain', { from: nodeName(seg.nodeA), to: nodeName(seg.nodeB), dist: avgM, chain: chainNames }),
+            detail: t('issue.detail.suspicious_chain'),
+            action: `switchTab('segments');showSegmentDetail('${seg.id}')`,
+            extraActions: `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${seg.id}')">${t('issue.verify_btn')}</button>`
+          });
+        }
+      }
+    }
+  }
+
+  // Partial segment overlap (shared track without shared infrastructure)
+  {
+    const SNAP_THRESHOLD = 0.05;  // 50m
+    const GRACE = 0.1;            // 100m from endpoints
+    const MIN_OVERLAP = 0.1;      // 100m of shared track to flag
+    const overlapVerified = data.settings?.verifiedSegments || [];
+    const overlapGeoSegs = data.segments.filter(s => !isInterchange(s) && s.wayGeometry?.length >= 2);
+
+    // Pre-compute bounding boxes (0.001° padding ≈ 110m)
+    const bboxes = new Map();
+    for (const s of overlapGeoSegs) bboxes.set(s.id, _segBBox(s.wayGeometry, 0.001));
+
+    // Compare all pairs with overlapping bounding boxes
+    for (let i = 0; i < overlapGeoSegs.length; i++) {
+      const sA = overlapGeoSegs[i];
+      if (overlapVerified.includes(sA.id)) continue;
+      const bbA = bboxes.get(sA.id);
+
+      for (let j = i + 1; j < overlapGeoSegs.length; j++) {
+        const sB = overlapGeoSegs[j];
+        if (overlapVerified.includes(sB.id)) continue;
+
+        // Skip pairs already flagged by same-endpoint or chain checks
+        const pairKey = [sA.id, sB.id].sort().join('::');
+        if (_suspFlagged.has(pairKey)) continue;
+
+        // Skip if same endpoints (already handled by Case 1 above)
+        const endpointsA = [sA.nodeA, sA.nodeB].sort().join('::');
+        const endpointsB = [sB.nodeA, sB.nodeB].sort().join('::');
+        if (endpointsA === endpointsB) continue;
+
+        // Skip if different modes (intentionally parallel)
+        const modesA = (sA.allowedModes || []).slice().sort().join(',');
+        const modesB = (sB.allowedModes || []).slice().sort().join(',');
+        if (modesA && modesB && modesA !== modesB) continue;
+
+        // Bounding box pre-filter
+        if (!_bboxOverlap(bbA, bboxes.get(sB.id))) continue;
+
+        // Check overlap in both directions, take the larger value
+        const overlapAB = findOverlapLength(sA.wayGeometry, sB.wayGeometry, SNAP_THRESHOLD, GRACE);
+        const overlapBA = findOverlapLength(sB.wayGeometry, sA.wayGeometry, SNAP_THRESHOLD, GRACE);
+        const overlapKm = Math.max(overlapAB, overlapBA);
+
+        if (overlapKm >= MIN_OVERLAP) {
+          const overlapM = Math.round(overlapKm * 1000);
+          const sharedEndpoint = (sA.nodeA === sB.nodeA || sA.nodeA === sB.nodeB ||
+                                  sA.nodeB === sB.nodeA || sA.nodeB === sB.nodeB);
+          const descKey = sharedEndpoint ? 'issue.desc.overlap_branching' : 'issue.desc.overlap_mid';
+          const fixBtn = sharedEndpoint
+            ? `<button class="btn btn-sm btn-primary" style="margin-top:4px;margin-right:4px" onclick="event.stopPropagation();showOverlapResolutionModal('${sA.id}','${sB.id}')">${t('resolve.fix_btn')}</button>`
+            : '';
+          issues.push({ severity: 'medium', type: t('issue.type.segment_overlap'), typeKey: 'segment_overlap',
+            desc: t(descKey, { segA: nodeName(sA.nodeA) + ' \u2014 ' + nodeName(sA.nodeB), segB: nodeName(sB.nodeA) + ' \u2014 ' + nodeName(sB.nodeB), dist: overlapM }),
+            detail: t('issue.detail.segment_overlap'),
+            action: `switchTab('segments');showSegmentDetail('${sA.id}')`,
+            extraActions: fixBtn + `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${sA.id}');verifySegment('${sB.id}')">${t('issue.verify_btn')}</button>`
+          });
+        }
+      }
     }
   }
 
@@ -809,6 +1126,7 @@ function runIssueDetection() {
       <div class="issue-type">${esc(i.type)}${i.action ? ` <span style="font-size:9px;opacity:0.6">\u2192 ${t('issue.click_to_fix')}</span>` : ''}</div>
       <div class="issue-desc">${esc(i.desc)}</div>
       <div class="issue-detail">${esc(i.detail)}</div>
+      ${i.extraActions || ''}
     </div>`;
   }
 
@@ -908,6 +1226,33 @@ function mapFitBounds() {
   _map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
 }
 
+// Per-vertex perpendicular offset for polylines (parallel line rendering)
+// coords: [[lat,lon],...], offsetPx: pixels, map: Leaflet map
+function _polylineOffset(coords, offsetPx, map) {
+  if (!offsetPx || coords.length < 2) return coords;
+  const pts = coords.map(c => map.latLngToLayerPoint(c));
+  const out = [];
+  for (let i = 0; i < pts.length; i++) {
+    // Average perpendicular direction from incoming + outgoing segments
+    let px = 0, py = 0, count = 0;
+    if (i > 0) {
+      const dx = pts[i].x - pts[i-1].x, dy = pts[i].y - pts[i-1].y;
+      const len = Math.sqrt(dx*dx + dy*dy) || 1;
+      px += -dy/len; py += dx/len; count++;
+    }
+    if (i < pts.length - 1) {
+      const dx = pts[i+1].x - pts[i].x, dy = pts[i+1].y - pts[i].y;
+      const len = Math.sqrt(dx*dx + dy*dy) || 1;
+      px += -dy/len; py += dx/len; count++;
+    }
+    px /= count; py /= count;
+    // Normalize the averaged perpendicular
+    const pLen = Math.sqrt(px*px + py*py) || 1;
+    out.push(map.layerPointToLatLng(L.point(pts[i].x + px/pLen*offsetPx, pts[i].y + py/pLen*offsetPx)));
+  }
+  return out;
+}
+
 function renderMapContent(skipFit) {
   if (!_map) return;
 
@@ -952,36 +1297,23 @@ function renderMapContent(skipFit) {
     const lines = segLineMap[seg.id] || [];
     const lineWeight = 5;
 
+    const segCoords = segmentCoords(seg);
+    if (segCoords.length < 2) continue;
+
     if (lines.length === 0) {
       // No line assigned — draw in dim grey
-      const polyline = L.polyline([[nA.lat, nA.lon], [nB.lat, nB.lon]], {
-        color: '#555', weight: 2, opacity: 0.4
-      });
-      segmentLines.push(polyline);
+      segmentLines.push(L.polyline(segCoords, { color: '#555', weight: 2, opacity: 0.4 }));
     } else if (lines.length === 1) {
       // Single line — draw with that line's color
-      const polyline = L.polyline([[nA.lat, nA.lon], [nB.lat, nB.lon]], {
-        color: lines[0].color || '#888', weight: lineWeight, opacity: 0.95
-      });
-      segmentLines.push(polyline);
+      segmentLines.push(L.polyline(segCoords, { color: lines[0].color || '#888', weight: lineWeight, opacity: 0.95 }));
     } else {
-      // Multiple lines — Beck-style parallel offset using perpendicular displacement
-      const pA = _map.latLngToLayerPoint([nA.lat, nA.lon]);
-      const pB = _map.latLngToLayerPoint([nB.lat, nB.lon]);
-      const dx = pB.x - pA.x, dy = pB.y - pA.y;
-      const len = Math.sqrt(dx * dx + dy * dy) || 1;
-      const px = -dy / len, py = dx / len;
-      const offsetStep = lineWeight + 1; // gap between parallel lines
+      // Multiple lines — per-vertex perpendicular offset along way geometry
+      const offsetStep = lineWeight + 1;
       const totalWidth = (lines.length - 1) * offsetStep;
-
       lines.forEach((grp, idx) => {
         const off = -totalWidth / 2 + idx * offsetStep;
-        const oA = _map.layerPointToLatLng(L.point(pA.x + px * off, pA.y + py * off));
-        const oB = _map.layerPointToLatLng(L.point(pB.x + px * off, pB.y + py * off));
-        const polyline = L.polyline([[oA.lat, oA.lng], [oB.lat, oB.lng]], {
-          color: grp.color || '#888', weight: lineWeight, opacity: 0.95
-        });
-        segmentLines.push(polyline);
+        const offsetCoords = _polylineOffset(segCoords, off, _map);
+        segmentLines.push(L.polyline(offsetCoords, { color: grp.color || '#888', weight: lineWeight, opacity: 0.95 }));
       });
     }
   }
@@ -1256,9 +1588,9 @@ function _dmDrawBackground(map, excludeSegIds) {
   for (const seg of data.segments) {
     if (isInterchange(seg)) continue;
     if (skip && skip.has(seg.id)) continue;
-    const nA = getNode(seg.nodeA), nB = getNode(seg.nodeB);
-    if (!nA || !nB || nA.lat == null || nB.lat == null) continue;
-    L.polyline([[nA.lat, nA.lon], [nB.lat, nB.lon]], { color: '#555', weight: 3, opacity: 1 }).addTo(map);
+    const coords = segmentCoords(seg);
+    if (coords.length < 2) continue;
+    L.polyline(coords, { color: '#555', weight: 3, opacity: 1 }).addTo(map);
   }
 }
 
@@ -1415,7 +1747,10 @@ function renderMiniBeck(svgEl, options) {
       if (mode === 'line') {
         for (const gid of focusGroups) {
           const ls = data.beckmap?.lineStations?.[gid];
-          if (ls) for (const nid of Object.keys(ls)) focusLabelNodes.add(nid);
+          if (ls) for (const nid of Object.keys(ls)) {
+            focusLabelNodes.add(nid);
+            focusMarkNodes.add(nid);
+          }
         }
       }
       if (typeof schemFindInterchanges === 'function') {
@@ -1437,7 +1772,9 @@ function renderMiniBeck(svgEl, options) {
         for (const entry of options.svcStopsList) {
           const gid = entry.groupId; if (!gid) continue;
           if (!svcPairsByGroup[gid]) svcPairsByGroup[gid] = new Set();
-          const paxStops = entry.stops.filter(nid => { const n = getNode(nid); return n && isPassengerStop(n); });
+          // stops may be plain nodeId strings or {nodeId, passThrough} objects
+          const stopNodes = entry.stops.map(s => typeof s === 'string' ? { nodeId: s, passThrough: false } : s);
+          const paxStops = stopNodes.filter(st => { const n = getNode(st.nodeId); return n && isPassengerStop(n) && !st.passThrough; }).map(st => st.nodeId);
           for (let i = 0; i < paxStops.length - 1; i++) {
             svcPairsByGroup[gid].add(paxStops[i] + '|' + paxStops[i+1]);
             svcPairsByGroup[gid].add(paxStops[i+1] + '|' + paxStops[i]);
@@ -1591,6 +1928,1090 @@ function _miniBeckPanZoom(svgEl, W, H, x0, y0) {
   }, { signal: ac.signal });
 
   svgEl.style.cursor = 'grab';
+}
+
+// ============================================================
+// IMPORT / EXPORT
+// ============================================================
+function renderImportExport() {
+  const el = document.getElementById('import-export-content');
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:800px">
+      <div class="ie-card">
+        <h3>${t('ie.json_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.json_desc')}</p>
+        <div class="flex gap-8">
+          <button class="btn" onclick="importData()">↑ ${t('btn.import_json')}</button>
+          <button class="btn" onclick="exportData()">↓ ${t('btn.export_json')}</button>
+        </div>
+      </div>
+      <div class="ie-card">
+        <h3>${t('ie.ogf_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.ogf_desc')}</p>
+        <button class="btn" onclick="startRelationImport()">${t('ie.ogf_btn')}</button>
+      </div>
+      <div class="ie-card">
+        <h3>${t('ie.csv_node_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.csv_node_desc')}</p>
+        <button class="btn" onclick="startCSVNodeImport()">${t('ie.csv_btn')}</button>
+      </div>
+      <div class="ie-card">
+        <h3>${t('ie.csv_seg_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.csv_seg_desc')}</p>
+        <button class="btn" onclick="startCSVSegmentImport()">${t('ie.csv_btn')}</button>
+      </div>
+      <div class="ie-card">
+        <h3>${t('ie.saves_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.saves_desc')}</p>
+        <button class="btn" onclick="openSaveManager()">${t('ie.manage_saves')}</button>
+      </div>
+    </div>`;
+}
+
+// ============================================================
+// OGF RELATION IMPORT WIZARD
+// ============================================================
+window._relImportState = null;
+
+function startRelationImport() {
+  window._relImportState = {
+    step: 1,
+    config: {
+      relationId: '', defaultMaxSpeed: 120, maxspeedBoundary: 'default',
+      allowedModes: [], defaultPlatformCount: getSetting('defaultPlatforms', 2),
+      defaultTrackCount: 2, disambiguationSuffix: ''
+    },
+    raw: null, stations: [], segments: [], warnings: []
+  };
+  document.getElementById('sidebar').classList.add('sidebar-locked');
+  _relRenderStep(1);
+}
+
+function _relCancel() {
+  window._relImportState = null;
+  document.getElementById('sidebar').classList.remove('sidebar-locked');
+  renderImportExport();
+}
+
+function _relRenderStep(n) {
+  _relImportState.step = n;
+  const el = document.getElementById('import-export-content');
+  const s = _relImportState;
+  const totalSteps = 5;
+
+  const header = (step, title) => {
+    return `<div class="csv-wizard-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <h2 style="font-family:var(--font-display);font-size:22px;font-weight:600;margin-bottom:2px">${t('rel.title')}</h2>
+          <div class="text-dim" style="font-size:13px">${t('csv.step_of', { n: step, total: totalSteps })}: ${title}</div>
+        </div>
+        <button class="btn" onclick="_relCancel()">${t('btn.cancel')}</button>
+      </div>
+      <div class="csv-step-bar">${Array.from({length: totalSteps}, (_, i) =>
+        `<div class="csv-step-dot${i + 1 <= step ? ' active' : ''}${i + 1 === step ? ' current' : ''}"></div>`
+      ).join('<div class="csv-step-line"></div>')}</div>
+    </div>`;
+  };
+
+  // ---- Step 1: Config ----
+  if (n === 1) {
+    const c = s.config;
+    let modesHtml = '';
+    if (data.categories.length) {
+      modesHtml = `<div class="form-group"><label>${t('field.allowed_modes')}</label>
+        <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('field.allowed_modes_help')}</p>`;
+      for (const cat of data.categories) {
+        const checked = c.allowedModes.includes(cat.id) ? 'checked' : '';
+        modesHtml += `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:4px">
+          <input type="checkbox" ${checked} onchange="_relToggleMode('${cat.id}',this.checked)"> ${esc(cat.name)}</label>`;
+      }
+      modesHtml += `</div>`;
+    }
+    el.innerHTML = header(1, t('rel.step_config')) + `
+      <div style="margin-top:20px;max-width:500px">
+        <div class="form-group"><label>${t('rel.relation_id')}</label>
+          <input type="text" id="rel-id" value="${esc(c.relationId)}" placeholder="${t('rel.relation_id_placeholder')}"
+            onchange="_relImportState.config.relationId=this.value.trim()"></div>
+        <div class="form-row">
+          <div class="form-group"><label>${t('csv.default_speed')}</label>
+            <input type="number" min="1" max="500" value="${c.defaultMaxSpeed}"
+              onchange="_relImportState.config.defaultMaxSpeed=parseInt(this.value)||120"></div>
+          <div class="form-group"><label>${t('csv.default_tracks')}</label>
+            <input type="number" min="1" max="20" value="${c.defaultTrackCount}"
+              onchange="_relImportState.config.defaultTrackCount=parseInt(this.value)||2"></div>
+        </div>
+        <div class="form-group"><label>${t('csv.default_platforms')}</label>
+          <input type="number" min="0" max="50" value="${c.defaultPlatformCount}"
+            onchange="_relImportState.config.defaultPlatformCount=parseInt(this.value)||0"></div>
+        <div class="form-group"><label>${t('rel.maxspeed_boundary')}</label>
+          <select onchange="_relImportState.config.maxspeedBoundary=this.value">
+            <option value="default" ${c.maxspeedBoundary === 'default' ? 'selected' : ''}>${t('rel.maxspeed_default')}</option>
+            <option value="waypoints" ${c.maxspeedBoundary === 'waypoints' ? 'selected' : ''}>${t('rel.maxspeed_waypoints')}</option>
+          </select></div>
+        <div class="form-group"><label>${t('rel.disambig')}</label>
+          <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('csv.disambig_desc')}</p>
+          <input type="text" value="${esc(c.disambiguationSuffix)}" placeholder="${t('csv.disambig_placeholder')}"
+            onchange="_relImportState.config.disambiguationSuffix=this.value.trim()"></div>
+        ${modesHtml}
+        <button class="btn btn-primary" onclick="_relFetchAndProcess()" id="rel-fetch-btn">${t('rel.fetch_btn')}</button>
+      </div>`;
+    return;
+  }
+
+  // ---- Step 2: Station Review ----
+  if (n === 2) {
+    const stations = s.stations;
+    let table = `<table class="data-table csv-preview-table"><thead><tr>
+      <th></th><th>${t('field.name')}</th><th>${t('field.type')}</th><th>OGF ID</th>
+      <th>${t('rel.snap_dist')}</th><th></th></tr></thead><tbody>`;
+    for (let i = 0; i < stations.length; i++) {
+      const st = stations[i];
+      if (st._isWaypoint) continue; // hide auto-generated waypoints
+      const snapM = Math.round((st._snap?.dist || 0) * 1000);
+      const snapWarn = snapM > 50 ? ` style="color:var(--warn)"` : '';
+      const dupWarn = st._dupType ? ` style="background:var(--warn-dim)"` : '';
+      const dupLabel = st._dupType === 'ogf' ? t('csv.warn_dup_ogf_existing', { name: st._dupExistingName })
+        : st._dupType === 'batch' ? t('csv.warn_dup_ogf') : '';
+      table += `<tr${dupWarn}>
+        <td><input type="checkbox" ${st._include !== false ? 'checked' : ''} onchange="_relImportState.stations[${i}]._include=this.checked"></td>
+        <td><input type="text" value="${esc(st.name)}" onchange="_relImportState.stations[${i}].name=this.value.trim()" style="width:180px;font-size:12px"></td>
+        <td>${esc(st.type)}</td>
+        <td class="mono" style="font-size:11px">${esc(st.ogfNode)}</td>
+        <td class="mono"${snapWarn}>${snapM}m</td>
+        <td class="text-dim" style="font-size:11px">${dupLabel}</td>
+      </tr>`;
+    }
+    table += `</tbody></table>`;
+    const count = stations.filter(st => st._include !== false && !st._isWaypoint).length;
+    el.innerHTML = header(2, t('rel.step_stations')) + `
+      <div style="margin-top:20px">
+        <div class="text-dim" style="margin-bottom:8px">${t('rel.station_count', { n: count })}</div>
+        <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
+        <div class="flex gap-8" style="margin-top:16px">
+          <button class="btn" onclick="_relRenderStep(1)">${t('btn.back')}</button>
+          <button class="btn btn-primary" onclick="_relRenderStep(3)">${t('btn.next')}</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // ---- Step 3: Segment Review ----
+  if (n === 3) {
+    const segs = s.segments;
+    let table = `<table class="data-table csv-preview-table"><thead><tr>
+      <th></th><th>${t('field.from_node')}</th><th>${t('field.to_node')}</th>
+      <th>${t('field.distance')}</th><th>${t('field.max_speed')}</th><th></th>
+    </tr></thead><tbody>`;
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      const stA = s.stations.find(st => st.id === seg.nodeA) || getNode(seg.nodeA);
+      const stB = s.stations.find(st => st.id === seg.nodeB) || getNode(seg.nodeB);
+      const fromName = stA ? (stA.name || nodeDisplayName?.(stA.id) || stA.id) : '?';
+      const toName = stB ? (stB.name || nodeDisplayName?.(stB.id) || stB.id) : '?';
+      const dupWarn = seg._dupType ? ` style="background:var(--warn-dim)"` : '';
+      table += `<tr${dupWarn}>
+        <td><input type="checkbox" ${seg._include !== false ? 'checked' : ''} onchange="_relImportState.segments[${i}]._include=this.checked"></td>
+        <td>${esc(fromName)}</td><td>${esc(toName)}</td>
+        <td class="mono">${seg.distance}</td>
+        <td><input type="number" value="${seg.maxSpeed}" min="1" max="500" onchange="_relImportState.segments[${i}].maxSpeed=parseInt(this.value)||120" style="width:70px;font-size:12px"></td>
+        <td class="text-dim" style="font-size:11px">${seg._dupType ? t('csv.warn_dup_existing') : ''}</td>
+      </tr>`;
+    }
+    table += `</tbody></table>`;
+    const count = segs.filter(sg => sg._include !== false).length;
+    el.innerHTML = header(3, t('rel.step_segments')) + `
+      <div style="margin-top:20px">
+        <div class="text-dim" style="margin-bottom:8px">${t('csv.review_count', { n: count })}</div>
+        <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
+        <div class="flex gap-8" style="margin-top:16px">
+          <button class="btn" onclick="_relRenderStep(2)">${t('btn.back')}</button>
+          <button class="btn btn-primary" onclick="_relRenderStep(4)">${t('btn.next')}</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // ---- Step 4: Warnings ----
+  if (n === 4) {
+    const w = s.warnings;
+    let html = `<div style="margin-top:20px">`;
+    if (!w.length) {
+      html += `<p class="text-dim">${t('rel.no_warnings')}</p>`;
+    } else {
+      const grouped = {};
+      for (const warn of w) {
+        if (!grouped[warn.type]) grouped[warn.type] = [];
+        grouped[warn.type].push(warn);
+      }
+      for (const [type, items] of Object.entries(grouped)) {
+        html += `<div style="margin-bottom:12px">
+          <div style="font-size:12px;font-weight:600;color:var(--warn);margin-bottom:4px">${esc(type)} (${items.length})</div>`;
+        for (const item of items) {
+          html += `<div class="text-dim" style="font-size:12px;margin-left:12px;margin-bottom:2px">${esc(item.message)}</div>`;
+        }
+        html += `</div>`;
+      }
+    }
+    html += `<div class="flex gap-8" style="margin-top:16px">
+      <button class="btn" onclick="_relRenderStep(3)">${t('btn.back')}</button>
+      <button class="btn btn-primary" onclick="_relRenderStep(5)">${t('btn.next')}</button>
+    </div></div>`;
+    el.innerHTML = header(4, t('rel.step_warnings')) + html;
+    return;
+  }
+
+  // ---- Step 5: Confirm ----
+  if (n === 5) {
+    const stCount = s.stations.filter(st => st._include !== false).length;
+    const sgCount = s.segments.filter(sg => sg._include !== false).length;
+    el.innerHTML = header(5, t('rel.step_confirm')) + `
+      <div style="margin-top:20px;max-width:500px">
+        <div class="ie-card" style="margin-bottom:20px">
+          <div style="font-size:16px;font-weight:600;margin-bottom:8px">${t('rel.summary')}</div>
+          <div>${t('rel.importing_stations', { n: stCount })}</div>
+          <div>${t('rel.importing_segments', { n: sgCount })}</div>
+          ${s.warnings.length ? `<div style="color:var(--warn)">${t('rel.warnings_count', { n: s.warnings.length })}</div>` : ''}
+        </div>
+        <div class="ie-card" style="margin-bottom:20px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">${t('rel.whats_left')}</div>
+          <ul class="text-dim" style="font-size:12px;margin-left:16px;line-height:1.8">
+            <li>${t('rel.manual_junctions')}</li>
+            <li>${t('rel.manual_tracks')}</li>
+            <li>${t('rel.manual_platforms')}</li>
+            <li>${t('rel.manual_services')}</li>
+            <li>${t('rel.manual_lines')}</li>
+          </ul>
+        </div>
+        <div class="flex gap-8">
+          <button class="btn" onclick="_relRenderStep(4)">${t('btn.back')}</button>
+          <button class="btn btn-primary" onclick="_relConfirmImport()">${t('csv.btn_import', { n: stCount + sgCount })}</button>
+        </div>
+      </div>`;
+    return;
+  }
+}
+
+function _relToggleMode(catId, checked) {
+  const modes = _relImportState.config.allowedModes;
+  if (checked && !modes.includes(catId)) modes.push(catId);
+  else if (!checked) { const idx = modes.indexOf(catId); if (idx >= 0) modes.splice(idx, 1); }
+}
+
+async function _relFetchAndProcess() {
+  const s = _relImportState;
+  const c = s.config;
+  const relId = c.relationId.replace(/\D/g, '');
+  if (!relId) { toast(t('rel.no_id'), 'error'); return; }
+
+  const btn = document.getElementById('rel-fetch-btn');
+  if (btn) { btn.disabled = true; btn.textContent = t('rel.fetching'); }
+
+  try {
+    toast(t('rel.fetching'), 'info');
+    s.raw = await fetchRelationFull(relId);
+    console.log('[Relation Import] Raw fetch result:', s.raw);
+    console.log(`[Relation Import] ${s.raw.ways.length} ways, ${s.raw.stops.length} stops, ${s.raw.warnings.length} warnings`);
+    const result = processRelationImport(c, s.raw);
+    console.log('[Relation Import] Processed:', result.stations.length, 'stations,', result.segments.length, 'segments,', result.warnings.length, 'warnings');
+    s.stations = result.stations;
+    s.segments = result.segments;
+    s.warnings = result.warnings;
+    _relRenderStep(2);
+  } catch (err) {
+    console.error('Relation import failed:', err);
+    toast(t('rel.fetch_error', { msg: err.message }), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = t('rel.fetch_btn'); }
+  }
+}
+
+let _relImporting = false;
+async function _relConfirmImport() {
+  if (_relImporting) return;
+  _relImporting = true;
+  const s = _relImportState;
+
+  const stationsToImport = s.stations.filter(st => st._include !== false);
+  const segmentsToImport = s.segments.filter(sg => sg._include !== false);
+
+  // Clean temp properties
+  for (const st of stationsToImport) {
+    delete st._snap; delete st._include; delete st._dupType;
+    delete st._dupExistingName; delete st._disambig; delete st._isWaypoint;
+  }
+  for (const sg of segmentsToImport) {
+    delete sg._include; delete sg._dupType;
+    // Remap segment nodeA/nodeB if their station was excluded
+    // (segments referencing excluded stations should have been unchecked too)
+  }
+
+  data.nodes.push(...stationsToImport);
+  data.segments.push(...segmentsToImport);
+
+  save();
+  document.getElementById('sidebar').classList.remove('sidebar-locked');
+  window._relImportState = null;
+  _relImporting = false;
+  refreshAll();
+  toast(t('csv.import_success', { n: stationsToImport.length + segmentsToImport.length }), 'success');
+  renderImportExport();
+}
+
+// ============================================================
+// CSV IMPORT WIZARDS
+// ============================================================
+window._csvImportState = null;
+
+const CSV_NODE_FIELDS = [
+  { key: 'skip', label: '(skip)' },
+  { key: 'name', label: 'Name' },
+  { key: 'type', label: 'Type' },
+  { key: 'ogfNode', label: 'OGF Node ID' },
+  { key: 'refCode', label: 'Ref Code' },
+  { key: 'address', label: 'Address' },
+  { key: 'description', label: 'Description' },
+  { key: 'platforms', label: 'Platforms (pipe-separated)' }
+];
+
+const CSV_SEG_FIELDS = [
+  { key: 'skip', label: '(skip)' },
+  { key: 'fromNode', label: 'From Node' },
+  { key: 'toNode', label: 'To Node' },
+  { key: 'distance', label: 'Distance (km)' },
+  { key: 'maxSpeed', label: 'Max Speed (km/h)' },
+  { key: 'trackCount', label: 'Track Count' },
+  { key: 'electrification', label: 'Electrified (true/false)' },
+  { key: 'refCode', label: 'Ref Code' },
+  { key: 'description', label: 'Description' },
+  { key: 'ogfWayIds', label: 'OGF Way IDs' }
+];
+
+function startCSVNodeImport() { _csvInit('nodes'); }
+function startCSVSegmentImport() { _csvInit('segments'); }
+
+function _csvInit(mode) {
+  window._csvImportState = {
+    mode, step: 1,
+    file: { name: '', raw: '', delimiter: ',', rows: [] },
+    columnMap: {},
+    defaults: mode === 'nodes'
+      ? { type: 'station', platformCount: getSetting('defaultPlatforms', 2) }
+      : { maxSpeed: 120, trackCount: 2, electrification: true, allowedModes: [] },
+    preview: [],
+    nodeMatches: {},
+    warnings: []
+  };
+  document.getElementById('sidebar').classList.add('sidebar-locked');
+  _csvRenderStep(1);
+}
+
+function _csvCancel() {
+  window._csvImportState = null;
+  document.getElementById('sidebar').classList.remove('sidebar-locked');
+  renderImportExport();
+}
+
+function _csvStepHeader(stepNum, totalSteps, title) {
+  const s = _csvImportState;
+  const modeLabel = s.mode === 'nodes' ? t('csv.mode_nodes') : t('csv.mode_segments');
+  return `<div class="csv-wizard-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div>
+        <h2 style="font-family:var(--font-display);font-size:22px;font-weight:600;margin-bottom:2px">${modeLabel}</h2>
+        <div class="text-dim" style="font-size:13px">${t('csv.step_of', { n: stepNum, total: totalSteps })}: ${title}</div>
+      </div>
+      <button class="btn" onclick="_csvCancel()">${t('btn.cancel')}</button>
+    </div>
+    <div class="csv-step-bar">${Array.from({length: totalSteps}, (_, i) =>
+      `<div class="csv-step-dot${i + 1 <= stepNum ? ' active' : ''}${i + 1 === stepNum ? ' current' : ''}"></div>`
+    ).join('<div class="csv-step-line"></div>')}</div>
+  </div>`;
+}
+
+function _csvRenderStep(n) {
+  _csvImportState.step = n;
+  const el = document.getElementById('import-export-content');
+  const s = _csvImportState;
+  const totalSteps = s.mode === 'nodes' ? 6 : 7;
+
+  if (n === 1) {
+    el.innerHTML = _csvStepHeader(1, totalSteps, t('csv.step_upload')) + `
+      <div class="ie-card" style="max-width:500px;margin-top:20px">
+        <p style="margin-bottom:16px">${t('csv.upload_desc')}</p>
+        <input type="file" accept=".csv,.tsv,.txt" onchange="_csvHandleFile(event)" style="font-size:13px">
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+          <label style="font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px">${t('csv.or_paste')}</label>
+          <textarea id="csv-paste-area" placeholder="${t('csv.paste_placeholder')}" style="width:100%;height:120px;font-family:var(--font-mono);font-size:12px;resize:vertical"></textarea>
+          <button class="btn" style="margin-top:8px" onclick="_csvHandlePaste()">${t('csv.use_pasted')}</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (n === 2) {
+    const rows = s.file.rows;
+    const delimLabel = s.file.delimiter === '\t' ? t('csv.delim_tab') : t('csv.delim_comma');
+    let table = `<table class="data-table csv-preview-table"><thead><tr>`;
+    const colCount = rows[0]?.length || 0;
+    for (let c = 0; c < colCount; c++) table += `<th>${t('csv.col')} ${c + 1}</th>`;
+    table += `</tr></thead><tbody>`;
+    for (let r = 0; r < Math.min(rows.length, 5); r++) {
+      table += `<tr>${rows[r].map(v => `<td>${esc(v)}</td>`).join('')}</tr>`;
+    }
+    table += `</tbody></table>`;
+    el.innerHTML = _csvStepHeader(2, totalSteps, t('csv.step_preview')) + `
+      <div style="margin-top:20px">
+        <div class="text-dim" style="margin-bottom:8px">${t('csv.detected', { delim: delimLabel, rows: rows.length, cols: colCount })}</div>
+        <div style="overflow-x:auto">${table}</div>
+        <div class="flex gap-8" style="margin-top:16px">
+          <button class="btn" onclick="_csvRenderStep(1)">${t('btn.back')}</button>
+          <button class="btn btn-primary" onclick="_csvRenderStep(3)">${t('btn.next')}</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  if (n === 3) {
+    const fields = s.mode === 'nodes' ? CSV_NODE_FIELDS : CSV_SEG_FIELDS;
+    const colCount = s.file.rows[0]?.length || 0;
+    const firstRow = s.file.rows[0] || [];
+    // Auto-assign columns if not yet mapped
+    if (Object.keys(s.columnMap).length === 0) {
+      for (let c = 0; c < colCount; c++) s.columnMap[c] = 'skip';
+    }
+    let html = `<div style="margin-top:20px;max-width:700px">`;
+    html += `<p class="text-dim" style="margin-bottom:12px">${t('csv.assign_desc')}</p>`;
+    for (let c = 0; c < colCount; c++) {
+      const sample = firstRow[c] || '';
+      html += `<div class="csv-assign-row">
+        <div class="csv-assign-label">${t('csv.col')} ${c + 1}</div>
+        <div class="csv-assign-sample mono">${esc(sample.length > 30 ? sample.slice(0, 30) + '...' : sample)}</div>
+        <select onchange="_csvImportState.columnMap[${c}]=this.value" class="csv-assign-select">
+          ${fields.map(f => `<option value="${f.key}" ${s.columnMap[c] === f.key ? 'selected' : ''}>${f.label}</option>`).join('')}
+        </select>
+      </div>`;
+    }
+    html += `<div class="flex gap-8" style="margin-top:16px">
+      <button class="btn" onclick="_csvRenderStep(2)">${t('btn.back')}</button>
+      <button class="btn btn-primary" onclick="_csvRenderStep(4)">${t('btn.next')}</button>
+    </div></div>`;
+    el.innerHTML = _csvStepHeader(3, totalSteps, t('csv.step_assign')) + html;
+    return;
+  }
+
+  if (s.mode === 'nodes') _csvRenderNodeStep(n, totalSteps);
+  else _csvRenderSegStep(n, totalSteps);
+}
+
+function _csvHandleFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    const raw = ev.target.result;
+    const parsed = parseCSV(raw);
+    _csvImportState.file = { name: file.name, raw, delimiter: parsed.delimiter, rows: parsed.rows };
+    _csvImportState.columnMap = {};
+    _csvRenderStep(2);
+  };
+  reader.readAsText(file);
+}
+
+function _csvHandlePaste() {
+  const raw = (document.getElementById('csv-paste-area')?.value || '').trim();
+  if (!raw) { toast(t('csv.paste_empty'), 'error'); return; }
+  const parsed = parseCSV(raw);
+  _csvImportState.file = { name: 'pasted data', raw, delimiter: parsed.delimiter, rows: parsed.rows };
+  _csvImportState.columnMap = {};
+  _csvRenderStep(2);
+}
+
+// ---- Node Import Steps 4-6 ----
+function _csvRenderNodeStep(n, totalSteps) {
+  const el = document.getElementById('import-export-content');
+  const s = _csvImportState;
+
+  if (n === 4) {
+    // Defaults step
+    const hasTypeCol = Object.values(s.columnMap).includes('type');
+    let html = `<div style="margin-top:20px;max-width:500px">`;
+    if (!hasTypeCol) {
+      html += `<div class="form-group"><label>${t('csv.default_type')}</label>
+        <select id="csv-def-type" onchange="_csvImportState.defaults.type=this.value">
+          <option value="station" ${s.defaults.type === 'station' ? 'selected' : ''}>Station</option>
+          <option value="bus_stop" ${s.defaults.type === 'bus_stop' ? 'selected' : ''}>Bus Stop</option>
+          <option value="junction" ${s.defaults.type === 'junction' ? 'selected' : ''}>Junction</option>
+          <option value="waypoint" ${s.defaults.type === 'waypoint' ? 'selected' : ''}>Waypoint</option>
+          <option value="depot" ${s.defaults.type === 'depot' ? 'selected' : ''}>Depot</option>
+          <option value="freight_yard" ${s.defaults.type === 'freight_yard' ? 'selected' : ''}>Freight Yard</option>
+        </select></div>`;
+    }
+    const hasPlatCol = Object.values(s.columnMap).includes('platforms');
+    if (!hasPlatCol) {
+      html += `<div class="form-group"><label>${t('csv.default_platforms')}</label>
+        <input type="number" min="0" max="50" value="${s.defaults.platformCount}" onchange="_csvImportState.defaults.platformCount=parseInt(this.value)||0"></div>`;
+    }
+    html += `<div class="flex gap-8" style="margin-top:16px">
+      <button class="btn" onclick="_csvRenderStep(3)">${t('btn.back')}</button>
+      <button class="btn btn-primary" onclick="_csvBuildNodePreview()">${t('csv.btn_preview')}</button>
+    </div></div>`;
+    el.innerHTML = _csvStepHeader(4, totalSteps, t('csv.step_defaults')) + html;
+    return;
+  }
+
+  if (n === 5) {
+    // Dedup review step — show only items with conflicts
+    const nodes = s.preview;
+    const dupes = nodes.map((nd, i) => ({ nd, i })).filter(({ nd }) => nd._dupType);
+    if (!dupes.length) {
+      el.innerHTML = _csvStepHeader(5, totalSteps, t('csv.step_dedup')) + `
+        <div style="margin-top:20px">
+          <p class="text-dim">${t('csv.no_dupes')}</p>
+          <div class="flex gap-8" style="margin-top:16px">
+            <button class="btn" onclick="_csvRenderStep(4)">${t('btn.back')}</button>
+            <button class="btn btn-primary" onclick="_csvRenderStep(6)">${t('btn.next')}</button>
+          </div>
+        </div>`;
+      return;
+    }
+    let html = `<div style="margin-top:20px">
+      <p class="text-dim" style="margin-bottom:12px">${t('csv.dedup_node_desc', { n: dupes.length })}</p>
+      <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
+      <table class="data-table csv-preview-table"><thead><tr>
+        <th>${t('csv.importing')}</th><th>${t('csv.existing')}</th><th>${t('csv.conflict')}</th><th>${t('csv.action')}</th>
+      </tr></thead><tbody>`;
+    for (const { nd, i } of dupes) {
+      const existName = nd._dupExistingName || '';
+      html += `<tr>
+        <td>${esc(nd.name || '')} <span class="mono text-dim" style="font-size:11px">${esc(nd.ogfNode || '')}</span></td>
+        <td>${esc(existName)}</td>
+        <td class="text-dim" style="font-size:11px">${nd._dupType === 'ogf' ? t('csv.dup_same_ogf') : t('csv.dup_same_batch')}</td>
+        <td style="white-space:nowrap">
+          <select onchange="_csvNodeDedupAction(${i},this.value)" class="csv-match-select">
+            <option value="skip" ${nd._include === false ? 'selected' : ''}>${t('csv.action_skip')}</option>
+            <option value="disambig" ${nd._include !== false ? 'selected' : ''}>${t('csv.action_disambig')}</option>
+          </select>
+          ${nd._include !== false ? `<input type="text" value="${esc(nd._disambig || '')}" placeholder="${t('csv.disambig_placeholder')}"
+            onchange="_csvNodeSetDisambig(${i},this.value)" style="width:120px;margin-left:6px;font-size:12px">` : ''}
+        </td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>
+      <div class="flex gap-8" style="margin-top:16px">
+        <button class="btn" onclick="_csvRenderStep(4)">${t('btn.back')}</button>
+        <button class="btn btn-primary" onclick="_csvApplyNodeDedup();_csvRenderStep(6)">${t('btn.next')}</button>
+      </div></div>`;
+    el.innerHTML = _csvStepHeader(5, totalSteps, t('csv.step_dedup')) + html;
+    return;
+  }
+
+  if (n === 6) {
+    // Final review
+    const nodes = s.preview;
+    let table = `<table class="data-table csv-preview-table"><thead><tr>
+      <th></th><th>${t('field.name')}</th><th>${t('field.type')}</th><th>${t('field.ogf_node')}</th>
+      <th>${t('field.platforms')}</th><th></th></tr></thead><tbody>`;
+    for (let i = 0; i < nodes.length; i++) {
+      const nd = nodes[i];
+      const warn = nd._warn ? ` style="background:var(--warn-dim)"` : '';
+      table += `<tr${warn}>
+        <td><input type="checkbox" ${nd._include !== false ? 'checked' : ''} onchange="_csvImportState.preview[${i}]._include=this.checked"></td>
+        <td>${esc(nd.name || '')}</td><td>${esc(nd.type)}</td><td class="mono">${esc(nd.ogfNode || '')}</td>
+        <td>${nd.platforms.length}</td>
+        <td class="text-dim" style="font-size:11px">${nd._warn || ''}</td>
+      </tr>`;
+    }
+    table += `</tbody></table>`;
+    const count = nodes.filter(nd => nd._include !== false).length;
+    el.innerHTML = _csvStepHeader(6, totalSteps, t('csv.step_review')) + `
+      <div style="margin-top:20px">
+        <div class="text-dim" style="margin-bottom:8px">${t('csv.review_count', { n: count })}</div>
+        <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
+        <div class="flex gap-8" style="margin-top:16px">
+          <button class="btn" onclick="_csvRenderStep(5)">${t('btn.back')}</button>
+          <button class="btn btn-primary" onclick="_csvConfirmNodeImport()">${t('csv.btn_import', { n: count })}</button>
+        </div>
+      </div>`;
+    return;
+  }
+}
+
+function _csvBuildNodePreview() {
+  const s = _csvImportState;
+  const fieldCol = _csvFieldCol();
+  const nodes = [];
+  for (const row of s.file.rows) {
+    const name = fieldCol.name != null ? (row[fieldCol.name] || '').trim() : '';
+    const typeRaw = fieldCol.type != null ? (row[fieldCol.type] || '').trim().toLowerCase() : '';
+    const validTypes = ['station', 'bus_stop', 'junction', 'waypoint', 'depot', 'freight_yard'];
+    const type = validTypes.includes(typeRaw) ? typeRaw : s.defaults.type;
+    const ogfNode = fieldCol.ogfNode != null ? (row[fieldCol.ogfNode] || '').trim().replace(/^node\s+/i, '') : '';
+    const refCode = fieldCol.refCode != null ? (row[fieldCol.refCode] || '').trim() : '';
+    const address = fieldCol.address != null ? (row[fieldCol.address] || '').trim() : '';
+    const description = fieldCol.description != null ? (row[fieldCol.description] || '').trim() : '';
+    const platRaw = fieldCol.platforms != null ? (row[fieldCol.platforms] || '').trim() : '';
+
+    let platforms = [];
+    if (platRaw) {
+      platforms = platRaw.split('|').map(p => ({ id: uid(), name: p.trim() })).filter(p => p.name);
+    } else if (type === 'station' || type === 'bus_stop') {
+      const count = s.defaults.platformCount || 0;
+      for (let i = 1; i <= count; i++) platforms.push({ id: uid(), name: `Platform ${i}` });
+    }
+
+    let warn = '', include = true, dupType = null, dupExistingName = '';
+    if (!name && !ogfNode) { warn = t('csv.warn_no_name_or_ogf'); include = false; }
+    else if (!name) warn = t('csv.warn_no_name');
+    // Dedup: tag conflicts for the dedup review step (don't auto-exclude)
+    if (ogfNode) {
+      const existingNode = data.nodes.find(n => String(n.ogfNode) === ogfNode);
+      if (existingNode) {
+        dupType = 'ogf'; dupExistingName = existingNode.name || existingNode.id;
+      } else if (nodes.some(n => n.ogfNode === ogfNode)) {
+        dupType = 'batch'; dupExistingName = nodes.find(n => n.ogfNode === ogfNode)?.name || '';
+      }
+    }
+
+    nodes.push({
+      id: uid(), name, type, ogfNode, refCode, address, description, platforms,
+      _include: include, _warn: warn,
+      _dupType: dupType, _dupExistingName: dupExistingName, _disambig: ''
+    });
+  }
+  s.preview = nodes;
+  _csvRenderStep(5);
+}
+
+function _csvNodeDedupAction(idx, action) {
+  const nd = _csvImportState.preview[idx];
+  if (action === 'skip') { nd._include = false; nd._disambig = ''; }
+  else { nd._include = true; }
+  _csvRenderStep(5);
+}
+
+function _csvNodeSetDisambig(idx, val) {
+  _csvImportState.preview[idx]._disambig = val.trim();
+}
+
+function _csvApplyNodeDedup() {
+  for (const nd of _csvImportState.preview) {
+    if (nd._dupType && nd._include !== false && nd._disambig) {
+      // Apply per-node disambiguation: strip existing suffix and add new one
+      nd.name = nd.name.replace(/\s*\[[^\]]*\]\s*$/, '') + ' [' + nd._disambig + ']';
+    }
+  }
+}
+
+let _csvImporting = false;
+async function _csvConfirmNodeImport() {
+  if (_csvImporting) return;
+  _csvImporting = true;
+  const s = _csvImportState;
+  const toImport = s.preview.filter(n => n._include !== false);
+  if (!toImport.length) { toast(t('csv.nothing_to_import'), 'error'); _csvImporting = false; return; }
+
+  // Clean temp properties and push
+  for (const n of toImport) { delete n._include; delete n._warn; }
+  data.nodes.push(...toImport);
+
+  // Fetch OGF data for nodes with OGF IDs
+  const withOgf = toImport.filter(n => n.ogfNode);
+  if (withOgf.length) {
+    toast(t('csv.fetching_ogf', { n: withOgf.length }), 'info');
+    await fetchOgfCoords(withOgf, { updateTags: true });
+  }
+
+  save();
+  document.getElementById('sidebar').classList.remove('sidebar-locked');
+  window._csvImportState = null;
+  _csvImporting = false;
+  refreshAll();
+  toast(t('csv.import_success', { n: toImport.length }), 'success');
+  renderImportExport();
+}
+
+// ---- Segment Import Steps 4-7 ----
+function _csvRenderSegStep(n, totalSteps) {
+  const el = document.getElementById('import-export-content');
+  const s = _csvImportState;
+
+  if (n === 4) {
+    // Node matching step
+    _csvBuildSegNodeMatches();
+    const matches = s.nodeMatches;
+    const rows = s.file.rows;
+    const fieldCol = _csvFieldCol();
+
+    let html = `<div style="margin-top:20px">
+      <p class="text-dim" style="margin-bottom:12px">${t('csv.match_desc')}</p>
+      <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
+      <table class="data-table csv-preview-table"><thead><tr>
+        <th>${t('csv.row')}</th><th>${t('csv.from_input')}</th><th>${t('csv.from_match')}</th>
+        <th>${t('csv.to_input')}</th><th>${t('csv.to_match')}</th></tr></thead><tbody>`;
+
+    for (let i = 0; i < rows.length; i++) {
+      const m = matches[i] || {};
+      const fm = m.from || [];
+      const tm = m.to || [];
+      const fromWarn = m.fromWarn ? `<div class="text-dim" style="font-size:10px;color:var(--warn)">${m.fromWarn}</div>` : '';
+      const toWarn = m.toWarn ? `<div class="text-dim" style="font-size:10px;color:var(--warn)">${m.toWarn}</div>` : '';
+
+      html += `<tr>
+        <td class="mono">${i + 1}</td>
+        <td>${esc(m.fromInput || '')}${fromWarn}</td>
+        <td>${_csvMatchSelect(i, 'from', fm)}</td>
+        <td>${esc(m.toInput || '')}${toWarn}</td>
+        <td>${_csvMatchSelect(i, 'to', tm)}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>
+      <div class="flex gap-8" style="margin-top:16px">
+        <button class="btn" onclick="_csvRenderStep(3)">${t('btn.back')}</button>
+        <button class="btn btn-primary" onclick="_csvRenderStep(5)">${t('btn.next')}</button>
+      </div></div>`;
+    el.innerHTML = _csvStepHeader(4, totalSteps, t('csv.step_matching')) + html;
+    return;
+  }
+
+  if (n === 5) {
+    // Defaults step
+    let html = `<div style="margin-top:20px;max-width:500px">`;
+    const hasSpeed = Object.values(s.columnMap).includes('maxSpeed');
+    const hasTracks = Object.values(s.columnMap).includes('trackCount');
+    const hasElec = Object.values(s.columnMap).includes('electrification');
+    if (!hasSpeed) {
+      html += `<div class="form-group"><label>${t('csv.default_speed')}</label>
+        <input type="number" min="1" max="500" value="${s.defaults.maxSpeed}" onchange="_csvImportState.defaults.maxSpeed=parseInt(this.value)||120"></div>`;
+    }
+    if (!hasTracks) {
+      html += `<div class="form-group"><label>${t('csv.default_tracks')}</label>
+        <input type="number" min="1" max="20" value="${s.defaults.trackCount}" onchange="_csvImportState.defaults.trackCount=parseInt(this.value)||2"></div>`;
+    }
+    if (!hasElec) {
+      html += `<div class="form-group"><label>${t('csv.default_elec')}</label>
+        <select onchange="_csvImportState.defaults.electrification=this.value==='true'">
+          <option value="true" ${s.defaults.electrification ? 'selected' : ''}>${t('seg_detail.electrified')}</option>
+          <option value="false" ${!s.defaults.electrification ? 'selected' : ''}>${t('seg_detail.not_electrified')}</option>
+        </select></div>`;
+    }
+    // Allowed modes — always shown (no CSV column for this)
+    if (data.categories.length) {
+      html += `<div class="form-group"><label>${t('field.allowed_modes')}</label>
+        <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('field.allowed_modes_help')}</p>`;
+      for (const cat of data.categories) {
+        const checked = s.defaults.allowedModes.includes(cat.id) ? 'checked' : '';
+        html += `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:4px">
+          <input type="checkbox" ${checked} onchange="_csvToggleAllowedMode('${cat.id}',this.checked)"> ${esc(cat.name)}</label>`;
+      }
+      html += `</div>`;
+    }
+    html += `<div class="flex gap-8" style="margin-top:16px">
+      <button class="btn" onclick="_csvRenderStep(4)">${t('btn.back')}</button>
+      <button class="btn btn-primary" onclick="_csvBuildSegPreview()">${t('csv.btn_preview')}</button>
+    </div></div>`;
+    el.innerHTML = _csvStepHeader(5, totalSteps, t('csv.step_defaults')) + html;
+    return;
+  }
+
+  if (n === 6) {
+    // Dedup review step
+    const segs = s.preview;
+    const dupes = segs.map((seg, i) => ({ seg, i })).filter(({ seg }) => seg._dupType);
+    if (!dupes.length) {
+      el.innerHTML = _csvStepHeader(6, totalSteps, t('csv.step_dedup')) + `
+        <div style="margin-top:20px">
+          <p class="text-dim">${t('csv.no_dupes')}</p>
+          <div class="flex gap-8" style="margin-top:16px">
+            <button class="btn" onclick="_csvRenderStep(5)">${t('btn.back')}</button>
+            <button class="btn btn-primary" onclick="_csvRenderStep(7)">${t('btn.next')}</button>
+          </div>
+        </div>`;
+      return;
+    }
+    let html = `<div style="margin-top:20px">
+      <p class="text-dim" style="margin-bottom:12px">${t('csv.dedup_seg_desc', { n: dupes.length })}</p>
+      <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
+      <table class="data-table csv-preview-table"><thead><tr>
+        <th>${t('csv.importing')}</th><th>${t('csv.conflict')}</th><th>${t('csv.action')}</th>
+      </tr></thead><tbody>`;
+    for (const { seg, i } of dupes) {
+      const fromName = getNode(seg.nodeA) ? nodeDisplayName(seg.nodeA) : '?';
+      const toName = getNode(seg.nodeB) ? nodeDisplayName(seg.nodeB) : '?';
+      const typeLabel = seg._dupType === 'pair' ? t('csv.dup_same_endpoints')
+        : seg._dupType === 'ways' ? t('csv.dup_same_ways')
+        : t('csv.dup_same_batch');
+      html += `<tr>
+        <td>${esc(fromName)} \u2192 ${esc(toName)}</td>
+        <td class="text-dim" style="font-size:11px">${typeLabel}</td>
+        <td>
+          <select onchange="_csvImportState.preview[${i}]._include=this.value==='keep'" class="csv-match-select">
+            <option value="skip" ${seg._include === false ? 'selected' : ''}>${t('csv.action_skip')}</option>
+            <option value="keep" ${seg._include !== false ? 'selected' : ''}>${t('csv.action_keep')}</option>
+          </select>
+        </td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>
+      <div class="flex gap-8" style="margin-top:16px">
+        <button class="btn" onclick="_csvRenderStep(5)">${t('btn.back')}</button>
+        <button class="btn btn-primary" onclick="_csvRenderStep(7)">${t('btn.next')}</button>
+      </div></div>`;
+    el.innerHTML = _csvStepHeader(6, totalSteps, t('csv.step_dedup')) + html;
+    return;
+  }
+
+  if (n === 7) {
+    // Final review
+    const segs = s.preview;
+    let table = `<table class="data-table csv-preview-table"><thead><tr>
+      <th></th><th>${t('field.from_node')}</th><th>${t('field.to_node')}</th>
+      <th>${t('field.distance')}</th><th>${t('field.max_speed')}</th><th>${t('field.tracks')}</th><th></th>
+    </tr></thead><tbody>`;
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i];
+      const warn = (seg._warn || seg._dupType) ? ` style="background:var(--warn-dim)"` : '';
+      const fromName = getNode(seg.nodeA) ? nodeDisplayName(seg.nodeA) : '?';
+      const toName = getNode(seg.nodeB) ? nodeDisplayName(seg.nodeB) : '?';
+      table += `<tr${warn}>
+        <td><input type="checkbox" ${seg._include !== false ? 'checked' : ''} onchange="_csvImportState.preview[${i}]._include=this.checked"></td>
+        <td>${esc(fromName)}</td><td>${esc(toName)}</td>
+        <td class="mono">${seg.distance}</td><td class="mono">${seg.maxSpeed}</td>
+        <td class="mono">${seg.tracks.length}</td>
+        <td class="text-dim" style="font-size:11px">${seg._warn || ''}</td>
+      </tr>`;
+    }
+    table += `</tbody></table>`;
+    const count = segs.filter(s => s._include !== false).length;
+    el.innerHTML = _csvStepHeader(7, totalSteps, t('csv.step_review')) + `
+      <div style="margin-top:20px">
+        <div class="text-dim" style="margin-bottom:8px">${t('csv.review_count', { n: count })}</div>
+        <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
+        <div class="flex gap-8" style="margin-top:16px">
+          <button class="btn" onclick="_csvRenderStep(6)">${t('btn.back')}</button>
+          <button class="btn btn-primary" onclick="_csvConfirmSegImport()">${t('csv.btn_import', { n: count })}</button>
+        </div>
+      </div>`;
+    return;
+  }
+}
+
+function _csvFieldCol() {
+  const fieldCol = {};
+  for (const [col, field] of Object.entries(_csvImportState.columnMap)) {
+    if (field !== 'skip') fieldCol[field] = parseInt(col);
+  }
+  return fieldCol;
+}
+
+function _csvResolveEndpoint(row, fieldCol, direction) {
+  // Single column: try OGF ID match first, fall back to fuzzy name match
+  const key = direction === 'from' ? 'fromNode' : 'toNode';
+  if (fieldCol[key] == null) return { input: '', matches: [], mode: 'none' };
+  const raw = (row[fieldCol[key]] || '').trim();
+  if (!raw) return { input: '', matches: [], mode: 'none' };
+  // If it looks like an OGF ID (digits, or "node 12345"), try OGF match first
+  const ogfMatches = matchNodeByOgfId(raw);
+  if (ogfMatches.length) return { input: raw, matches: ogfMatches, mode: 'ogf' };
+  // Fall back to fuzzy name match
+  return { input: raw, matches: fuzzyMatchNode(raw).slice(0, 3), mode: 'name' };
+}
+
+function _csvBuildSegNodeMatches() {
+  const s = _csvImportState;
+  const fieldCol = _csvFieldCol();
+  if (!s.nodeMatches || !Object.keys(s.nodeMatches).length) {
+    s.nodeMatches = {};
+    for (let i = 0; i < s.file.rows.length; i++) {
+      const row = s.file.rows[i];
+      const fromRes = _csvResolveEndpoint(row, fieldCol, 'from');
+      const toRes = _csvResolveEndpoint(row, fieldCol, 'to');
+
+      const fromWarn = fromRes.mode === 'ogf' && fromRes.matches.length > 1 ? t('csv.warn_dup_ogf_match') : '';
+      const toWarn = toRes.mode === 'ogf' && toRes.matches.length > 1 ? t('csv.warn_dup_ogf_match') : '';
+
+      s.nodeMatches[i] = {
+        from: fromRes.matches, to: toRes.matches,
+        fromInput: fromRes.input, toInput: toRes.input,
+        fromMode: fromRes.mode, toMode: toRes.mode,
+        fromWarn, toWarn,
+        fromSelected: null, toSelected: null
+      };
+      // Auto-select exact/unique matches
+      if (s.nodeMatches[i].from.length === 1 && s.nodeMatches[i].from[0].score === 100) {
+        s.nodeMatches[i].fromSelected = s.nodeMatches[i].from[0].node.id;
+      }
+      if (s.nodeMatches[i].to.length === 1 && s.nodeMatches[i].to[0].score === 100) {
+        s.nodeMatches[i].toSelected = s.nodeMatches[i].to[0].node.id;
+      }
+    }
+  }
+}
+
+function _csvMatchSelect(rowIdx, direction, matches) {
+  const s = _csvImportState;
+  const entry = s.nodeMatches[rowIdx];
+  const selected = direction === 'from' ? entry?.fromSelected : entry?.toSelected;
+  if (!matches.length) return `<span class="csv-match-none">${t('csv.no_match')}</span>`;
+  let html = `<select onchange="_csvImportState.nodeMatches[${rowIdx}].${direction}Selected=this.value||null" class="csv-match-select">`;
+  html += `<option value="">${t('csv.select_node')}</option>`;
+  for (const m of matches) {
+    const label = `${nodeDisplayName(m.node.id)} (${m.method})`;
+    html += `<option value="${m.node.id}" ${selected === m.node.id ? 'selected' : ''}>${esc(label)}</option>`;
+  }
+  html += `</select>`;
+  return html;
+}
+
+function _csvSetMatch(rowIdx, direction, nodeId) {
+  const s = _csvImportState;
+  if (direction === 'from') s.nodeMatches[rowIdx].fromSelected = nodeId || null;
+  else s.nodeMatches[rowIdx].toSelected = nodeId || null;
+}
+
+function _csvToggleAllowedMode(catId, checked) {
+  const modes = _csvImportState.defaults.allowedModes;
+  if (checked && !modes.includes(catId)) modes.push(catId);
+  else if (!checked) {
+    const idx = modes.indexOf(catId);
+    if (idx >= 0) modes.splice(idx, 1);
+  }
+}
+
+function _csvBuildSegPreview() {
+  const s = _csvImportState;
+  const fieldCol = _csvFieldCol();
+  const segs = [];
+  const seenPairs = new Set();
+
+  for (let i = 0; i < s.file.rows.length; i++) {
+    const row = s.file.rows[i];
+    const match = s.nodeMatches[i];
+    const fromId = match?.fromSelected;
+    const toId = match?.toSelected;
+
+    const distRaw = fieldCol.distance != null ? parseFloat(row[fieldCol.distance]) : 0;
+    const distance = isNaN(distRaw) || distRaw <= 0 ? 0 : Math.round(distRaw * 100) / 100;
+    const speedRaw = fieldCol.maxSpeed != null ? parseInt(row[fieldCol.maxSpeed]) : 0;
+    const maxSpeed = speedRaw > 0 ? speedRaw : s.defaults.maxSpeed;
+    const trackRaw = fieldCol.trackCount != null ? parseInt(row[fieldCol.trackCount]) : 0;
+    const trackCount = trackRaw > 0 ? trackRaw : s.defaults.trackCount;
+    const elecRaw = fieldCol.electrification != null ? (row[fieldCol.electrification] || '').trim().toLowerCase() : '';
+    const electrification = elecRaw ? (elecRaw === 'true' || elecRaw === 'yes' || elecRaw === '1') : s.defaults.electrification;
+    const refCode = fieldCol.refCode != null ? (row[fieldCol.refCode] || '').trim() : '';
+    const description = fieldCol.description != null ? (row[fieldCol.description] || '').trim() : '';
+    const ogfWayRaw = fieldCol.ogfWayIds != null ? (row[fieldCol.ogfWayIds] || '').trim() : '';
+    const ogfWayIds = ogfWayRaw ? ogfWayRaw.replace(/\bway\s+/gi, '').split(/[,\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0) : [];
+
+    const tracks = [];
+    for (let tk = 1; tk <= trackCount; tk++) tracks.push({ id: uid(), name: `Track ${tk}` });
+
+    let warn = '', include = true, dupType = null;
+    if (!fromId && !toId) { warn = t('csv.warn_no_nodes'); include = false; }
+    else if (!fromId) { warn = t('csv.warn_no_from'); include = false; }
+    else if (!toId) { warn = t('csv.warn_no_to'); include = false; }
+    else if (fromId === toId) { warn = t('csv.warn_same_node'); include = false; }
+
+    // Duplicate tagging for the dedup review step
+    if (fromId && toId && fromId !== toId) {
+      const pairKey = [fromId, toId].sort().join('|');
+      const existingPairDup = data.segments.some(seg =>
+        !isInterchange(seg) && (
+          (seg.nodeA === fromId && seg.nodeB === toId) ||
+          (seg.nodeA === toId && seg.nodeB === fromId)
+        )
+      );
+      const wayKey = ogfWayIds.length ? [...ogfWayIds].sort().join(',') : '';
+      const existingWayDup = wayKey && data.segments.some(seg =>
+        seg.ogfWayIds?.length && [...seg.ogfWayIds].sort().join(',') === wayKey
+      );
+      if (existingPairDup) dupType = 'pair';
+      else if (existingWayDup) dupType = 'ways';
+      else if (seenPairs.has(pairKey)) dupType = 'batch';
+      if (dupType) include = false; // default to skip, user can override in dedup step
+      seenPairs.add(pairKey);
+    }
+
+    segs.push({
+      id: uid(), nodeA: fromId || '', nodeB: toId || '',
+      tracks, maxSpeed, distance, electrification,
+      refCode, description, interchangeType: null,
+      ogfWayIds, wayGeometry: null,
+      allowedModes: [...s.defaults.allowedModes],
+      _include: include, _warn: warn, _dupType: dupType
+    });
+  }
+  s.preview = segs;
+  _csvRenderStep(6);
+}
+
+async function _csvConfirmSegImport() {
+  if (_csvImporting) return;
+  _csvImporting = true;
+  const s = _csvImportState;
+  const toImport = s.preview.filter(seg => seg._include !== false);
+  if (!toImport.length) { toast(t('csv.nothing_to_import'), 'error'); _csvImporting = false; return; }
+
+  for (const seg of toImport) { delete seg._include; delete seg._warn; }
+  data.segments.push(...toImport);
+
+  // Fetch way geometry for segments with OGF Way IDs — single batch API call
+  const withWays = toImport.filter(seg => seg.ogfWayIds?.length);
+  if (withWays.length) {
+    toast(t('csv.fetching_ways', { n: withWays.length }), 'info');
+    try {
+      const allWayIds = withWays.flatMap(seg => seg.ogfWayIds);
+      const wayCache = await fetchWayGeometryBatch(allWayIds);
+
+      for (const seg of withWays) {
+        const result = stitchWayGeometry(seg.ogfWayIds, wayCache);
+        if (!result?.coords?.length) continue;
+        let coords = result.coords;
+        const nA = getNode(seg.nodeA), nB = getNode(seg.nodeB);
+
+        // Auto-trim to endpoints if both nodes have coordinates
+        if (nA?.lat != null && nB?.lat != null) {
+          const snapA = _snapToPolyline([nA.lat, nA.lon], coords);
+          const snapB = _snapToPolyline([nB.lat, nB.lon], coords);
+          if (snapA.dist > 0.05) toast(t('toast.snap_warn', { name: nA.name, m: Math.round(snapA.dist * 1000) }), 'error');
+          if (snapB.dist > 0.05) toast(t('toast.snap_warn', { name: nB.name, m: Math.round(snapB.dist * 1000) }), 'error');
+          coords = _slicePolyline(coords, snapA, snapB);
+
+          // _slicePolyline orders by polyline direction, not by A/B.
+          // Orient so coords[0] is near nodeA and coords[last] is near nodeB.
+          const d0A = _ptDist(coords[0], [nA.lat, nA.lon]);
+          const d0B = _ptDist(coords[0], [nB.lat, nB.lon]);
+          if (d0B < d0A) coords.reverse();
+
+          // Compute track distance from trimmed geometry before anchoring
+          if (!seg.distance || seg.distance <= 0) seg.distance = haversineDistance(coords);
+
+          // Anchor geometry endpoints to actual node positions
+          coords[0] = [nA.lat, nA.lon];
+          coords[coords.length - 1] = [nB.lat, nB.lon];
+        } else {
+          // No trim possible — set node positions from way endpoints
+          // and compute distance from full geometry
+          if (!seg.distance || seg.distance <= 0) seg.distance = haversineDistance(coords);
+          if (nA && nA.lat == null) { nA.lat = coords[0][0]; nA.lon = coords[0][1]; }
+          if (nB && nB.lat == null) { nB.lat = coords[coords.length - 1][0]; nB.lon = coords[coords.length - 1][1]; }
+        }
+
+        seg.wayGeometry = coords;
+        if (result.maxSpeed && seg.maxSpeed === s.defaults.maxSpeed) seg.maxSpeed = result.maxSpeed;
+      }
+    } catch (err) {
+      console.error('Batch way fetch failed:', err);
+      toast(t('toast.way_fetch_error', { msg: err.message }), 'error');
+    }
+  }
+
+  save();
+  document.getElementById('sidebar').classList.remove('sidebar-locked');
+  window._csvImportState = null;
+  _csvImporting = false;
+  refreshAll();
+  toast(t('csv.import_success', { n: toImport.length }), 'success');
+  renderImportExport();
 }
 
 // ============================================================

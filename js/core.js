@@ -97,6 +97,11 @@ function platName(stationId, platId) {
   const n = getNode(stationId); if (!n?.platforms) return '—';
   const p = n.platforms.find(p => p.id === platId); return p ? p.name : '—';
 }
+// Short display name: strip "Platform " prefix and "[...]" bracketed text
+function platDisplayName(name) {
+  if (!name || name === '—') return name;
+  return name.replace(/^[Pp]latform\s*/i, '').replace(/\s*\[.*?\]\s*/g, '').trim();
+}
 // Resolve effective platform for a departure at stop index i
 // Checks departure-level overrides first, then falls back to service default
 function depPlatId(dep, svc, i) {
@@ -150,6 +155,23 @@ function connectedNodes(nodeId) {
 function findSeg(a, b) {
   return data.segments.find(s => !isInterchange(s) && ((s.nodeA === a && s.nodeB === b) || (s.nodeB === a && s.nodeA === b)));
 }
+// Find ALL traversable segments between two nodes (for parallel segment support)
+function findSegs(a, b) {
+  return data.segments.filter(s => !isInterchange(s) && ((s.nodeA === a && s.nodeB === b) || (s.nodeB === a && s.nodeA === b)));
+}
+// Find the segment between two nodes that contains a specific trackId
+function findSegByTrack(a, b, trackId) {
+  if (!trackId) return findSeg(a, b);
+  return data.segments.find(s => !isInterchange(s) &&
+    ((s.nodeA === a && s.nodeB === b) || (s.nodeB === a && s.nodeA === b)) &&
+    Array.isArray(s.tracks) && s.tracks.some(tk => tk.id === trackId)) || findSeg(a, b);
+}
+// Check if a mode (category) is allowed on a segment
+function isModeAllowedOnSeg(seg, catId) {
+  if (!seg || !catId) return true;
+  if (!seg.allowedModes || !seg.allowedModes.length) return true; // Empty = all allowed
+  return seg.allowedModes.includes(catId);
+}
 
 // Find ALL connections including interchanges (for node detail display)
 function allConnectedSegments(nodeId) {
@@ -159,6 +181,102 @@ function allConnectedSegments(nodeId) {
     if (s.nodeB === nodeId) result.push({ nodeId: s.nodeA, segId: s.id, interchange: s.interchangeType });
   }
   return result;
+}
+
+// ============================================================
+// TRACK HELPERS
+// ============================================================
+
+// Backward-safe track count: works with both integer (legacy) and array (v16.3+)
+function segTrackCount(seg) {
+  if (!seg) return 1;
+  if (Array.isArray(seg.tracks)) return seg.tracks.length;
+  return seg.tracks || 1;
+}
+
+// Migrate segment tracks from integer to named objects, and schematic trackNum → trackId
+function migrateSegmentTracks() {
+  // Step 1: Convert segment tracks from integer to array
+  for (const seg of data.segments) {
+    if (Array.isArray(seg.tracks)) continue; // Already migrated
+    const n = seg.tracks || 0;
+    if (isInterchange(seg) || isRoad(seg) || n <= 0) {
+      seg.tracks = [];
+    } else {
+      seg.tracks = Array.from({ length: n }, (_, i) => ({ id: uid(), name: 'Track ' + (i + 1) }));
+    }
+  }
+  // Step 2: Migrate schematic sideA/sideB entries from trackNum to trackId
+  for (const node of data.nodes) {
+    if (!node.schematic?.tracks) continue;
+    for (const trk of node.schematic.tracks) {
+      for (const side of ['sideA', 'sideB']) {
+        if (!trk[side]) continue;
+        trk[side] = trk[side].map(c => {
+          // Already migrated (has trackId)
+          if (c.trackId) return c;
+          // Legacy string entry
+          if (typeof c === 'string') {
+            const seg = getSeg(c);
+            return { segId: c, trackId: seg?.tracks?.[0]?.id || null };
+          }
+          // Legacy { segId, trackNum } entry
+          const seg = getSeg(c.segId);
+          const idx = (c.trackNum || 1) - 1; // trackNum is 1-based
+          return { segId: c.segId, trackId: seg?.tracks?.[idx]?.id || seg?.tracks?.[0]?.id || null };
+        });
+      }
+    }
+    // Step 3: Clean up cross-wired connections (segment on wrong side)
+    const sides = node.schematic.sides || {};
+    const sideASet = new Set(sides.a || []);
+    const sideBSet = new Set(sides.b || []);
+    const sideCSet = new Set(sides.c || []);
+    const sideDSet = new Set(sides.d || []);
+    for (const trk of node.schematic.tracks) {
+      if (trk.sideA) trk.sideA = trk.sideA.filter(c => sideASet.has(c.segId));
+      if (trk.sideB) trk.sideB = trk.sideB.filter(c => sideBSet.has(c.segId));
+      if (trk.sideC) trk.sideC = trk.sideC.filter(c => sideCSet.has(c.segId));
+      if (trk.sideD) trk.sideD = trk.sideD.filter(c => sideDSet.has(c.segId));
+    }
+  }
+}
+
+// ============================================================
+// GEOMETRY HELPERS
+// ============================================================
+
+// Haversine distance: sum pairwise great-circle distances through coords array
+// coords: [[lat,lon], ...], returns km rounded to 2dp
+function haversineDistance(coords) {
+  const R = 6371;
+  let total = 0;
+  for (let i = 0; i < coords.length - 1; i++) {
+    const [lat1, lon1] = coords[i];
+    const [lat2, lon2] = coords[i + 1];
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) ** 2;
+    total += 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+  return Math.round(total * 100) / 100;
+}
+
+// Return coordinates for a segment: wayGeometry if available, else straight line from nodes
+function segmentCoords(seg) {
+  if (seg.wayGeometry && seg.wayGeometry.length >= 2) return seg.wayGeometry;
+  const nA = getNode(seg.nodeA), nB = getNode(seg.nodeB);
+  if (nA && nA.lat != null && nB && nB.lat != null) return [[nA.lat, nA.lon], [nB.lat, nB.lon]];
+  return [];
+}
+
+// Return coordinates directed from a specific node (reversed if fromNodeId is nodeB)
+function segmentCoordsDirected(seg, fromNodeId) {
+  const coords = segmentCoords(seg);
+  if (fromNodeId === seg.nodeB) return [...coords].reverse();
+  return coords;
 }
 
 function toMin(str) { const [h, m] = str.split(':').map(Number); return h * 60 + (m || 0); }
@@ -388,31 +506,25 @@ function travelTime(a, b, stock) {
 function travelTimeInContext(stops, segIdx, stock) {
   const fromStop = stops[segIdx];
   const toStop = stops[segIdx + 1];
-  const seg = findSeg(fromStop.nodeId, toStop.nodeId);
+  const seg = findSegByTrack(fromStop.nodeId, toStop.nodeId, toStop?.trackId);
   if (!seg) return 5;
 
   const accel = stock ? stock.acceleration : DEFAULT_ACCEL();
   const segSpeed = effectiveMaxSpeed(seg.maxSpeed, stock);
 
-  // A stop is "flowing" (no speed penalty) if it's pass-through AND has no dwell time.
-  // A pass-through with dwell > 0 means the train stops (e.g. waypoint hold), so speed = 0.
   const fromFlowing = fromStop.passThrough && !fromStop.dwell;
   const toFlowing = toStop.passThrough && !toStop.dwell;
 
-  // Determine entry speed: if train stopped at fromStop, entry is 0.
-  // If flowing through, entry speed is min(this segment effective, previous segment effective).
   let entrySpeed = 0;
   if (fromFlowing && segIdx > 0) {
-    const prevSeg = findSeg(stops[segIdx - 1].nodeId, fromStop.nodeId);
+    const prevSeg = findSegByTrack(stops[segIdx - 1].nodeId, fromStop.nodeId, fromStop?.trackId);
     const prevSpeed = prevSeg ? effectiveMaxSpeed(prevSeg.maxSpeed, stock) : segSpeed;
     entrySpeed = Math.min(segSpeed, prevSpeed);
   }
 
-  // Determine exit speed: if train stops at toStop, exit is 0.
-  // If flowing through, exit speed is min(this segment effective, next segment effective).
   let exitSpeed = 0;
   if (toFlowing && segIdx + 2 < stops.length) {
-    const nextSeg = findSeg(toStop.nodeId, stops[segIdx + 2].nodeId);
+    const nextSeg = findSegByTrack(toStop.nodeId, stops[segIdx + 2].nodeId, stops[segIdx + 2]?.trackId);
     const nextSpeed = nextSeg ? effectiveMaxSpeed(nextSeg.maxSpeed, stock) : segSpeed;
     exitSpeed = Math.min(segSpeed, nextSpeed);
   }

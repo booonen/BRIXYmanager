@@ -509,7 +509,7 @@ function jpPlatName(nodeId, platId) {
   const node = getNode(nodeId);
   if (!node) return '';
   const plat = (node.platforms || []).find(p => p.id === platId);
-  return plat ? plat.name : '';
+  return plat ? platDisplayName(plat.name) : '';
 }
 
 function jpCountIntermediateStops(dep, fromIdx, toIdx) {
@@ -834,10 +834,16 @@ function jpRenderBeckMap(jIdx) {
     if (leg.isWalk) continue;
     if (leg.svc?.groupId) focusGroupIds.add(leg.svc.groupId);
     if (leg.dep?.times && leg.boardIdx != null && leg.alightIdx != null) {
-      const stops = leg.dep.times.slice(leg.boardIdx, leg.alightIdx + 1).map(t => t.nodeId);
-      // All intermediate stops get marks but not labels
-      for (const nid of stops) focusNodeIds.add(nid);
-      svcStopsList.push({ groupId: leg.svc?.groupId, stops });
+      const svc = leg.svc;
+      const depTimes = leg.dep.times.slice(leg.boardIdx, leg.alightIdx + 1);
+      // Build stops with passThrough info from the service definition
+      const stops = depTimes.map(t => {
+        const svcStop = svc?.stops?.find(st => st.nodeId === t.nodeId);
+        return { nodeId: t.nodeId, passThrough: !!svcStop?.passThrough };
+      });
+      // Stopped-at stations get marks (skip pass-throughs)
+      for (const st of stops) { if (!st.passThrough) focusNodeIds.add(st.nodeId); }
+      svcStopsList.push({ groupId: svc?.groupId, stops });
     }
   }
 
@@ -863,16 +869,28 @@ function jpInitMap(jIdx, container) {
 }
 
 function jpBuildLegCoords(leg) {
-  // Trace through dep.times from boardIdx to alightIdx
+  // Trace through dep.times from boardIdx to alightIdx using segment geometry
   const coords = [];
   if (leg.dep && leg.dep.times) {
     for (let i = leg.boardIdx; i <= leg.alightIdx; i++) {
-      const t = leg.dep.times[i];
-      const n = getNode(t.nodeId);
+      if (i > leg.boardIdx) {
+        // Add segment geometry between consecutive stops
+        const fromId = leg.dep.times[i - 1].nodeId;
+        const toId = leg.dep.times[i].nodeId;
+        const seg = findSeg(fromId, toId);
+        if (seg) {
+          const sc = segmentCoordsDirected(seg, fromId);
+          // Skip first point (duplicate of previous endpoint)
+          for (let j = (coords.length ? 1 : 0); j < sc.length; j++) coords.push(sc[j]);
+          continue;
+        }
+      }
+      // Fallback: just add node position
+      const n = getNode(leg.dep.times[i].nodeId);
       if (n && n.lat != null && n.lon != null) coords.push([n.lat, n.lon]);
     }
   } else {
-    // Walk leg or no dep — just board to alight
+    // Walk leg — straight line between board and alight
     const bN = getNode(leg.boardNodeId), aN = getNode(leg.alightNodeId);
     if (bN?.lat != null) coords.push([bN.lat, bN.lon]);
     if (aN?.lat != null) coords.push([aN.lat, aN.lon]);
@@ -892,11 +910,9 @@ function jpRenderMapRoute(jIdx) {
   const bgLines = [];
   for (const seg of data.segments) {
     if (isInterchange(seg)) continue;
-    const nA = getNode(seg.nodeA), nB = getNode(seg.nodeB);
-    if (!nA || !nB || nA.lat == null || nB.lat == null) continue;
-    bgLines.push(L.polyline([[nA.lat, nA.lon], [nB.lat, nB.lon]], {
-      color: '#333', weight: 3, opacity: 1
-    }));
+    const coords = segmentCoords(seg);
+    if (coords.length < 2) continue;
+    bgLines.push(L.polyline(coords, { color: '#333', weight: 3, opacity: 1 }));
   }
   jpd.layers.bg = L.layerGroup(bgLines).addTo(map);
 
