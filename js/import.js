@@ -489,9 +489,10 @@ function processRelationImport(config, rawData) {
 
   // 4. Generate segments between consecutive station pairs
   const segments = [];
-  // Build maps for maxspeed and infrastructure type lookup per polyline edge
+  // Build maps for maxspeed, infrastructure type, and way ID lookup per polyline edge
   const waySpeedMap = _buildWaySpeedMap(ways, polyline);
   const wayInfraMap = _buildWayInfraMap(ways, polyline);
+  const wayIdMap = _buildWayIdMap(ways, polyline);
 
   for (let i = 0; i < stations.length - 1; i++) {
     const stA = stations[i], stB = stations[i + 1];
@@ -508,12 +509,20 @@ function processRelationImport(config, rawData) {
     coords[0] = [stA.lat, stA.lon];
     coords[coords.length - 1] = [stB.lat, stB.lon];
 
-    // Resolve maxspeed and infrastructure type from underlying ways
+    // Resolve maxspeed, infrastructure type and OGF way IDs from underlying ways
+    const minEdge = Math.min(stA._snap.edgeIdx, stB._snap.edgeIdx);
+    const maxEdge = Math.max(stA._snap.edgeIdx, stB._snap.edgeIdx);
     const midEdge = Math.floor((stA._snap.edgeIdx + stB._snap.edgeIdx) / 2);
     const waySpeed = waySpeedMap[midEdge];
     const maxSpeed = waySpeed > 0 ? waySpeed : config.defaultMaxSpeed;
     const segInfra = wayInfraMap[midEdge] || 'rail';
     const isRoadSeg = segInfra === 'road';
+    const segWayIdSet = new Set();
+    for (let e = minEdge; e <= maxEdge; e++) {
+      const wids = wayIdMap[e];
+      if (wids) for (const wid of wids) segWayIdSet.add(wid);
+    }
+    const ogfWayIds = [...segWayIdSet].map(id => parseInt(id)).filter(n => n > 0);
 
     const tracks = [];
     if (!isRoadSeg) {
@@ -538,7 +547,7 @@ function processRelationImport(config, rawData) {
       id: uid(), nodeA: nodeAId, nodeB: nodeBId,
       tracks, maxSpeed, distance: Math.round(distance * 100) / 100,
       electrification: isRoadSeg ? false : true, refCode: '', description: '',
-      interchangeType: isRoadSeg ? 'road' : null, ogfWayIds: [], wayGeometry: coords,
+      interchangeType: isRoadSeg ? 'road' : null, ogfWayIds, wayGeometry: coords,
       allowedModes: [...config.allowedModes],
       _include: !dupType, // skip by default if duplicate found
       _dupType: dupType
@@ -547,7 +556,7 @@ function processRelationImport(config, rawData) {
 
   // 5. Maxspeed waypoint insertion (if enabled)
   if (config.maxspeedBoundary === 'waypoints') {
-    _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, wayInfraMap, config);
+    _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, wayInfraMap, wayIdMap, config);
   }
 
   return { stations, segments, warnings };
@@ -597,6 +606,26 @@ function _buildWayInfraMap(ways, polyline) {
   return infraMap;
 }
 
+function _buildWayIdMap(ways, polyline) {
+  // Map each edge of the polyline to the OGF way IDs that cover it
+  const idMap = {};
+  for (const w of ways) {
+    const wFirst = w.coords[0], wLast = w.coords[w.coords.length - 1];
+    for (let e = 0; e < polyline.length - 1; e++) {
+      const p = polyline[e];
+      if ((Math.abs(p[0] - wFirst[0]) < 0.0001 && Math.abs(p[1] - wFirst[1]) < 0.0001) ||
+          (Math.abs(p[0] - wLast[0]) < 0.0001 && Math.abs(p[1] - wLast[1]) < 0.0001)) {
+        for (let j = Math.max(0, e - w.coords.length); j <= Math.min(polyline.length - 2, e + w.coords.length); j++) {
+          if (!idMap[j]) idMap[j] = [];
+          if (!idMap[j].includes(w.id)) idMap[j].push(w.id);
+        }
+        break;
+      }
+    }
+  }
+  return idMap;
+}
+
 function _parseMaxspeed(val) {
   if (!val) return 0;
   const mph = val.match(/^(\d+)\s*mph$/i);
@@ -605,7 +634,7 @@ function _parseMaxspeed(val) {
   return num > 0 ? num : 0;
 }
 
-function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, wayInfraMap, config) {
+function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, wayInfraMap, wayIdMap, config) {
   // Find edges where speed changes and insert waypoints
   const speedChanges = [];
   let prevSpeed = 0;
@@ -662,10 +691,18 @@ function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, 
       coords[0] = [pA.lat, pA.lon];
       coords[coords.length - 1] = [pB.lat, pB.lon];
 
+      const subMinEdge = Math.min(pA._snap.edgeIdx, pB._snap.edgeIdx);
+      const subMaxEdge = Math.max(pA._snap.edgeIdx, pB._snap.edgeIdx);
       const midEdge = Math.floor((pA._snap.edgeIdx + pB._snap.edgeIdx) / 2);
       const speed = waySpeedMap[midEdge] || config.defaultMaxSpeed;
       const subInfra = wayInfraMap[midEdge] || 'rail';
       const subIsRoad = subInfra === 'road';
+      const subWayIdSet = new Set();
+      for (let e = subMinEdge; e <= subMaxEdge; e++) {
+        const wids = wayIdMap[e];
+        if (wids) for (const wid of wids) subWayIdSet.add(wid);
+      }
+      const subOgfWayIds = [...subWayIdSet].map(id => parseInt(id)).filter(n => n > 0);
 
       const tracks = [];
       if (!subIsRoad) {
@@ -676,7 +713,7 @@ function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, 
         id: uid(), nodeA: pA.id, nodeB: pB.id,
         tracks, maxSpeed: speed, distance: Math.round(dist * 100) / 100,
         electrification: subIsRoad ? false : true, refCode: '', description: '',
-        interchangeType: subIsRoad ? 'road' : null, ogfWayIds: [], wayGeometry: coords,
+        interchangeType: subIsRoad ? 'road' : null, ogfWayIds: subOgfWayIds, wayGeometry: coords,
         allowedModes: [...config.allowedModes],
         _include: true, _dupType: null
       });

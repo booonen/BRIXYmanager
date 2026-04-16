@@ -1282,7 +1282,7 @@ async function saveSegment() {
     _lastSegDefaults.road.maxSpeed = maxSpeed;
     _lastSegDefaults.road.refCode = refCode;
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
-    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
+    const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
     const obj = { nodeA, nodeB, tracks: [], maxSpeed, distance, electrification: false, refCode, description, interchangeType: 'road', ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
@@ -1304,7 +1304,7 @@ async function saveSegment() {
     const refCode = document.getElementById('f-sRef').value.trim();
     _lastSegDefaults.track = { trackCount: tracks.length, maxSpeed, electrification, refCode };
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
-    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
+    const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
     const obj = { nodeA, nodeB, tracks, maxSpeed, distance, electrification, refCode, description, interchangeType: null, ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
