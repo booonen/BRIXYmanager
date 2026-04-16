@@ -153,14 +153,17 @@ function findDivergencePoint(segA, segB, snapThresholdKm) {
     : segA.nodeB === segB.nodeA || segA.nodeB === segB.nodeB ? segA.nodeB : null;
   if (!sharedNode) return null;
 
-  // Orient both polylines so they start from the shared endpoint
+  // Orient both polylines so they start from the shared endpoint.
+  // Use coordinate proximity rather than nodeA/nodeB ordering, since
+  // wayGeometry direction isn't guaranteed to match the node ordering.
   let geoA = [...segA.wayGeometry];
   let geoB = [...segB.wayGeometry];
   const sharedN = getNode(sharedNode);
   if (!sharedN || sharedN.lat == null) return null;
+  const sharedCoord = [sharedN.lat, sharedN.lon];
 
-  if (segA.nodeB === sharedNode) geoA.reverse();
-  if (segB.nodeB === sharedNode) geoB.reverse();
+  if (_ptDist(geoA[geoA.length - 1], sharedCoord) < _ptDist(geoA[0], sharedCoord)) geoA.reverse();
+  if (_ptDist(geoB[geoB.length - 1], sharedCoord) < _ptDist(geoB[0], sharedCoord)) geoB.reverse();
 
   // Walk along geoA, snap to geoB.
   // Allow initial divergence — paths may converge into parallel after the station.
