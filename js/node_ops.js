@@ -603,3 +603,109 @@ function applySplit() {
   toast(t('toast.split_done', { name: rightNode.name }), 'success');
   setTimeout(() => showNodeDetail(origId), 150);
 }
+
+// ---- Merge modals ----
+
+function openMergeChooser(nodeId) {
+  const candidates = nodeMergeCandidates(nodeId);
+  if (!candidates.length) return;
+  _mergeState = { thisId: nodeId };
+  let body = '';
+  for (const c of candidates) {
+    const rk = c.reason === 'osi' ? 'merge.chooser_reason_osi'
+      : c.reason === 'isi' ? 'merge.chooser_reason_isi' : 'merge.chooser_reason_same_name';
+    body += `<label style="display:block;padding:8px 4px;cursor:pointer">
+      <input type="radio" name="merge-target" value="${c.node.id}" style="margin-right:8px">
+      ${esc(c.node.name)} <span class="text-dim" style="font-size:12px">(${t(rk)})</span></label>`;
+  }
+  _openNodeOpsOverlay(esc(t('merge.chooser_title')), 'merge-chooser-body',
+    `<button class="btn" onclick="_nodeOpsClose()">${t('btn.cancel')}</button>
+     <button class="btn btn-primary" onclick="_mergeChooserContinue()">${t('merge.chooser_continue')}</button>`, {});
+  document.getElementById('merge-chooser-body').innerHTML = body;
+}
+
+function _mergeChooserContinue() {
+  const sel = document.querySelector('#node-ops-overlay input[name="merge-target"]:checked');
+  if (!sel) { toast(t('merge.chooser_no_candidates'), 'error'); return; }
+  openMergePreview(_mergeState.thisId, sel.value);
+}
+
+function openMergePreview(thisId, targetId) {
+  const thisNode = getNode(thisId), targetNode = getNode(targetId);
+  if (!thisNode || !targetNode) return;
+  _mergeState = { thisId, targetId };
+  const check = canMerge(thisId, targetId);
+
+  // Summary counts
+  const targetSegs = data.segments.filter(s => s.nodeA === targetId || s.nodeB === targetId);
+  const directISI = data.segments.filter(s => isInterchange(s) &&
+    ((s.nodeA === thisId && s.nodeB === targetId) || (s.nodeB === thisId && s.nodeA === targetId)));
+  const segsToMigrate = targetSegs.length - directISI.length;
+  const svcsAffected = data.services.filter(s => s.stops.some(st => st.nodeId === targetId)).length;
+  let beckCount = 0;
+  if (data.beckmap?.lineStations) {
+    for (const sm of Object.values(data.beckmap.lineStations)) { if (sm[targetId]) beckCount++; }
+  }
+  const targetHasSchem = !!(targetNode.schematic?.tracks?.length);
+
+  // Fields comparison (only show differing fields)
+  const fields = [
+    { key: 'name', label: t('merge.field_name') },
+    { key: 'refCode', label: t('merge.field_ref') },
+    { key: 'ogfNode', label: t('merge.field_ogf') },
+    { key: 'address', label: t('merge.field_address') },
+    { key: 'description', label: t('merge.field_description') }
+  ];
+  const visFields = fields.filter(f => (thisNode[f.key] || '') !== (targetNode[f.key] || ''));
+
+  let body = '';
+  if (visFields.length) {
+    body += `<div class="nops-sec-hdr">${t('merge.fields_section')}</div>`;
+    body += `<table class="nops-merge-tbl"><thead><tr><th></th><th>${esc(thisNode.name)}</th><th>${esc(targetNode.name)}</th></tr></thead><tbody>`;
+    for (const f of visFields) {
+      const tv = thisNode[f.key] || '', xv = targetNode[f.key] || '';
+      body += `<tr><td style="font-weight:600;white-space:nowrap">${f.label}</td>
+        <td><label><input type="radio" name="mf-${f.key}" value="this" checked> ${tv ? esc(tv) : '<span class="text-dim">(empty)</span>'}</label>
+          <input type="text" id="mf-this-${f.key}" value="${esc(tv)}" style="width:100%;margin-top:4px"
+            oninput="document.querySelector('input[name=mf-${f.key}][value=this]').checked=true"></td>
+        <td><label><input type="radio" name="mf-${f.key}" value="target"> ${xv ? esc(xv) : '<span class="text-dim">(empty)</span>'}</label>
+          <input type="text" id="mf-target-${f.key}" value="${esc(xv)}" style="width:100%;margin-top:4px"
+            oninput="document.querySelector('input[name=mf-${f.key}][value=target]').checked=true"></td></tr>`;
+    }
+    body += '</tbody></table>';
+  }
+
+  // Info sections
+  body += `<div class="nops-sec-hdr">${t('merge.platforms_section')}</div>`;
+  body += `<div class="text-dim" style="font-size:13px">${t('merge.platforms_desc')}</div>`;
+  const allPlats = [...(thisNode.platforms || []).map(p => p.name + ' [1]'),
+    ...(targetNode.platforms || []).map(p => p.name + ' [2]')];
+  if (allPlats.length) body += '<div style="margin:4px 0 8px;font-size:13px">' + allPlats.map(n => esc(n)).join(', ') + '</div>';
+
+  body += `<div class="nops-sec-hdr">${t('merge.segments_section')}</div>`;
+  if (segsToMigrate > 0) body += `<div class="text-dim" style="font-size:13px">${t('merge.segments_desc', { n: segsToMigrate })}</div>`;
+  if (directISI.length) body += `<div style="font-size:13px;color:var(--warn)">${t('merge.isi_removal_note', { n: directISI.length })}</div>`;
+
+  if (svcsAffected > 0) {
+    body += `<div class="nops-sec-hdr">${t('merge.services_section')}</div>`;
+    body += `<div class="text-dim" style="font-size:13px">${t('merge.services_desc', { n: svcsAffected })}</div>`;
+  }
+  if (targetHasSchem) {
+    body += `<div class="nops-sec-hdr">${t('merge.schematic_section')}</div>`;
+    body += `<div class="text-dim" style="font-size:13px">${t('merge.schematic_desc')}</div>`;
+  }
+  if (beckCount > 0) {
+    body += `<div class="nops-sec-hdr">${t('merge.beckmap_section')}</div>`;
+    body += `<div class="text-dim" style="font-size:13px">${t('merge.beckmap_desc', { n: beckCount })}</div>`;
+  }
+  if (!check.ok) {
+    body += `<div style="margin-top:12px;padding:12px;background:var(--danger-dim);border:1px solid var(--danger);border-radius:var(--radius);color:var(--danger);font-size:13px">${esc(check.reason)}</div>`;
+  }
+
+  _openNodeOpsOverlay(esc(t('merge.preview_title', { 'this': thisNode.name, target: targetNode.name })),
+    'merge-preview-body',
+    `<div id="merge-error" style="flex:1;color:var(--danger);font-size:13px"></div>
+     <button class="btn" onclick="_nodeOpsClose()">${t('btn.cancel')}</button>
+     <button class="btn btn-primary" ${check.ok ? '' : 'disabled'} onclick="applyMerge()">${t('merge.apply_btn')}</button>`, {});
+  document.getElementById('merge-preview-body').innerHTML = body;
+}
