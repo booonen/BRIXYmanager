@@ -105,7 +105,7 @@ function showNodeDetail(id) {
   // Connected segments (track + interchange)
   const conns = connectedNodes(id);
   const allConns = allConnectedSegments(id);
-  const ichConns = allConns.filter(c => c.interchange);
+  const ichConns = allConns.filter(c => c.interchange === 'osi' || c.interchange === 'isi');
 
   let html = `<div class="detail-panel">
     <h3>${esc(node.name)} ${node.refCode ? `<span class="mono text-dim" style="font-size:12px;margin-left:4px">[${esc(node.refCode)}]</span>` : ''}
@@ -139,7 +139,13 @@ function showNodeDetail(id) {
     html += `<div class="mt-8">`;
     html += conns.map(c => {
       const seg = getSeg(c.segId);
-      return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;background:var(--accent-glow);border-color:var(--accent);color:var(--accent)" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))} · ${seg.distance}km · ${seg.maxSpeed}km/h</span>`;
+      const road = isRoad(seg);
+      const info = road ? `${seg.distance}km · ${seg.maxSpeed}km/h` : `${seg.distance}km · ${seg.maxSpeed}km/h`;
+      const style = road
+        ? 'background:#1a2a1a;border-color:#6cc070;color:#6cc070'
+        : 'background:var(--accent-glow);border-color:var(--accent);color:var(--accent)';
+      const typeLabel = road ? ' · Road' : '';
+      return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;${style}" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))}${typeLabel} · ${seg.distance}km · ${seg.maxSpeed}km/h</span>`;
     }).join('');
     html += ichConns.map(c => {
       const seg = data.segments.find(s => s.id === c.segId);
