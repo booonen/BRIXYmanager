@@ -709,3 +709,114 @@ function openMergePreview(thisId, targetId) {
      <button class="btn btn-primary" ${check.ok ? '' : 'disabled'} onclick="applyMerge()">${t('merge.apply_btn')}</button>`, {});
   document.getElementById('merge-preview-body').innerHTML = body;
 }
+
+// ---- Apply merge ----
+
+function applyMerge() {
+  const ms = _mergeState;
+  if (!ms) return;
+  const thisNode = getNode(ms.thisId), targetNode = getNode(ms.targetId);
+  if (!thisNode || !targetNode) return;
+
+  // 1. Field choices
+  const fields = ['name', 'refCode', 'ogfNode', 'address', 'description'];
+  for (const f of fields) {
+    const radio = document.querySelector(`input[name="mf-${f}"]:checked`);
+    if (radio) {
+      const textEl = document.getElementById(`mf-${radio.value}-${f}`);
+      thisNode[f] = textEl ? textEl.value.trim() : (radio.value === 'target' ? targetNode[f] : thisNode[f]);
+    }
+  }
+
+  // 2. Merge platforms with [1]/[2] suffixes
+  const suffixed = (plats, idx) => (plats || []).map(p => ({ id: p.id, name: p.name + ' [' + idx + ']' }));
+  thisNode.platforms = [...suffixed(thisNode.platforms, 1), ...suffixed(targetNode.platforms, 2)];
+
+  // 3. Redirect segments; delete direct ISI/OSI between the two
+  const toDelete = [];
+  for (const seg of data.segments) {
+    const aT = seg.nodeA === ms.targetId, bT = seg.nodeB === ms.targetId;
+    const aS = seg.nodeA === ms.thisId, bS = seg.nodeB === ms.thisId;
+    if (isInterchange(seg) && ((aT && bS) || (bT && aS))) { toDelete.push(seg.id); continue; }
+    if (aT) seg.nodeA = ms.thisId;
+    if (bT) seg.nodeB = ms.thisId;
+  }
+  data.segments = data.segments.filter(seg => !toDelete.includes(seg.id));
+
+  // 4. Redirect services and departures
+  for (const svc of data.services) {
+    for (const st of svc.stops) { if (st.nodeId === ms.targetId) st.nodeId = ms.thisId; }
+  }
+  for (const dep of data.departures) {
+    for (const tm of dep.times) { if (tm.nodeId === ms.targetId) tm.nodeId = ms.thisId; }
+  }
+
+  // 5. Merge schematics
+  if (targetNode.schematic?.tracks?.length) {
+    if (!thisNode.schematic) {
+      thisNode.schematic = targetNode.schematic;
+    } else {
+      thisNode.schematic.tracks = thisNode.schematic.tracks.concat(targetNode.schematic.tracks);
+      for (const side of ['a', 'b', 'c', 'd']) {
+        const ts = thisNode.schematic.sides[side] || [];
+        const xs = targetNode.schematic.sides?.[side] || [];
+        thisNode.schematic.sides[side] = [...new Set([...ts, ...xs])].filter(id => !toDelete.includes(id));
+      }
+    }
+    if (thisNode.schematic?.tracks) {
+      for (const trk of thisNode.schematic.tracks) {
+        for (const sk of ['sideA', 'sideB', 'sideC', 'sideD']) {
+          if (trk[sk]) trk[sk] = trk[sk].filter(c => !toDelete.includes(c.segId));
+        }
+      }
+    }
+  }
+
+  // 6. Migrate beckmap
+  if (data.beckmap?.lineStations) {
+    for (const [gid, sm] of Object.entries(data.beckmap.lineStations)) {
+      if (sm[ms.targetId]) {
+        if (!sm[ms.thisId]) sm[ms.thisId] = sm[ms.targetId];
+        delete sm[ms.targetId];
+      }
+    }
+  }
+  if (data.beckmap?.infraStations?.[ms.targetId]) {
+    if (!data.beckmap.infraStations[ms.thisId])
+      data.beckmap.infraStations[ms.thisId] = data.beckmap.infraStations[ms.targetId];
+    delete data.beckmap.infraStations[ms.targetId];
+  }
+  if (data.beckmap?.stationGroups) {
+    for (const sg of Object.values(data.beckmap.stationGroups)) {
+      if (!sg.members) continue;
+      sg.members = sg.members.map(m => {
+        const parts = m.split('|');
+        return (parts.length === 2 && parts[1] === ms.targetId) ? parts[0] + '|' + ms.thisId : m;
+      });
+      sg.members = [...new Set(sg.members)];
+    }
+  }
+  for (const field of ['labelOverrides', 'labelWrap', 'markOverrides']) {
+    if (!data.beckmap?.[field]) continue;
+    const remapped = {};
+    for (const [key, val] of Object.entries(data.beckmap[field])) {
+      const parts = key.split('|');
+      if (parts.length === 2 && parts[1] === ms.targetId) {
+        const nk = parts[0] + '|' + ms.thisId;
+        if (!remapped[nk]) remapped[nk] = val;
+      } else {
+        remapped[key] = val;
+      }
+    }
+    data.beckmap[field] = remapped;
+  }
+
+  // 7. Delete target node
+  data.nodes = data.nodes.filter(n => n.id !== ms.targetId);
+
+  const savedId = ms.thisId;
+  _nodeOpsClose();
+  save(); refreshAll();
+  toast(t('toast.merge_done', { name: thisNode.name }), 'success');
+  setTimeout(() => showNodeDetail(savedId), 150);
+}
