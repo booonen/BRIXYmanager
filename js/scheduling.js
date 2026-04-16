@@ -35,7 +35,6 @@ function openScheduleModal(svcId) {
       <div class="form-row mt-8" style="max-width:400px">
         <div class="form-group" style="margin-bottom:8px"><label>${t('field.window_start')}</label><input type="time" id="sh-start" value="06:00" onchange="refreshScheduleModal()"></div>
         <div class="form-group" style="margin-bottom:8px"><label>${t('field.window_end')}</label><input type="time" id="sh-end" value="23:00" onchange="refreshScheduleModal()"></div>
-        <div class="form-group" style="margin-bottom:8px"><label>${t('sch.custom_freq')}</label><input type="number" id="sh-custom-freq" min="1" max="1440" placeholder="${t('sch.custom_freq_placeholder')}" onchange="refreshScheduleModal()"></div>
       </div>
       <div id="helper-suggestions"></div>
       <div id="helper-free-list" class="mt-16"></div>
@@ -146,19 +145,15 @@ function updateHelperSuggestions(svcId) {
   if (!el) return;
 
   const clearExisting = document.getElementById('sh-clear')?.checked ?? true;
-  const customFreq = parseInt(document.getElementById('sh-custom-freq')?.value);
+  const customFreqVal = document.getElementById('sh-custom-freq')?.value || '';
   const freqs = [10, 15, 20, 30, 60];
-  if (customFreq > 0 && customFreq <= 1440 && !freqs.includes(customFreq)) {
-    freqs.push(customFreq);
-    freqs.sort((a, b) => a - b);
-  }
   let html = '<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Suggested Schedules</strong>';
   html += '<table class="schedule-table mt-8"><thead><tr><th>Freq.</th><th>Deps.</th><th>Best Start</th><th>Conflicts</th><th></th></tr></thead><tbody>';
 
   // Handle cross-midnight: if end < start, treat end as next day
   const effectiveEnd = wEnd <= wStart ? wEnd + 1440 : wEnd;
 
-  for (const freq of freqs) {
+  function _evalFreq(freq) {
     let bestOffset = 0, bestConflicts = Infinity, bestCount = 0;
     for (let offset = 0; offset < freq; offset++) {
       let conflicts = 0, count = 0;
@@ -170,7 +165,11 @@ function updateHelperSuggestions(svcId) {
         bestConflicts = conflicts; bestOffset = offset; bestCount = count;
       }
     }
+    return { bestOffset, bestConflicts, bestCount };
+  }
 
+  for (const freq of freqs) {
+    const { bestOffset, bestConflicts, bestCount } = _evalFreq(freq);
     const firstDep = wStart + bestOffset;
     const statusColor = bestConflicts === 0 ? 'var(--success)' : (bestConflicts <= 2 ? 'var(--warn)' : 'var(--danger)');
     const statusText = bestConflicts === 0 ? '✓ Clear' : `${bestConflicts} conflict${bestConflicts!==1?'s':''}`;
@@ -183,6 +182,25 @@ function updateHelperSuggestions(svcId) {
       <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="applyFrequencySchedule('${svcId}',${firstDep},${effectiveEnd},${freq})">${t('btn.apply')}</button></td>
     </tr>`;
   }
+
+  // Custom frequency row — input inline in the table
+  const customFreq = parseInt(customFreqVal);
+  const hasCustom = customFreq > 0 && customFreq <= 1440 && !freqs.includes(customFreq);
+  html += `<tr style="border-top:1px solid var(--border)">
+    <td><input type="number" id="sh-custom-freq" min="1" max="1440" value="${esc(customFreqVal)}" placeholder="${t('sch.custom_freq_placeholder')}" onchange="refreshScheduleModal()" style="width:60px;font-size:12px;font-family:var(--font-mono)">m</td>`;
+  if (hasCustom) {
+    const { bestOffset, bestConflicts, bestCount } = _evalFreq(customFreq);
+    const firstDep = wStart + bestOffset;
+    const statusColor = bestConflicts === 0 ? 'var(--success)' : (bestConflicts <= 2 ? 'var(--warn)' : 'var(--danger)');
+    const statusText = bestConflicts === 0 ? '✓ Clear' : `${bestConflicts} conflict${bestConflicts!==1?'s':''}`;
+    html += `<td class="mono">${bestCount}</td>
+      <td class="mono" style="color:var(--warn)">${toTime(firstDep)}</td>
+      <td style="color:${statusColor};font-weight:500">${statusText}</td>
+      <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="applyFrequencySchedule('${svcId}',${firstDep},${effectiveEnd},${customFreq})">${t('btn.apply')}</button></td>`;
+  } else {
+    html += `<td colspan="4" class="text-dim" style="font-size:11px"></td>`;
+  }
+  html += '</tr>';
 
   html += '</tbody></table>';
   el.innerHTML = html;
