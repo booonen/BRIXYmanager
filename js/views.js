@@ -1063,8 +1063,7 @@ function runIssueDetection() {
           const sharedEndpoint = (sA.nodeA === sB.nodeA || sA.nodeA === sB.nodeB ||
                                   sA.nodeB === sB.nodeA || sA.nodeB === sB.nodeB);
           const descKey = sharedEndpoint ? 'issue.desc.overlap_branching' : 'issue.desc.overlap_mid';
-          const canFix = sharedEndpoint && !!findDivergencePoint(sA, sB, SNAP_THRESHOLD);
-          const fixBtn = canFix
+          const fixBtn = sharedEndpoint
             ? `<button class="btn btn-sm btn-primary" style="margin-top:4px;margin-right:4px" onclick="event.stopPropagation();showOverlapResolutionModal('${sA.id}','${sB.id}')">${t('resolve.fix_btn')}</button>`
             : '';
           issues.push({ severity: 'medium', type: t('issue.type.segment_overlap'), typeKey: 'segment_overlap',

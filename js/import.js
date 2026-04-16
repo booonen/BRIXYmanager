@@ -145,8 +145,9 @@ function findOverlapLength(coordsA, coordsB, snapThresholdKm, graceKm) {
 }
 
 // ---- Divergence Point Detection ----
-// Given two segments sharing an endpoint, find where their tracks diverge.
-// Returns { coord: [lat,lon], idxA, idxB } — the last shared point on each polyline.
+// Given two segments sharing an endpoint, find where their parallel paths diverge.
+// Tolerates initial divergence near the shared node (e.g. parallel roads leaving
+// a station in slightly different directions before running side by side).
 function findDivergencePoint(segA, segB, snapThresholdKm) {
   const sharedNode = segA.nodeA === segB.nodeA || segA.nodeA === segB.nodeB ? segA.nodeA
     : segA.nodeB === segB.nodeA || segA.nodeB === segB.nodeB ? segA.nodeB : null;
@@ -155,35 +156,35 @@ function findDivergencePoint(segA, segB, snapThresholdKm) {
   // Orient both polylines so they start from the shared endpoint
   let geoA = [...segA.wayGeometry];
   let geoB = [...segB.wayGeometry];
-  const nodeA = getNode(segA.nodeA), nodeB = getNode(segA.nodeB);
   const sharedN = getNode(sharedNode);
   if (!sharedN || sharedN.lat == null) return null;
 
-  // Flip A if shared endpoint is at the end
   if (segA.nodeB === sharedNode) geoA.reverse();
   if (segB.nodeB === sharedNode) geoB.reverse();
 
-  // Walk along geoA, snap to geoB, find where they diverge
+  // Walk along geoA, snap to geoB.
+  // Allow initial divergence — paths may converge into parallel after the station.
   let lastSharedIdx = 0;
+  let foundProximity = false;
   const cumA = _cumulativeDist(geoA);
   for (let i = 1; i < geoA.length; i++) {
-    // Skip the first 10m (they're at the same station, always close)
     if (cumA[i] < 0.01) { lastSharedIdx = i; continue; }
     const snap = _snapToPolyline(geoA[i], geoB);
-    if (snap.dist >= snapThresholdKm) break;
-    lastSharedIdx = i;
+    if (snap.dist < snapThresholdKm) {
+      lastSharedIdx = i;
+      foundProximity = true;
+    } else if (foundProximity) {
+      break;
+    }
   }
 
-  if (lastSharedIdx <= 0) return null;
+  if (!foundProximity) return null;
 
   const coord = geoA[lastSharedIdx];
-  // Find the corresponding index on original (non-reversed) geometries
   return {
     coord,
     sharedNode,
-    // Distance from shared endpoint to divergence along A's track
     distFromShared: cumA[lastSharedIdx],
-    // The oriented geometries (starting from shared endpoint)
     orientedA: geoA,
     orientedB: geoB
   };
