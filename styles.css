@@ -177,6 +177,22 @@ input[type="checkbox"]:checked::after {
 }
 .modal .close-btn:hover { color: var(--text); }
 
+/* Node Split & Merge */
+.nops-cols { display: flex; gap: 16px; margin-bottom: 12px; }
+.nops-col { flex: 1; min-width: 0; }
+.nops-col-hdr { font-weight: 600; font-size: 13px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.nops-sec-hdr { font-size: 12px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em; font-weight: 600; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
+.nops-plat-row { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
+.nops-plat-row input[type="text"] { font-size: 13px; padding: 4px 8px; }
+.nops-seg-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
+.nops-sticky-group { border: 2px solid var(--accent-dim); border-radius: var(--radius); padding: 8px; margin: 4px 0; }
+.nops-sticky-hdr { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+.nops-warnings { margin-top: 12px; padding: 8px 12px; background: var(--warn-dim); border-radius: var(--radius); }
+.nops-merge-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.nops-merge-tbl th, .nops-merge-tbl td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.nops-merge-tbl th { font-size: 12px; color: var(--text-dim); text-align: left; }
+.nops-merge-tbl input[type="text"] { font-size: 12px; padding: 3px 6px; }
+
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
 .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
 .empty-state h3 { font-family: var(--font-display); font-size: 18px; color: var(--text); margin-bottom: 8px; }
