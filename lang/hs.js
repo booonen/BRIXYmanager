@@ -272,7 +272,9 @@ registerLanguage('hs', 'Hemsteiner', {
     "deps_added": "{n} vertrèk(ke) biegeveug", 
     "deps_replaced": "{n} vertrèk(ke) vervónk",
     "invalid_time": "Netèg'r tied: \"{time}\"",
-    "no_other_langs": "Geine angerrer tale gelootj \u2014 allein Hemsteiner is besjikbaar"
+    "no_other_langs": "Geine angerrer tale gelootj \u2014 allein Hemsteiner is besjikbaar",
+    "split_done": "Gesjplis nao \"{name}\"", //NEW: Split into
+    "merge_done": "Samegevuug nao \"{name}\"" //NEW: Merged into
   },
   "modal": {
     "edit_node": "Knówp Aanpasse",
@@ -794,5 +796,59 @@ registerLanguage('hs', 'Hemsteiner', {
     "show": "toen", //NEW: show
     "hide": "sjoel", //NEW: hide
     "edit_filters": "bewèrk fèltèrre" //NEW: edit filters
+  },
+  "split": {
+    "btn": "Knówp Sjplitse", //NEW: Split Node
+    "btn_disabled_tooltip": "Kan neet sjplitse \u2014 alle segmènte deele deenste", //NEW: Cannot split
+    "modal_title": "Knówp sjplitse: {name}", //NEW: Split Node: {name}
+    "left_header": "Links (origineel)", //NEW: Left (original)
+    "right_header": "Rèchts (nuuj knówp)", //NEW: Right (new node)
+    "platforms_section": "Perróns", //NEW: Platforms
+    "segments_section": "Segmènte", //NEW: Segments
+    "options_section": "Opsies", //NEW: Options
+    "group_label": "Groep {n} \u2014 gebroek door {services}", //NEW: Group {n}
+    "move_group_right": "\u2192 Groep nao rèchts", //NEW: Move group to right
+    "move_group_left": "\u2190 Groep nao links", //NEW: Move group to left
+    "create_isi": "ISI-segmènt tusse de twieë hèlfte make", //NEW: Create ISI segment
+    "isi_distance": "Loopaafsjtandj (km)", //NEW: Walk distance (km)
+    "warning_platforms_moved": "{n} perróns gaon nao de nuje knówp.", //NEW: platforms moved
+    "warning_stops_unassigned": "{n} deenshalte verleeze 't perrón.", //NEW: stops unassigned
+    "warning_segments_moved": "{n} segmènte gaon nao de nuje knówp.", //NEW: segments moved
+    "warning_services_repointed": "{n} deenshalte gaon nao de nuje knówp.", //NEW: stops repointed
+    "warning_beckmap_migrated": "{n} beckmap-plaatsènge migreere.", //NEW: beckmap migrated
+    "err_name_required": "Beid knówpe motte 'n naam höbbe.", //NEW: Both must have name
+    "err_names_same": "De twieë knówpe motte versjillendj zeen.", //NEW: Names must differ
+    "err_nothing_split": "Minstes ein segmènt of perrón mot nao rèchts.", //NEW: Nothing split
+    "err_isi_distance": "ISI-aafsjtandj mot positief zeen.", //NEW: ISI distance positive
+    "apply_btn": "Knówp Sjplitse" //NEW: Split Node
+  },
+  "merge": {
+    "btn": "Sameveuge nao\u2026", //NEW: Merge Into...
+    "chooser_title": "Kees Sameveugdoel", //NEW: Select Merge Target
+    "chooser_no_candidates": "Gein gesjikte sameveugdoele.", //NEW: No candidates
+    "chooser_reason_same_name": "zelfde naam", //NEW: same name
+    "chooser_reason_isi": "ISI-verbinjing", //NEW: ISI connection
+    "chooser_reason_osi": "OSI-verbinjing", //NEW: OSI connection
+    "chooser_continue": "Wijer \u2192", //NEW: Continue
+    "preview_title": "Sameveuge: {this} \u2190 {target}", //NEW: Merge
+    "fields_section": "Vèljer om te beheelde", //NEW: Fields to keep
+    "field_name": "Naam", //NEW: Name
+    "field_ref": "Ref", //NEW: Ref
+    "field_ogf": "OGF-knówp", //NEW: OGF node
+    "field_address": "Adres", //NEW: Address
+    "field_description": "Besjrieving", //NEW: Description
+    "platforms_section": "Perróns", //NEW: Platforms
+    "platforms_desc": "Alle perróns beheeldj mit [1]/[2]-achterveugzels.", //NEW: kept with suffixes
+    "segments_section": "Segmènte", //NEW: Segments
+    "segments_desc": "{n} segmènte waere gemigreerd.", //NEW: segments migrated
+    "isi_removal_note": "{n} ISI-segmènte tusse de twieë knówpe waere verwiederd.", //NEW: ISI removed
+    "services_section": "Deenste", //NEW: Services
+    "services_desc": "{n} deenste aon 't doel waere biejgewèrk.", //NEW: services updated
+    "schematic_section": "Sjematies", //NEW: Schematic
+    "schematic_desc": "Sjpore vaan 't doel waere touvogevoeg.", //NEW: tracks appended
+    "beckmap_section": "Beckmap", //NEW: Beckmap
+    "beckmap_desc": "{n} lien-sjtasie-plaatsènge waere gemigreerd.", //NEW: placements migrated
+    "abort_self_loop": "Sameveuge zouw 'n zelflus-segmènt make. Verwiedert iers 't direktte segmènt.", //NEW: self-loop
+    "apply_btn": "Knówpe Sameveuge" //NEW: Merge Nodes
   }
 });
