@@ -15,7 +15,9 @@ function _nodeOpsClose() {
 }
 
 function _openNodeOpsOverlay(title, bodyId, footerHtml, opts) {
-  _nodeOpsClose();
+  // Only remove DOM — don't clear state (caller already set it)
+  const prev = document.getElementById('node-ops-overlay');
+  if (prev) prev.remove();
   const ov = document.createElement('div');
   ov.id = 'node-ops-overlay';
   ov.className = 'modal-overlay open';
