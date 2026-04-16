@@ -154,7 +154,7 @@ function showNodeDetail(id) {
       return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;background:${seg?.interchangeType==='osi'?'#2a1f3d':'#1f2a2a'};border-color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'};color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'}" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))} · ${label} · ${walkMins} min</span>`;
     }).join('');
     html += '</div>';
-  } else html += '<div class="text-dim mt-8" style="font-size:13px">No segments.</div>';
+  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_segments')}</div>`;
   html += '</div>';
 
   html += '<div class="detail-map-clear"></div>';
@@ -309,16 +309,16 @@ function openNodeModal(id, hField) {
       <div class="form-group"><label>${t('field.platforms')}</label><div id="plat-list">${plats}</div>
         <button class="btn btn-sm mt-8" onclick="addPlatRow()">${t('btn.add_platform')}</button></div>
       ${n && n.type === 'station' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.station_schematic")}</label>
-        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
+        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
         ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
       </div>` : ''}
     </div>
     ${n && n.type === 'junction' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.junction_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}
     ${n && n.type === 'waypoint' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.waypoint_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}`,
     `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
@@ -1100,9 +1100,9 @@ function openSegmentModal(id, hField) {
   openModal(s ? t('modal.edit_segment') : t('modal.add_segment'), `
     <div class="form-group"><label>${t('field.segment_type')}</label>
       <select id="f-sType" onchange="segTypeChanged(this.value)">
-        <option value="" ${!isInterchange?'selected':''}>Track segment</option>
-        <option value="road" ${isInterchange==='road'?'selected':''}>Road segment</option>
-        <option value="osi" ${isInterchange==='osi'||isInterchange==='isi'?'selected':''}>Walking interchange</option>
+        <option value="" ${!isInterchange?'selected':''}>${t('seg.track_segment')}</option>
+        <option value="road" ${isInterchange==='road'?'selected':''}>${t('seg.road_segment')}</option>
+        <option value="osi" ${isInterchange==='osi'||isInterchange==='isi'?'selected':''}>${t('seg.walking_interchange')}</option>
       </select></div>
     <div class="form-row">
       <div class="form-group"><label>${t('field.from_node')}</label><div id="seg-node-a-picker"></div></div>
@@ -1491,7 +1491,7 @@ function renderLines() {
   }
 
   if (!list.length) {
-    el.innerHTML = `<div class="text-dim mt-16">No lines matching "${esc(q)}".</div>`;
+    el.innerHTML = `<div class="text-dim mt-16">${t('empty.no_lines_match', { q })}</div>`;
     return;
   }
 
@@ -1550,7 +1550,7 @@ function showLineDetail(id) {
       }).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">No services assigned to this line yet.</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_services')}</div>`;
   }
   html += `</div>`;
 
@@ -1562,7 +1562,7 @@ function showLineDetail(id) {
       ${segs.map(s => `<span class="chip clickable" onclick="switchTab('segments');showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))} — ${esc(nodeName(s.nodeB))} <span class="text-muted" style="font-size:11px">${s.distance}km</span></span>`).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">No segments covered — add services with routes to this line.</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_segments')}</div>`;
   }
   html += `<div class="detail-map-clear"></div></div></div>`;
 
@@ -2412,7 +2412,7 @@ function renderRouteBuilder() {
   if (prependContainer) prependContainer.innerHTML = '';
 
   if (!stops.length) {
-    container.innerHTML = '<div class="text-dim" style="font-size:13px">No stops yet. Pick a starting node below.</div>';
+    container.innerHTML = `<div class="text-dim" style="font-size:13px">${t('empty.no_stops')}</div>`;
     const sorted = [...data.nodes].sort((a, b) => a.name.localeCompare(b.name));
     addContainer.innerHTML = `<div class="form-group"><label>${t('field.starting_node')}</label>
       <select onchange="addRouteStop(this.value);this.value='';">
@@ -2519,7 +2519,7 @@ function renderRouteBuilder() {
       ${_routeTrackOptions(connected)}
     </select>`;
   } else {
-    addContainer.innerHTML = '<div class="text-dim" style="font-size:12px">No further connections from this node.</div>';
+    addContainer.innerHTML = `<div class="text-dim" style="font-size:12px">${t('empty.no_further_connections')}</div>`;
   }
 }
 

@@ -83,17 +83,17 @@ function renderSettings() {
         <p class="text-dim" style="font-size:11px;margin-top:2px">${t('settings.jp_map_tiles_desc')}</p>
       </div>
       <div class="form-group">
-        <label style="font-size:13px;color:var(--text)">Default detail map view</label>
+        <label style="font-size:13px;color:var(--text)">${t('settings.default_detail_map')}</label>
         <select onchange="saveSetting('defaultDetailMap', this.value)" style="width:200px">
-          <option value="geo" ${(s.defaultDetailMap||'geo')==='geo'?'selected':''}>Geomap</option>
-          <option value="beck" ${s.defaultDetailMap==='beck'?'selected':''}>Railmap</option>
+          <option value="geo" ${(s.defaultDetailMap||'geo')==='geo'?'selected':''}>${t('nav.geomap')}</option>
+          <option value="beck" ${s.defaultDetailMap==='beck'?'selected':''}>${t('nav.railmap')}</option>
         </select>
       </div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
           <input type="checkbox" ${s.beckShowInfra ? 'checked' : ''} onchange="saveSetting('beckShowInfra', this.checked)">
-          Show all infrastructure on Railmap</label>
-        <p class="text-dim" style="font-size:11px;margin-top:2px">When enabled, all stations and segments are visible on the Railmap, even if not assigned to a service or line. Unassigned elements appear in grey.</p>
+          ${t('settings.beck_show_infra')}</label>
+        <p class="text-dim" style="font-size:11px;margin-top:2px">${t('settings.beck_show_infra_desc')}</p>
       </div>
       <div class="form-group" style="margin-top:24px">
         <button class="btn btn-danger" onclick="newSystem()">${t('btn.new_system')}</button>
@@ -1532,8 +1532,8 @@ function detailMapContainerHTML(containerId, hasGeo, hasBeck) {
   const showGeo = hasGeo && (!hasBeck || pref === 'geo');
   const showBeck = hasBeck && (!hasGeo || pref === 'beck');
   const tabBtns = (hasGeo && hasBeck ? `
-    <button class="${showGeo ? 'active' : ''}" onclick="detailMapToggle('${containerId}','geo')">Geomap</button>
-    <button class="${showBeck ? 'active' : ''}" onclick="detailMapToggle('${containerId}','beck')">Railmap</button>` : '') +
+    <button class="${showGeo ? 'active' : ''}" onclick="detailMapToggle('${containerId}','geo')">${t('nav.geomap')}</button>
+    <button class="${showBeck ? 'active' : ''}" onclick="detailMapToggle('${containerId}','beck')">${t('nav.railmap')}</button>` : '') +
     `<button class="dm-expand-btn" onclick="detailMapExpand('${containerId}')" title="Expand">⤢</button>`;
   const tabs = `<div class="detail-map-tabs">${tabBtns}</div>`;
   const h = hasGeo && hasBeck ? 'calc(100% - 28px)' : '100%';

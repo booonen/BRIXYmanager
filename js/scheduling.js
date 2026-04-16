@@ -25,7 +25,7 @@ function openScheduleModal(svcId) {
     </div>
     <div class="form-group" style="margin-bottom:8px">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
-        <input type="checkbox" id="sh-clear" checked onchange="refreshScheduleModal()">Clear existing departures for this service first</label></div>
+        <input type="checkbox" id="sh-clear" checked onchange="refreshScheduleModal()">${t('label.clear_existing')}</label></div>
     <div id="helper-timeline"></div>
     <div class="htabs">
       <div class="htab active" id="htab-freq" onclick="switchScheduleTab('freq')">${t('sch.frequency')}</div>
@@ -81,7 +81,7 @@ function refreshScheduleModal() {
   const freeCount = slots.filter(s => s.free).length;
 
   // Timeline bar
-  let timelineHtml = '<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Availability Timeline (24h)</strong>';
+  let timelineHtml = `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('label.availability_timeline')}</strong>`;
   timelineHtml += '<div style="display:flex;height:24px;border-radius:4px;overflow:hidden;border:1px solid var(--border);margin:12px 0">';
   for (let block = 0; block < 96; block++) {
     const startM = block * 15;
@@ -147,8 +147,8 @@ function updateHelperSuggestions(svcId) {
   const clearExisting = document.getElementById('sh-clear')?.checked ?? true;
   const customFreqVal = document.getElementById('sh-custom-freq')?.value || '';
   const freqs = [10, 15, 20, 30, 60];
-  let html = '<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Suggested Schedules</strong>';
-  html += '<table class="schedule-table mt-8"><thead><tr><th>Freq.</th><th>Deps.</th><th>Best Start</th><th>Conflicts</th><th></th></tr></thead><tbody>';
+  let html = `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('sch.suggested_schedules')}</strong>`;
+  html += `<table class="schedule-table mt-8"><thead><tr><th>${t('th.frequency')}</th><th>${t('th.deps')}</th><th>${t('th.best_start')}</th><th>${t('th.conflicts')}</th><th></th></tr></thead><tbody>`;
 
   // Handle cross-midnight: if end < start, treat end as next day
   const effectiveEnd = wEnd <= wStart ? wEnd + 1440 : wEnd;
@@ -172,10 +172,10 @@ function updateHelperSuggestions(svcId) {
     const { bestOffset, bestConflicts, bestCount } = _evalFreq(freq);
     const firstDep = wStart + bestOffset;
     const statusColor = bestConflicts === 0 ? 'var(--success)' : (bestConflicts <= 2 ? 'var(--warn)' : 'var(--danger)');
-    const statusText = bestConflicts === 0 ? '✓ Clear' : `${bestConflicts} conflict${bestConflicts!==1?'s':''}`;
+    const statusText = bestConflicts === 0 ? `✓ ${t('sch.clear')}` : (bestConflicts === 1 ? t('sch.conflicts_n_one') : t('sch.conflicts_n_other', { n: bestConflicts }));
 
     html += `<tr>
-      <td class="mono" style="font-weight:500">Every ${freq}m</td>
+      <td class="mono" style="font-weight:500">${t('sch.every_n_min', { n: freq })}</td>
       <td class="mono">${bestCount}</td>
       <td class="mono" style="color:var(--warn)">${toTime(firstDep)}</td>
       <td style="color:${statusColor};font-weight:500">${statusText}</td>
@@ -192,7 +192,7 @@ function updateHelperSuggestions(svcId) {
     const { bestOffset, bestConflicts, bestCount } = _evalFreq(customFreq);
     const firstDep = wStart + bestOffset;
     const statusColor = bestConflicts === 0 ? 'var(--success)' : (bestConflicts <= 2 ? 'var(--warn)' : 'var(--danger)');
-    const statusText = bestConflicts === 0 ? '✓ Clear' : `${bestConflicts} conflict${bestConflicts!==1?'s':''}`;
+    const statusText = bestConflicts === 0 ? `✓ ${t('sch.clear')}` : (bestConflicts === 1 ? t('sch.conflicts_n_one') : t('sch.conflicts_n_other', { n: bestConflicts }));
     html += `<td class="mono">${bestCount}</td>
       <td class="mono" style="color:var(--warn)">${toTime(firstDep)}</td>
       <td style="color:${statusColor};font-weight:500">${statusText}</td>

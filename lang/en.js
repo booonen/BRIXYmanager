@@ -578,6 +578,7 @@ registerLanguage('en', 'English', {
   },
   "seg": {
     "track_segment": "Track segment",
+    "road_segment": "Road segment",
     "walking_interchange": "Walking interchange",
     "osi": "OSI (Out of Station)",
     "isi": "ISI (In-Station)",
@@ -593,6 +594,8 @@ registerLanguage('en', 'English', {
     "explicit": "Explicit Times",
     "custom_freq": "Custom (min)",
     "custom_freq_placeholder": "e.g. 7, 12",
+    "suggested_schedules": "Suggested Schedules",
+    "every_n_min": "Every {n}m",
     "free": "Free",
     "partial": "Partial",
     "blocked": "Blocked",
@@ -691,7 +694,8 @@ registerLanguage('en', 'English', {
     "earlier": "\u2190 Earlier departures",
     "later": "Later departures \u2192",
     "showing_results": "Showing {start}\u2013{end}",
-    "terminus": "Terminus"
+    "terminus": "Terminus",
+    "searching": "Searching..."
   },
   "issue": {
     "no_issues": "No issues detected",
@@ -873,7 +877,10 @@ registerLanguage('en', 'English', {
     "light": "Light",
     "system_pref": "System preference",
     "check_translations": "Check Translations",
-    "show_low_severity": "Show low-severity issues"
+    "show_low_severity": "Show low-severity issues",
+    "default_detail_map": "Default detail map view",
+    "beck_show_infra": "Show all infrastructure on Railmap",
+    "beck_show_infra_desc": "When enabled, all stations and segments are visible on the Railmap, even if not assigned to a service or line. Unassigned elements appear in grey."
   },
   "l10n": {
     "report_title": "Translation Report",
