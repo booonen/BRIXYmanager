@@ -35,6 +35,7 @@ function openScheduleModal(svcId) {
       <div class="form-row mt-8" style="max-width:400px">
         <div class="form-group" style="margin-bottom:8px"><label>${t('field.window_start')}</label><input type="time" id="sh-start" value="06:00" onchange="refreshScheduleModal()"></div>
         <div class="form-group" style="margin-bottom:8px"><label>${t('field.window_end')}</label><input type="time" id="sh-end" value="23:00" onchange="refreshScheduleModal()"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>${t('sch.custom_freq')}</label><input type="number" id="sh-custom-freq" min="1" max="1440" placeholder="${t('sch.custom_freq_placeholder')}" onchange="refreshScheduleModal()"></div>
       </div>
       <div id="helper-suggestions"></div>
       <div id="helper-free-list" class="mt-16"></div>
@@ -145,7 +146,12 @@ function updateHelperSuggestions(svcId) {
   if (!el) return;
 
   const clearExisting = document.getElementById('sh-clear')?.checked ?? true;
+  const customFreq = parseInt(document.getElementById('sh-custom-freq')?.value);
   const freqs = [10, 15, 20, 30, 60];
+  if (customFreq > 0 && customFreq <= 1440 && !freqs.includes(customFreq)) {
+    freqs.push(customFreq);
+    freqs.sort((a, b) => a - b);
+  }
   let html = '<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Suggested Schedules</strong>';
   html += '<table class="schedule-table mt-8"><thead><tr><th>Freq.</th><th>Deps.</th><th>Best Start</th><th>Conflicts</th><th></th></tr></thead><tbody>';
 

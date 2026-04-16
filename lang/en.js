@@ -591,6 +591,8 @@ registerLanguage('en', 'English', {
   "sch": {
     "frequency": "Frequency",
     "explicit": "Explicit Times",
+    "custom_freq": "Custom (min)",
+    "custom_freq_placeholder": "e.g. 7, 12",
     "free": "Free",
     "partial": "Partial",
     "blocked": "Blocked",
