@@ -742,6 +742,15 @@ function applyMerge() {
     if (isInterchange(seg) && ((aT && bS) || (bT && aS))) { toDelete.push(seg.id); continue; }
     if (aT) seg.nodeA = ms.thisId;
     if (bT) seg.nodeB = ms.thisId;
+    // Move the wayGeometry endpoint that was on the target node to the surviving node
+    if ((aT || bT) && seg.wayGeometry?.length >= 2 && targetNode.lat != null && thisNode.lat != null) {
+      const tCoord = [targetNode.lat, targetNode.lon];
+      const mCoord = [thisNode.lat, thisNode.lon];
+      const dFirst = _ptDist(seg.wayGeometry[0], tCoord);
+      const dLast = _ptDist(seg.wayGeometry[seg.wayGeometry.length - 1], tCoord);
+      if (dFirst <= dLast) seg.wayGeometry[0] = mCoord;
+      else seg.wayGeometry[seg.wayGeometry.length - 1] = mCoord;
+    }
   }
   data.segments = data.segments.filter(seg => !toDelete.includes(seg.id));
 

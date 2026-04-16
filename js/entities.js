@@ -1108,7 +1108,7 @@ function openSegmentModal(id, hField) {
         <div class="form-group"><label>${t('field.distance')}</label><input type="number" id="f-sDi" value="${s?.distance||''}" min="0.1" step="0.1"></div>
       </div>
       <div class="form-row">
-        <div class="form-group" id="seg-elec-group">
+        <div class="form-group" id="seg-elec-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
           <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
             <input type="checkbox" id="f-sEl" ${defElec?'checked':''}>${t('field.electrified_label')}</label>
         </div>
@@ -1133,9 +1133,9 @@ function openSegmentModal(id, hField) {
         }).join('')}</div>
         <p class="text-dim" style="font-size:11px;margin-top:4px">${t('field.allowed_modes_help')}</p>
       </div>` : ''}
-      <div class="form-group" id="seg-tracks-group">
+      <div class="form-group" id="seg-tracks-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
         <label>${t('field.tracks')}</label>
-        <div id="seg-track-list">${defTrackRows}</div>
+        <div id="seg-track-list">${segTypeVal === 'road' ? '' : defTrackRows}</div>
         <button type="button" class="btn btn-sm mt-4" onclick="addSegTrackRow()">+ ${t('btn.add_track')}</button>
       </div>
     </div>
