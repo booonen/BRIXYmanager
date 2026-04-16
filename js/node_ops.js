@@ -133,3 +133,197 @@ function canMerge(thisId, targetId) {
   }
   return { ok: true };
 }
+
+// ---- Split modal ----
+
+function openSplitModal(nodeId) {
+  const node = getNode(nodeId);
+  if (!node) return;
+
+  const allSegs = data.segments.filter(s => s.nodeA === nodeId || s.nodeB === nodeId);
+  const placements = {};
+  for (const s of allSegs) placements[s.id] = 'left';
+  const platPlace = {}, platNames = {};
+  for (const p of (node.platforms || [])) { platPlace[p.id] = 'left'; platNames[p.id] = p.name; }
+
+  const groups = computeStickyGroups(nodeId);
+  const seg2g = {};
+  for (let gi = 0; gi < groups.length; gi++)
+    for (const sid of groups[gi].segIds) seg2g[sid] = gi;
+
+  _splitState = {
+    nodeId,
+    left: { name: node.name, refCode: node.refCode || '', ogfNode: node.ogfNode || '',
+            address: node.address || '', description: node.description || '' },
+    right: { name: '', refCode: node.refCode || '', ogfNode: node.ogfNode || '',
+             address: node.address || '', description: node.description || '' },
+    segmentPlacements: placements,
+    platformPlacements: platPlace,
+    platformNames: platNames,
+    newPlatforms: [],
+    deletedPlatforms: new Set(),
+    createISI: false,
+    isiDistance: 0.1,
+    stickyGroups: groups,
+    ichSegs: allSegs.filter(s => isInterchange(s)).map(s => s.id),
+    seg2group: seg2g
+  };
+
+  _openNodeOpsOverlay(
+    esc(t('split.modal_title', { name: node.name })),
+    'split-body',
+    `<div id="split-error" style="flex:1;color:var(--danger);font-size:13px"></div>
+     <button class="btn" onclick="_nodeOpsClose()">${t('btn.cancel')}</button>
+     <button class="btn btn-primary" onclick="applySplit()">${t('split.apply_btn')}</button>`,
+    { wide: true }
+  );
+  _renderSplitBody();
+}
+
+function _splitSyncInputs() {
+  if (!_splitState) return;
+  const s = _splitState;
+  const v = id => { const el = document.getElementById(id); return el ? el.value : undefined; };
+  const fmap = { name: 'name', refCode: 'ref', ogfNode: 'ogf', address: 'addr', description: 'desc' };
+  for (const [f, suf] of Object.entries(fmap)) {
+    const lv = v('split-left-' + suf); if (lv !== undefined) s.left[f] = lv;
+    const rv = v('split-right-' + suf); if (rv !== undefined) s.right[f] = rv;
+  }
+  const node = getNode(s.nodeId);
+  for (const p of (node.platforms || [])) {
+    if (s.deletedPlatforms.has(p.id)) continue;
+    const pv = v('split-plat-' + p.id); if (pv !== undefined) s.platformNames[p.id] = pv;
+  }
+  for (const np of s.newPlatforms) {
+    const nv = v('split-np-' + np.id); if (nv !== undefined) np.name = nv;
+  }
+  const cb = document.getElementById('split-isi-cb');
+  if (cb) s.createISI = cb.checked;
+  const dv = v('split-isi-dist');
+  if (dv !== undefined) s.isiDistance = parseFloat(dv) || 0.1;
+}
+
+function _renderSplitBody() {
+  const el = document.getElementById('split-body');
+  if (el) el.innerHTML = _buildSplitHTML();
+}
+
+function _splitFieldInputs(side, vals) {
+  const fields = [['name', t('field.name')], ['ref', t('field.ref_code')],
+    ['ogf', t('field.ogf_node')], ['addr', t('field.address')], ['desc', t('field.description')]];
+  const map = { name: 'name', ref: 'refCode', ogf: 'ogfNode', addr: 'address', desc: 'description' };
+  return fields.map(([k, label]) =>
+    `<div class="form-group" style="margin-bottom:8px"><label style="font-size:12px">${label}</label>
+      <input type="text" id="split-${side}-${k}" value="${esc(vals[map[k]] || '')}"></div>`
+  ).join('');
+}
+
+function _splitPlatCol(side, node) {
+  const s = _splitState;
+  const other = side === 'left' ? 'right' : 'left';
+  const arrow = side === 'left' ? '\u2192' : '\u2190';
+  let h = '';
+  const plats = (node.platforms || []).filter(p =>
+    !s.deletedPlatforms.has(p.id) && s.platformPlacements[p.id] === side);
+  for (const p of plats) {
+    h += `<div class="nops-plat-row">
+      ${side === 'right' ? `<button class="btn btn-sm" onclick="_splitMovePlat('${p.id}','${other}')">${arrow}</button>` : ''}
+      <input type="text" id="split-plat-${p.id}" value="${esc(s.platformNames[p.id] || p.name)}" style="flex:1">
+      ${side === 'left' ? `<button class="btn btn-sm" onclick="_splitMovePlat('${p.id}','${other}')">${arrow}</button>` : ''}
+      <button class="btn btn-sm btn-danger" onclick="_splitDeletePlat('${p.id}')">&#x2715;</button></div>`;
+  }
+  const newPlats = s.newPlatforms.filter(p => p.side === side);
+  for (const p of newPlats) {
+    h += `<div class="nops-plat-row">
+      ${side === 'right' ? `<button class="btn btn-sm" onclick="_splitMoveNewPlat('${p.id}','${other}')">${arrow}</button>` : ''}
+      <input type="text" id="split-np-${p.id}" value="${esc(p.name)}" style="flex:1">
+      ${side === 'left' ? `<button class="btn btn-sm" onclick="_splitMoveNewPlat('${p.id}','${other}')">${arrow}</button>` : ''}
+      <button class="btn btn-sm btn-danger" onclick="_splitDeleteNewPlat('${p.id}')">&#x2715;</button></div>`;
+  }
+  if (!plats.length && !newPlats.length) h += '<div class="text-dim" style="font-size:12px;padding:4px 0">(empty)</div>';
+  h += `<button class="btn btn-sm" style="margin-top:4px" onclick="_splitAddPlat('${side}')">+ ${t('btn.add_platform')}</button>`;
+  return h;
+}
+
+function _splitSegCol(side) {
+  const s = _splitState;
+  const other = side === 'left' ? 'right' : 'left';
+  const arrow = side === 'left' ? '\u2192' : '\u2190';
+  let h = '';
+
+  for (let gi = 0; gi < s.stickyGroups.length; gi++) {
+    const g = s.stickyGroups[gi];
+    const gSide = s.segmentPlacements[g.segIds[0]] || 'left';
+    if (gSide !== side) continue;
+
+    if (g.segIds.length === 1) {
+      const seg = getSeg(g.segIds[0]); if (!seg) continue;
+      const oName = nodeName(_segOtherNode(seg, s.nodeId));
+      const svcLabel = g.serviceIds.size ? ' <span class="text-dim" style="font-size:11px">(' +
+        esc([...g.serviceIds].map(id => getSvc(id)?.name || '?').slice(0, 3).join(', ')) + ')</span>' : '';
+      h += `<div class="nops-seg-row"><span style="flex:1">\u2194 ${esc(oName)}${svcLabel}</span>
+        <button class="btn btn-sm" onclick="_splitMoveGroup(${gi},'${other}')">${arrow}</button></div>`;
+    } else {
+      const svcNames = [...g.serviceIds].map(id => getSvc(id)?.name || '?');
+      const svcLabel = svcNames.length > 3 ? svcNames.slice(0, 3).join(', ') + '\u2026' : svcNames.join(', ');
+      h += '<div class="nops-sticky-group">';
+      h += `<div class="nops-sticky-hdr">${t('split.group_label', { n: gi + 1, services: esc(svcLabel) })}</div>`;
+      for (const segId of g.segIds) {
+        const seg = getSeg(segId); if (!seg) continue;
+        h += `<div style="padding:2px 0 2px 8px;font-size:13px">\u2194 ${esc(nodeName(_segOtherNode(seg, s.nodeId)))}</div>`;
+      }
+      const moveLabel = side === 'left' ? t('split.move_group_right') : t('split.move_group_left');
+      h += `<button class="btn btn-sm" style="margin-top:4px" onclick="_splitMoveGroup(${gi},'${other}')">${moveLabel}</button></div>`;
+    }
+  }
+
+  for (const segId of s.ichSegs) {
+    if (s.segmentPlacements[segId] !== side) continue;
+    const seg = getSeg(segId); if (!seg) continue;
+    const oName = nodeName(_segOtherNode(seg, s.nodeId));
+    const label = (seg.interchangeType || 'ICH').toUpperCase();
+    h += `<div class="nops-seg-row"><span style="flex:1">${label} \u2192 ${esc(oName)}</span>
+      <button class="btn btn-sm" onclick="_splitMoveSeg('${segId}','${other}')">${arrow}</button></div>`;
+  }
+
+  if (!h) h = '<div class="text-dim" style="font-size:12px;padding:4px 0">(empty)</div>';
+  return h;
+}
+
+function _buildSplitHTML() {
+  const s = _splitState;
+  const node = getNode(s.nodeId);
+  let h = '';
+  // Fields
+  h += '<div class="nops-cols"><div class="nops-col"><div class="nops-col-hdr">' + t('split.left_header') + '</div>';
+  h += _splitFieldInputs('left', s.left);
+  h += '</div><div class="nops-col"><div class="nops-col-hdr">' + t('split.right_header') + '</div>';
+  h += _splitFieldInputs('right', s.right);
+  h += '</div></div>';
+  // Platforms
+  h += '<div class="nops-sec-hdr">' + t('split.platforms_section') + '</div>';
+  h += '<div class="nops-cols"><div class="nops-col">' + _splitPlatCol('left', node) + '</div>';
+  h += '<div class="nops-col">' + _splitPlatCol('right', node) + '</div></div>';
+  // Segments
+  h += '<div class="nops-sec-hdr">' + t('split.segments_section') + '</div>';
+  h += '<div class="nops-cols"><div class="nops-col">' + _splitSegCol('left') + '</div>';
+  h += '<div class="nops-col">' + _splitSegCol('right') + '</div></div>';
+  // Options
+  h += '<div class="nops-sec-hdr">' + t('split.options_section') + '</div>';
+  h += `<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <input type="checkbox" id="split-isi-cb" ${s.createISI ? 'checked' : ''}
+      onchange="document.getElementById('split-isi-dist').disabled=!this.checked">
+    ${t('split.create_isi')}</label>`;
+  h += `<div style="margin-left:24px;display:flex;align-items:center;gap:6px">
+    ${t('split.isi_distance')}
+    <input type="number" id="split-isi-dist" value="${s.isiDistance}" step="0.01" min="0.01"
+      style="width:80px" ${s.createISI ? '' : 'disabled'}> km</div>`;
+  // Warnings
+  const warnings = _splitComputeWarnings();
+  if (warnings.length) {
+    h += '<div class="nops-warnings">';
+    for (const w of warnings) h += `<div style="color:var(--warn);font-size:13px">\u26A0 ${esc(w)}</div>`;
+    h += '</div>';
+  }
+  return h;
+}
