@@ -274,12 +274,13 @@ function applyOverlapResolution(proposal) {
   data.nodes.push(junction);
 
   // 2. Create shared segment (sharedNode → junction)
+  const sharedIsRoad = isRoad(segA);
   const sharedSeg = {
     id: uid(), nodeA: sharedNode, nodeB: junction.id,
-    tracks: segA.tracks.map(t => ({ id: uid(), name: t.name })),
+    tracks: sharedIsRoad ? [] : segA.tracks.map(t => ({ id: uid(), name: t.name })),
     maxSpeed: segA.maxSpeed, distance: Math.round(sharedDist * 100) / 100,
-    electrification: segA.electrification, refCode: '', description: '',
-    interchangeType: null, ogfWayIds: [], wayGeometry: sharedGeo,
+    electrification: sharedIsRoad ? false : segA.electrification, refCode: '', description: '',
+    interchangeType: segA.interchangeType, ogfWayIds: [], wayGeometry: sharedGeo,
     allowedModes: [...(segA.allowedModes || []), ...(segB.allowedModes || [])]
       .filter((v, i, a) => a.indexOf(v) === i) // unique
   };

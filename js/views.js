@@ -908,6 +908,7 @@ function runIssueDetection() {
     const THRESHOLD = 0.05; // 50m average distance = suspicious
 
     function _modesCompatible(sA, sB) {
+      if ((sA.interchangeType || null) !== (sB.interchangeType || null)) return false;
       const modesA = (sA.allowedModes || []).slice().sort().join(',');
       const modesB = (sB.allowedModes || []).slice().sort().join(',');
       return !modesA || !modesB || modesA === modesB;
@@ -1040,6 +1041,9 @@ function runIssueDetection() {
         const endpointsA = [sA.nodeA, sA.nodeB].sort().join('::');
         const endpointsB = [sB.nodeA, sB.nodeB].sort().join('::');
         if (endpointsA === endpointsB) continue;
+
+        // Skip if different infrastructure types (road vs track never overlap)
+        if ((sA.interchangeType || null) !== (sB.interchangeType || null)) continue;
 
         // Skip if different modes (intentionally parallel)
         const modesA = (sA.allowedModes || []).slice().sort().join(',');
