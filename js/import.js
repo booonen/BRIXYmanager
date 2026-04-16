@@ -329,7 +329,7 @@ function applyOverlapResolution(proposal) {
   segB.wayGeometry[segB.wayGeometry.length - 1] = [getNode(farNodeB).lat, getNode(farNodeB).lon];
   segB.distance = Math.round(remainderBDist * 100) / 100;
 
-  // 5. Update services: insert junction as pass-through
+  // 5. Update services: insert junction as pass-through, with matching departure times
   let servicesUpdated = 0;
   for (const svc of data.services) {
     let modified = false;
@@ -339,15 +339,23 @@ function applyOverlapResolution(proposal) {
         (a === sharedNode && (b === farNodeA || b === farNodeB)) ||
         (b === sharedNode && (a === farNodeA || a === farNodeB));
       if (needsJunction) {
-        // Insert junction as pass-through after the shared endpoint
-        const insertIdx = (a === sharedNode) ? i + 1 : i + 1;
-        // Determine correct position: junction goes between shared node and far node
         const junctionStop = { nodeId: junction.id, platformId: null, dwell: 0, passThrough: true };
-        if (a === sharedNode) {
-          svc.stops.splice(i + 1, 0, junctionStop);
-        } else {
-          svc.stops.splice(i + 1, 0, junctionStop);
+        svc.stops.splice(i + 1, 0, junctionStop);
+
+        // Interpolate a time entry into every departure so times stays in sync with stops
+        const isFarA = (b === farNodeA || a === farNodeA);
+        const remDist = isFarA ? remainderADist : remainderBDist;
+        const totalDist = sharedDist + remDist;
+        const fraction = totalDist > 0 ? ((a === sharedNode) ? sharedDist / totalDist : remDist / totalDist) : 0.5;
+        for (const dep of data.departures) {
+          if (dep.serviceId !== svc.id) continue;
+          if (dep.times.length <= i + 1) continue;
+          const prevT = dep.times[i]?.depart ?? dep.times[i]?.arrive ?? 0;
+          const nextT = dep.times[i + 1]?.arrive ?? dep.times[i + 1]?.depart ?? 0;
+          const jTime = Math.round(prevT + (nextT - prevT) * fraction);
+          dep.times.splice(i + 1, 0, { nodeId: junction.id, arrive: jTime, depart: jTime });
         }
+
         modified = true;
       }
     }
