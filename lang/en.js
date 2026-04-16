@@ -826,7 +826,9 @@ registerLanguage('en', 'English', {
       "suspicious_chain": "This segment's path matches a chain of shorter segments. It may be a redundant express route that skips intermediate stations.",
       "segment_overlap": "These segments share physical track. Consider inserting a junction at the split point to enable proper conflict detection."
     },
-    "verify_btn": "Mark as verified"
+    "verify_btn": "Mark as verified",
+    "unverify_btn": "Unverify",
+    "verified_summary": "{n} verified segment(s)"
   },
   "resolve": {
     "title": "Resolve Segment Overlap",

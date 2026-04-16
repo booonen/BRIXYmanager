@@ -1063,7 +1063,8 @@ function runIssueDetection() {
           const sharedEndpoint = (sA.nodeA === sB.nodeA || sA.nodeA === sB.nodeB ||
                                   sA.nodeB === sB.nodeA || sA.nodeB === sB.nodeB);
           const descKey = sharedEndpoint ? 'issue.desc.overlap_branching' : 'issue.desc.overlap_mid';
-          const fixBtn = sharedEndpoint
+          const canFix = sharedEndpoint && !!findDivergencePoint(sA, sB, SNAP_THRESHOLD);
+          const fixBtn = canFix
             ? `<button class="btn btn-sm btn-primary" style="margin-top:4px;margin-right:4px" onclick="event.stopPropagation();showOverlapResolutionModal('${sA.id}','${sB.id}')">${t('resolve.fix_btn')}</button>`
             : '';
           issues.push({ severity: 'medium', type: t('issue.type.segment_overlap'), typeKey: 'segment_overlap',
@@ -1178,7 +1179,43 @@ function runIssueDetection() {
     </div>`;
   }
 
+  // Verified segments section
+  const verifiedIds = data.settings?.verifiedSegments || [];
+  const verifiedSegs = verifiedIds.map(id => getSeg(id)).filter(Boolean);
+  if (verifiedSegs.length) {
+    html += `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+      <div class="clickable" style="font-size:12px;color:var(--text-muted);cursor:pointer" onclick="const el=document.getElementById('verified-segs-list');el.style.display=el.style.display==='none'?'':'none'">
+        ${t('issue.verified_summary', { n: verifiedSegs.length })} · <span style="color:var(--accent)">${t('issue_hidden.show')} / ${t('issue_hidden.hide')}</span>
+      </div>
+      <div id="verified-segs-list" style="display:none;margin-top:8px">
+        ${verifiedSegs.map(seg => {
+          const label = nodeName(seg.nodeA) + ' \u2014 ' + nodeName(seg.nodeB);
+          const typeLabel = isRoad(seg) ? 'Road' : 'Track';
+          return `<div class="issue-item severity-low" style="cursor:pointer" onclick="switchTab('segments');showSegmentDetail('${seg.id}')">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div><span style="font-size:12px;font-weight:600">${esc(label)}</span> <span class="text-dim" style="font-size:11px">${typeLabel} · ${seg.distance}km</span></div>
+              <button class="btn btn-sm" onclick="event.stopPropagation();unverifySegment('${seg.id}')">${t('issue.unverify_btn')}</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Clean stale verified IDs (segments that no longer exist)
+  if (verifiedIds.length !== verifiedSegs.length) {
+    data.settings.verifiedSegments = verifiedIds.filter(id => getSeg(id));
+    save();
+  }
+
   el.innerHTML = html;
+}
+
+function unverifySegment(segId) {
+  if (!data.settings?.verifiedSegments) return;
+  data.settings.verifiedSegments = data.settings.verifiedSegments.filter(id => id !== segId);
+  save();
+  runIssueDetection();
 }
 
 // ============================================================
