@@ -443,3 +443,163 @@ function _splitValidate() {
   if (s.createISI && s.isiDistance <= 0) return t('split.err_isi_distance');
   return null;
 }
+
+// ---- Apply split ----
+
+function applySplit() {
+  _splitSyncInputs();
+  const err = _splitValidate();
+  if (err) { const el = document.getElementById('split-error'); if (el) el.textContent = err; return; }
+
+  const s = _splitState;
+  const orig = getNode(s.nodeId);
+
+  // 1. Build platformToSide
+  const platSide = {};
+  for (const [pid, side] of Object.entries(s.platformPlacements)) {
+    if (!s.deletedPlatforms.has(pid)) platSide[pid] = side;
+  }
+  for (const np of s.newPlatforms) platSide[np.id] = np.side;
+
+  // 2. Precompute service stop decisions BEFORE modifying segments
+  const stopDecs = [];
+  for (const svc of data.services) {
+    for (let i = 0; i < svc.stops.length; i++) {
+      if (svc.stops[i].nodeId !== s.nodeId) continue;
+      let side = null;
+      if (i > 0) {
+        const seg = findSegByTrack(svc.stops[i - 1].nodeId, s.nodeId, svc.stops[i]?.trackId);
+        if (seg && s.segmentPlacements[seg.id]) side = s.segmentPlacements[seg.id];
+      }
+      if (side === null && i < svc.stops.length - 1) {
+        const seg = findSegByTrack(s.nodeId, svc.stops[i + 1].nodeId, svc.stops[i + 1]?.trackId);
+        if (seg && s.segmentPlacements[seg.id]) side = s.segmentPlacements[seg.id];
+      }
+      if (side === null) side = 'left';
+      stopDecs.push({ svc, idx: i, side });
+    }
+  }
+
+  // 3. Create right node
+  const rightNode = {
+    id: uid(), name: s.right.name.trim(), type: orig.type,
+    ogfNode: s.right.ogfNode.trim(), refCode: s.right.refCode.trim(),
+    address: s.right.address.trim(), description: s.right.description.trim(),
+    platforms: [], lat: orig.lat, lon: orig.lon
+  };
+  data.nodes.push(rightNode);
+
+  // 4. Update left node fields
+  Object.assign(orig, {
+    name: s.left.name.trim(), ogfNode: s.left.ogfNode.trim(),
+    refCode: s.left.refCode.trim(), address: s.left.address.trim(),
+    description: s.left.description.trim()
+  });
+
+  // 5. Partition platforms
+  const leftPlats = [], rightPlats = [];
+  for (const p of (orig.platforms || [])) {
+    if (s.deletedPlatforms.has(p.id)) continue;
+    const pn = s.platformNames[p.id] || p.name;
+    (s.platformPlacements[p.id] === 'right' ? rightPlats : leftPlats).push({ id: p.id, name: pn });
+  }
+  for (const np of s.newPlatforms) {
+    (np.side === 'right' ? rightPlats : leftPlats).push({ id: np.id, name: np.name });
+  }
+  orig.platforms = leftPlats;
+  rightNode.platforms = rightPlats;
+
+  // 6. Clean up deleted platform refs
+  for (const pid of s.deletedPlatforms) {
+    for (const svc of data.services) {
+      for (const st of svc.stops) { if (st.platformId === pid) st.platformId = null; }
+    }
+    for (const dep of data.departures) {
+      if (dep.platformOverrides) {
+        for (const [idx, dpid] of Object.entries(dep.platformOverrides)) {
+          if (dpid === pid) delete dep.platformOverrides[idx];
+        }
+      }
+    }
+  }
+
+  // 7. Partition segments
+  for (const [segId, side] of Object.entries(s.segmentPlacements)) {
+    if (side !== 'right') continue;
+    const seg = getSeg(segId);
+    if (!seg) continue;
+    if (seg.nodeA === orig.id) seg.nodeA = rightNode.id;
+    else if (seg.nodeB === orig.id) seg.nodeB = rightNode.id;
+  }
+
+  // 8. Apply service stop decisions
+  for (const dec of stopDecs) {
+    if (dec.side === 'right') {
+      dec.svc.stops[dec.idx].nodeId = rightNode.id;
+      const pid = dec.svc.stops[dec.idx].platformId;
+      if (pid && platSide[pid] !== 'right') dec.svc.stops[dec.idx].platformId = null;
+    } else {
+      const pid = dec.svc.stops[dec.idx].platformId;
+      if (pid && platSide[pid] !== 'left') dec.svc.stops[dec.idx].platformId = null;
+    }
+  }
+
+  // 9. Update departures
+  for (const dep of data.departures) {
+    const svc = getSvc(dep.serviceId);
+    if (!svc) continue;
+    for (let i = 0; i < dep.times.length; i++) {
+      if (dep.times[i].nodeId === orig.id && svc.stops[i]?.nodeId === rightNode.id) {
+        dep.times[i].nodeId = rightNode.id;
+      }
+    }
+    if (dep.platformOverrides) {
+      for (const [idx, dpid] of Object.entries(dep.platformOverrides)) {
+        if (!dpid || !platSide[dpid]) continue;
+        const stopNid = svc.stops[parseInt(idx)]?.nodeId;
+        const expected = stopNid === rightNode.id ? 'right' : 'left';
+        if (platSide[dpid] !== expected) delete dep.platformOverrides[idx];
+      }
+    }
+  }
+
+  // 10. Wipe schematic on original
+  delete orig.schematic;
+
+  // 11. Migrate beckmap lineStations
+  if (data.beckmap?.lineStations) {
+    for (const [gid, sm] of Object.entries(data.beckmap.lineStations)) {
+      if (!sm[orig.id]) continue;
+      const lineSvcs = data.services.filter(sv => sv.groupId === gid);
+      let rc = 0, lc = 0;
+      for (const sv of lineSvcs) {
+        for (const st of sv.stops) {
+          if (st.nodeId === rightNode.id) { rc++; break; }
+          if (st.nodeId === orig.id) { lc++; break; }
+        }
+      }
+      if (rc > 0 && lc > 0) {
+        sm[rightNode.id] = { ...sm[orig.id] };
+      } else if (rc > lc) {
+        sm[rightNode.id] = sm[orig.id];
+        delete sm[orig.id];
+      }
+    }
+  }
+
+  // 12. Create ISI segment if requested
+  if (s.createISI) {
+    data.segments.push({
+      id: uid(), nodeA: orig.id, nodeB: rightNode.id,
+      tracks: [], maxSpeed: 0, distance: s.isiDistance,
+      electrification: false, refCode: '', description: '',
+      interchangeType: 'isi', ogfWayIds: [], wayGeometry: null, allowedModes: []
+    });
+  }
+
+  const origId = orig.id;
+  _nodeOpsClose();
+  save(); refreshAll();
+  toast(t('toast.split_done', { name: rightNode.name }), 'success');
+  setTimeout(() => showNodeDetail(origId), 150);
+}
