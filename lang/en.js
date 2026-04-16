@@ -425,7 +425,8 @@ registerLanguage('en', 'English', {
     "select_origin_dest": "Select both origin and destination",
     "origin_dest_differ": "Origin and destination must be different",
     "split_done": "Split into \"{name}\"",
-    "merge_done": "Merged into \"{name}\""
+    "merge_done": "Merged into \"{name}\"",
+    "merge_done_with_segs": "Merged into \"{name}\" — {n} duplicate segment(s) also merged"
   },
   "modal": {
     "edit_node": "Edit Node",

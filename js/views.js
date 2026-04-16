@@ -2136,7 +2136,7 @@ function _relRenderStep(n) {
         <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
         <div class="flex gap-8" style="margin-top:16px">
           <button class="btn" onclick="_relRenderStep(1)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_relRenderStep(3)">${t('btn.next')}</button>
+          <button class="btn btn-primary" onclick="_relAdvanceFromStations()">${t('btn.next')}</button>
         </div>
       </div>`;
     return;
@@ -2411,6 +2411,12 @@ function _relProximityDedup(s) {
   const remapIds = {};
   let mergedToExisting = 0, mergedInBatch = 0;
 
+  // Save pre-proximity segment state so we can reset and re-run after name edits
+  for (const seg of s.segments) {
+    seg._preProxNodeA = seg.nodeA;
+    seg._preProxNodeB = seg.nodeB;
+  }
+
   for (let i = 0; i < s.stations.length; i++) {
     const st = s.stations[i];
     if (st._dupType || st._isWaypoint) continue;
@@ -2470,6 +2476,7 @@ function _relProximityDedup(s) {
     if (seg.nodeA === seg.nodeB && !seg._dupType) {
       seg._dupType = 'selfloop';
       seg._include = false;
+      seg._dupByProximity = true;
     }
   }
 
@@ -2484,7 +2491,7 @@ function _relProximityDedup(s) {
         (ex.nodeA === seg.nodeB && ex.nodeB === seg.nodeA)
       )
     );
-    if (existDup) { seg._dupType = 'pair'; seg._include = false; continue; }
+    if (existDup) { seg._dupType = 'pair'; seg._include = false; seg._dupByProximity = true; continue; }
 
     const batchDup = s.segments.slice(0, i).some(prev =>
       !prev._dupType && (
@@ -2492,9 +2499,11 @@ function _relProximityDedup(s) {
         (prev.nodeA === seg.nodeB && prev.nodeB === seg.nodeA)
       )
     );
-    if (batchDup) { seg._dupType = 'pair'; seg._include = false; }
+    if (batchDup) { seg._dupType = 'pair'; seg._include = false; seg._dupByProximity = true; }
   }
 
+  // Remove any stale proximity_merge warnings, then add fresh one
+  s.warnings = s.warnings.filter(w => w.type !== 'proximity_merge');
   s.warnings.push({
     type: 'proximity_merge',
     message: t('rel.proximity_merge_summary', {
@@ -2503,6 +2512,38 @@ function _relProximityDedup(s) {
       batch: mergedInBatch
     })
   });
+}
+
+function _relResetProximityDedup(s) {
+  for (const st of s.stations) {
+    if (st._dupType === 'proximity') {
+      st._dupType = null;
+      st._dupExistingName = '';
+      st._existingId = null;
+      st._include = true;
+    }
+  }
+  for (const seg of s.segments) {
+    if (seg._preProxNodeA != null) {
+      seg.nodeA = seg._preProxNodeA;
+      seg.nodeB = seg._preProxNodeB;
+      delete seg._preProxNodeA;
+      delete seg._preProxNodeB;
+    }
+    if (seg._dupByProximity) {
+      seg._dupType = null;
+      seg._include = true;
+      delete seg._dupByProximity;
+    }
+  }
+  s.warnings = s.warnings.filter(w => w.type !== 'proximity_merge');
+}
+
+function _relAdvanceFromStations() {
+  const s = _relImportState;
+  _relResetProximityDedup(s);
+  _relProximityDedup(s);
+  _relRenderStep(3);
 }
 
 function _relBuildServices() {
