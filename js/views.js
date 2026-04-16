@@ -369,7 +369,7 @@ function runIssueDetection() {
       const stop = svc.stops[i];
       if (stop.passThrough) continue;
       const node = getNode(stop.nodeId);
-      if (isPassengerStop(node) && (node.platforms||[]).length > 0 && !stop.platformId) {
+      if (node?.type === 'station' && (node.platforms||[]).length > 0 && !stop.platformId) {
         issues.push({ severity: 'medium', type: t('issue.type.missing_platform'), typeKey: 'missing_platform',
           desc: t('issue.desc.missing_platform', { name: svc.name, station: node.name }),
           detail: t('issue.detail.missing_platform', { n: i+1 }),
@@ -614,7 +614,7 @@ function runIssueDetection() {
   }
 
   for (const n of data.nodes) {
-    if (isPassengerStop(n) && (!n.platforms || n.platforms.length === 0)) {
+    if (n.type === 'station' && (!n.platforms || n.platforms.length === 0)) {
       issues.push({ severity: 'low', type: t('issue.type.no_platforms'), typeKey: 'no_platforms',
         desc: t('issue.desc.no_platforms', { name: n.name }),
         detail: t('issue.detail.no_platforms'),
@@ -2113,7 +2113,8 @@ function _relRenderStep(n) {
       const dupWarn = st._dupType ? ` style="background:var(--warn-dim)"` : '';
       const dupLabel = st._dupType === 'ogf' ? t('csv.warn_dup_ogf_existing', { name: st._dupExistingName })
         : st._dupType === 'batch' ? t('csv.warn_dup_ogf')
-        : st._dupType === 'cross' ? t('rel.dup_cross_relation', { name: st._dupExistingName }) : '';
+        : st._dupType === 'cross' ? t('rel.dup_cross_relation', { name: st._dupExistingName })
+        : st._dupType === 'proximity' ? t('rel.dup_proximity', { name: st._dupExistingName }) : '';
       table += `<tr${dupWarn}>
         <td><input type="checkbox" ${st._include !== false ? 'checked' : ''} onchange="_relImportState.stations[${i}]._include=this.checked"></td>
         <td><input type="text" value="${esc(st.name)}" onchange="_relImportState.stations[${i}].name=this.value.trim()" style="width:180px;font-size:12px"></td>
@@ -2329,6 +2330,9 @@ async function _relFetchAndProcess() {
     // Cross-relation duplicate resolution
     if (s.relations.length > 1) _relCrossDedup(s);
 
+    // Proximity-based auto-merge (catches bidirectional bus stop duplicates etc.)
+    _relProximityDedup(s);
+
     console.log(`[Relation Import] Total: ${s.stations.length} stations, ${s.segments.length} segments, ${s.warnings.length} warnings from ${uniqueIds.length} relation(s)`);
     _relRenderStep(2);
   } catch (err) {
@@ -2392,6 +2396,109 @@ function _relCrossDedup(s) {
     );
     if (batchDup) { seg._dupType = 'pair'; seg._include = false; }
   }
+}
+
+// Auto-merge stations with matching name+type within proximity threshold.
+// Primary use case: bidirectional bus/tram relations where each direction has
+// a separate OGF node per stop, but the stops represent the same physical place.
+function _relProximityDedup(s) {
+  const MERGE_DIST_KM = 0.1; // 100m
+  const normName = x => (x || '').trim().toLowerCase();
+  const remapIds = {};
+  let mergedToExisting = 0, mergedInBatch = 0;
+
+  for (let i = 0; i < s.stations.length; i++) {
+    const st = s.stations[i];
+    if (st._dupType || st._isWaypoint) continue;
+    if (!st.name || st.lat == null) continue;
+    const nameKey = normName(st.name);
+    if (!nameKey) continue;
+
+    // Match against existing data.nodes first
+    let matched = false;
+    for (const existing of data.nodes) {
+      if (existing.type !== st.type) continue;
+      if (normName(existing.name) !== nameKey) continue;
+      if (existing.lat == null) continue;
+      const dist = _ptDist([st.lat, st.lon], [existing.lat, existing.lon]);
+      if (dist > MERGE_DIST_KM) continue;
+      st._dupType = 'proximity';
+      st._dupExistingName = existing.name;
+      st._existingId = existing.id;
+      st._include = false;
+      remapIds[st.id] = existing.id;
+      mergedToExisting++;
+      matched = true;
+      break;
+    }
+    if (matched) continue;
+
+    // Match against earlier imported stations in the same batch
+    for (let j = 0; j < i; j++) {
+      const earlier = s.stations[j];
+      if (earlier._isWaypoint) continue;
+      if (earlier.type !== st.type) continue;
+      if (normName(earlier.name) !== nameKey) continue;
+      if (earlier.lat == null) continue;
+      const dist = _ptDist([st.lat, st.lon], [earlier.lat, earlier.lon]);
+      if (dist > MERGE_DIST_KM) continue;
+      const canonicalId = earlier._existingId || earlier.id;
+      st._dupType = 'proximity';
+      st._dupExistingName = earlier.name;
+      st._existingId = canonicalId;
+      st._include = false;
+      remapIds[st.id] = canonicalId;
+      mergedInBatch++;
+      break;
+    }
+  }
+
+  if (!Object.keys(remapIds).length) return;
+
+  // Remap segment endpoints to the canonical node
+  for (const seg of s.segments) {
+    if (remapIds[seg.nodeA]) seg.nodeA = remapIds[seg.nodeA];
+    if (remapIds[seg.nodeB]) seg.nodeB = remapIds[seg.nodeB];
+  }
+
+  // Exclude self-loop segments (both endpoints merged into the same node)
+  for (const seg of s.segments) {
+    if (seg.nodeA === seg.nodeB && !seg._dupType) {
+      seg._dupType = 'selfloop';
+      seg._include = false;
+    }
+  }
+
+  // Re-check segment duplicates against existing data and earlier batch segments
+  for (let i = 0; i < s.segments.length; i++) {
+    const seg = s.segments[i];
+    if (seg._dupType) continue;
+
+    const existDup = data.segments.some(ex =>
+      !isInterchange(ex) && (
+        (ex.nodeA === seg.nodeA && ex.nodeB === seg.nodeB) ||
+        (ex.nodeA === seg.nodeB && ex.nodeB === seg.nodeA)
+      )
+    );
+    if (existDup) { seg._dupType = 'pair'; seg._include = false; continue; }
+
+    const batchDup = s.segments.slice(0, i).some(prev =>
+      !prev._dupType && (
+        (prev.nodeA === seg.nodeA && prev.nodeB === seg.nodeB) ||
+        (prev.nodeA === seg.nodeB && prev.nodeB === seg.nodeA)
+      )
+    );
+    if (batchDup) { seg._dupType = 'pair'; seg._include = false; }
+  }
+
+  s.warnings.push({
+    type: 'proximity_merge',
+    message: t('rel.proximity_merge_summary', {
+      n: Object.keys(remapIds).length,
+      existing: mergedToExisting,
+      batch: mergedInBatch
+    })
+  });
 }
 
 function _relBuildServices() {
@@ -2773,9 +2880,9 @@ function _csvBuildNodePreview() {
     const platRaw = fieldCol.platforms != null ? (row[fieldCol.platforms] || '').trim() : '';
 
     let platforms = [];
-    if (platRaw) {
+    if (platRaw && type !== 'bus_stop') {
       platforms = platRaw.split('|').map(p => ({ id: uid(), name: p.trim() })).filter(p => p.name);
-    } else if (type === 'station' || type === 'bus_stop') {
+    } else if (type === 'station') {
       const count = s.defaults.platformCount || 0;
       for (let i = 1; i <= count; i++) platforms.push({ id: uid(), name: `Platform ${i}` });
     }

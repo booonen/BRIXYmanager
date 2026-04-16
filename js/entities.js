@@ -5,7 +5,7 @@ const _nodePrefixMap = {
   name: n => n.name,
   ref: n => n.refCode,
   type: n => n.type,
-  platforms: n => isPassengerStop(n) ? (n.platforms || []).length : null,
+  platforms: n => n.type === 'station' ? (n.platforms || []).length : null,
   desc: n => n.description,
   address: n => n.address,
   ogf: n => !!n.ogfNode,
@@ -27,7 +27,7 @@ function _nodeFreeText(n, q) {
 }
 const _nodeSortDefs = {
   name: n => n.name, ref: n => n.refCode || '', type: n => n.type,
-  platforms: n => isPassengerStop(n) ? (n.platforms || []).length : null,
+  platforms: n => n.type === 'station' ? (n.platforms || []).length : null,
   connections: n => connectedNodes(n.id).length
 };
 
@@ -58,7 +58,7 @@ function renderNodes() {
       <td><strong class="clickable" onclick="showNodeDetail('${n.id}')">${esc(n.name)}</strong>${n.description ? `<div class="text-dim" style="font-size:11px;margin-top:1px">${esc(n.description)}</div>` : ''}</td>
       <td class="mono text-dim" style="font-size:11px">${esc(n.refCode || '—')}</td>
       <td><span class="type-badge type-${n.type}">${t('type.'+n.type)}</span></td>
-      <td class="mono">${isPassengerStop(n) ? (n.platforms||[]).length : '—'}</td>
+      <td class="mono">${n.type === 'station' ? (n.platforms||[]).length : '—'}</td>
       <td class="mono">${conns}</td>
       <td style="text-align:center">${hasOgf ? '<span title="OGF node linked" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>'}</td>
       <td style="text-align:center">${n.lat != null ? '<span title="' + n.lat.toFixed(5) + ', ' + n.lon.toFixed(5) + '" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>'}</td>
@@ -291,7 +291,7 @@ function openNodeModal(id, hField) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>${t('field.type')}</label>
-        <select id="f-type" onchange="document.getElementById('plat-sec').style.display=(this.value==='station'||this.value==='bus_stop')?'':'none'">
+        <select id="f-type" onchange="document.getElementById('plat-sec').style.display=(this.value==='station')?'':'none'">
           ${['station','bus_stop','junction','waypoint','depot','freight_yard'].map(tp =>
             `<option value="${tp}" ${(n ? n.type : _lastNodeType)===tp?'selected':''}>${t('type.'+tp)}</option>`).join('')}
         </select></div>
@@ -299,7 +299,7 @@ function openNodeModal(id, hField) {
     </div>
     <div class="form-group"><label>${t('field.address')}</label><input type="text" id="f-addr" value="${esc(n?.address||'')}"></div>
     <div class="form-group"><label>${t('field.description')}</label><input type="text" id="f-ndesc" value="${esc(n?.description||'')}" placeholder="${t('placeholder.eg_description')}"></div>
-    <div id="plat-sec" style="${(n ? isPassengerStop(n) : (_lastNodeType==='station'||_lastNodeType==='bus_stop'))?'':'display:none'}">
+    <div id="plat-sec" style="${(n ? n.type === 'station' : _lastNodeType==='station')?'':'display:none'}">
       <div class="form-group"><label>${t('field.platforms')}</label><div id="plat-list">${plats}</div>
         <button class="btn btn-sm mt-8" onclick="addPlatRow()">${t('btn.add_platform')}</button></div>
       ${n && n.type === 'station' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.station_schematic")}</label>
@@ -335,7 +335,7 @@ function saveNode() {
   const refCode = document.getElementById('f-ref').value.trim();
   const description = document.getElementById('f-ndesc').value.trim();
   let platforms = [];
-  if (type === 'station' || type === 'bus_stop') {
+  if (type === 'station') {
     document.querySelectorAll('#plat-list .plat-name').forEach(inp => {
       const pn = inp.value.trim(); if (pn) platforms.push({ id: uid(), name: pn });
     });

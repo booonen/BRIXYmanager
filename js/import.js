@@ -452,7 +452,9 @@ function processRelationImport(config, rawData) {
     let name = stop.name;
 
     const platforms = [];
-    for (let i = 1; i <= config.defaultPlatformCount; i++) platforms.push({ id: uid(), name: `Platform ${i}` });
+    if (nodeType !== 'bus_stop') {
+      for (let i = 1; i <= config.defaultPlatformCount; i++) platforms.push({ id: uid(), name: `Platform ${i}` });
+    }
 
     if (snapResult.dist > 0.05) {
       warnings.push({ type: 'snap_distance', message: `"${name || stop.ogfId}" is ${Math.round(snapResult.dist * 1000)}m from the nearest way.`, ogfId: stop.ogfId });

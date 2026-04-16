@@ -174,6 +174,8 @@ registerLanguage('en', 'English', {
     "seg_track": "Track",
     "seg_road": "Road",
     "dup_cross_relation": "Already imported from another relation: {name}",
+    "dup_proximity": "Auto-merged with nearby node: {name}",
+    "proximity_merge_summary": "{n} node(s) auto-merged based on name and proximity (within 100m) — {existing} with existing, {batch} within import. Review in the Stations step to override.",
     "fetch_btn": "Fetch & Process",
     "fetching": "Fetching relation...",
     "fetching_n": "Fetching relation {n} of {total}...",
