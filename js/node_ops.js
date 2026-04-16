@@ -327,3 +327,119 @@ function _buildSplitHTML() {
   }
   return h;
 }
+
+// ---- Split interactions ----
+
+function _splitMoveGroup(gi, toSide) {
+  _splitSyncInputs();
+  for (const sid of _splitState.stickyGroups[gi].segIds)
+    _splitState.segmentPlacements[sid] = toSide;
+  _renderSplitBody();
+}
+
+function _splitMoveSeg(segId, toSide) {
+  _splitSyncInputs();
+  _splitState.segmentPlacements[segId] = toSide;
+  _renderSplitBody();
+}
+
+function _splitMovePlat(platId, toSide) {
+  _splitSyncInputs();
+  _splitState.platformPlacements[platId] = toSide;
+  _renderSplitBody();
+}
+
+function _splitMoveNewPlat(platId, toSide) {
+  _splitSyncInputs();
+  const np = _splitState.newPlatforms.find(p => p.id === platId);
+  if (np) np.side = toSide;
+  _renderSplitBody();
+}
+
+function _splitAddPlat(side) {
+  _splitSyncInputs();
+  const count = _splitState.newPlatforms.length +
+    Object.keys(_splitState.platformPlacements).length - _splitState.deletedPlatforms.size;
+  _splitState.newPlatforms.push({ id: uid(), name: 'Platform ' + (count + 1), side });
+  _renderSplitBody();
+}
+
+function _splitDeletePlat(platId) {
+  _splitSyncInputs();
+  const refs = data.services.filter(s => s.stops.some(st => st.platformId === platId));
+  if (refs.length) {
+    appConfirm(`This platform is referenced by ${refs.length} service stop(s). Delete anyway?`, () => {
+      _splitState.deletedPlatforms.add(platId);
+      _renderSplitBody();
+    });
+  } else {
+    _splitState.deletedPlatforms.add(platId);
+    _renderSplitBody();
+  }
+}
+
+function _splitDeleteNewPlat(platId) {
+  _splitSyncInputs();
+  _splitState.newPlatforms = _splitState.newPlatforms.filter(p => p.id !== platId);
+  _renderSplitBody();
+}
+
+// ---- Split warnings & validation ----
+
+function _splitComputeWarnings() {
+  const s = _splitState;
+  const w = [];
+  const rightPlats = Object.values(s.platformPlacements).filter(v => v === 'right').length
+    + s.newPlatforms.filter(p => p.side === 'right').length;
+  const rightSegs = Object.values(s.segmentPlacements).filter(v => v === 'right').length;
+
+  const platSide = {};
+  for (const [pid, side] of Object.entries(s.platformPlacements)) {
+    if (!s.deletedPlatforms.has(pid)) platSide[pid] = side;
+  }
+  for (const np of s.newPlatforms) platSide[np.id] = np.side;
+
+  let repointed = 0, unassigned = 0;
+  for (const svc of data.services) {
+    for (let i = 0; i < svc.stops.length; i++) {
+      if (svc.stops[i].nodeId !== s.nodeId) continue;
+      let side = null;
+      if (i > 0) {
+        const seg = findSegByTrack(svc.stops[i - 1].nodeId, s.nodeId, svc.stops[i]?.trackId);
+        if (seg && s.segmentPlacements[seg.id]) side = s.segmentPlacements[seg.id];
+      }
+      if (side === null && i < svc.stops.length - 1) {
+        const seg = findSegByTrack(s.nodeId, svc.stops[i + 1].nodeId, svc.stops[i + 1]?.trackId);
+        if (seg && s.segmentPlacements[seg.id]) side = s.segmentPlacements[seg.id];
+      }
+      if (side === null) side = 'left';
+      if (side === 'right') repointed++;
+      const pid = svc.stops[i].platformId;
+      if (pid && platSide[pid] && platSide[pid] !== side) unassigned++;
+    }
+  }
+
+  let beckCount = 0;
+  if (data.beckmap?.lineStations) {
+    for (const sm of Object.values(data.beckmap.lineStations)) { if (sm[s.nodeId]) beckCount++; }
+  }
+
+  if (rightPlats > 0) w.push(t('split.warning_platforms_moved', { n: rightPlats }));
+  if (unassigned > 0) w.push(t('split.warning_stops_unassigned', { n: unassigned }));
+  if (rightSegs > 0) w.push(t('split.warning_segments_moved', { n: rightSegs }));
+  if (repointed > 0) w.push(t('split.warning_services_repointed', { n: repointed }));
+  if (beckCount > 0) w.push(t('split.warning_beckmap_migrated', { n: beckCount }));
+  return w;
+}
+
+function _splitValidate() {
+  const s = _splitState;
+  if (!s.left.name.trim() || !s.right.name.trim()) return t('split.err_name_required');
+  if (s.left.name.trim() === s.right.name.trim()) return t('split.err_names_same');
+  const hasRight = Object.values(s.segmentPlacements).some(v => v === 'right')
+    || Object.values(s.platformPlacements).some(v => v === 'right')
+    || s.newPlatforms.some(p => p.side === 'right');
+  if (!hasRight) return t('split.err_nothing_split');
+  if (s.createISI && s.isiDistance <= 0) return t('split.err_isi_distance');
+  return null;
+}
