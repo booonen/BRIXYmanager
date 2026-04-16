@@ -151,28 +151,33 @@ function findOverlapLength(coordsA, coordsB, snapThresholdKm, graceKm) {
 function findDivergencePoint(segA, segB, snapThresholdKm) {
   const sharedNode = segA.nodeA === segB.nodeA || segA.nodeA === segB.nodeB ? segA.nodeA
     : segA.nodeB === segB.nodeA || segA.nodeB === segB.nodeB ? segA.nodeB : null;
-  if (!sharedNode) return null;
+  if (!sharedNode) { console.warn('[Divergence] No shared node between', segA.id, segB.id); return null; }
 
   // Orient both polylines so they start from the shared endpoint.
-  // Use coordinate proximity rather than nodeA/nodeB ordering, since
-  // wayGeometry direction isn't guaranteed to match the node ordering.
   let geoA = [...segA.wayGeometry];
   let geoB = [...segB.wayGeometry];
   const sharedN = getNode(sharedNode);
-  if (!sharedN || sharedN.lat == null) return null;
+  if (!sharedN || sharedN.lat == null) { console.warn('[Divergence] Shared node has no coords:', sharedNode); return null; }
   const sharedCoord = [sharedN.lat, sharedN.lon];
 
-  if (_ptDist(geoA[geoA.length - 1], sharedCoord) < _ptDist(geoA[0], sharedCoord)) geoA.reverse();
-  if (_ptDist(geoB[geoB.length - 1], sharedCoord) < _ptDist(geoB[0], sharedCoord)) geoB.reverse();
+  const dAFirst = _ptDist(geoA[0], sharedCoord), dALast = _ptDist(geoA[geoA.length - 1], sharedCoord);
+  const dBFirst = _ptDist(geoB[0], sharedCoord), dBLast = _ptDist(geoB[geoB.length - 1], sharedCoord);
+  console.log(`[Divergence] Shared node ${sharedN.name} (${sharedNode})`);
+  console.log(`[Divergence] segA ${segA.id}: geoA[0] ${Math.round(dAFirst*1000)}m, geoA[last] ${Math.round(dALast*1000)}m from shared → ${dALast < dAFirst ? 'REVERSING' : 'ok'}`);
+  console.log(`[Divergence] segB ${segB.id}: geoB[0] ${Math.round(dBFirst*1000)}m, geoB[last] ${Math.round(dBLast*1000)}m from shared → ${dBLast < dBFirst ? 'REVERSING' : 'ok'}`);
+  if (dALast < dAFirst) geoA.reverse();
+  if (dBLast < dBFirst) geoB.reverse();
 
-  // Walk along geoA, snap to geoB.
-  // Allow initial divergence — paths may converge into parallel after the station.
   let lastSharedIdx = 0;
   let foundProximity = false;
   const cumA = _cumulativeDist(geoA);
+  console.log(`[Divergence] Walking geoA: ${geoA.length} points, total ${Math.round(cumA[cumA.length-1]*1000)}m. Threshold: ${snapThresholdKm*1000}m`);
   for (let i = 1; i < geoA.length; i++) {
     if (cumA[i] < 0.01) { lastSharedIdx = i; continue; }
     const snap = _snapToPolyline(geoA[i], geoB);
+    if (i <= 5 || snap.dist < snapThresholdKm || (foundProximity && snap.dist >= snapThresholdKm)) {
+      console.log(`[Divergence]   i=${i} cumDist=${Math.round(cumA[i]*1000)}m snapDist=${Math.round(snap.dist*1000)}m ${snap.dist < snapThresholdKm ? 'CLOSE' : 'FAR'} foundProx=${foundProximity}`);
+    }
     if (snap.dist < snapThresholdKm) {
       lastSharedIdx = i;
       foundProximity = true;
@@ -181,9 +186,10 @@ function findDivergencePoint(segA, segB, snapThresholdKm) {
     }
   }
 
-  if (!foundProximity) return null;
+  if (!foundProximity) { console.warn(`[Divergence] No proximity found. lastSharedIdx=${lastSharedIdx}`); return null; }
 
   const coord = geoA[lastSharedIdx];
+  console.log(`[Divergence] Split point at idx=${lastSharedIdx}, dist=${Math.round(cumA[lastSharedIdx]*1000)}m from shared node, coord=${coord[0].toFixed(5)},${coord[1].toFixed(5)}`);
   return {
     coord,
     sharedNode,
