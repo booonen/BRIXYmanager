@@ -7,20 +7,65 @@
 // Hierarchical keys: t('nav.nodes') → _strings[_lang].nav.nodes
 // Plurals: use separate keys (toast.fetched_one, toast.fetched_other) — caller picks.
 // Static HTML strings: elements with data-t="key" are hydrated by l10nHydrate().
+//
+// Staleness detection:
+// English is the source of truth. Every leaf string in en is hashed (djb2 → base36).
+// Each translation file stamps `_hashes` — a flat { "dot.key": hash } map recording
+// the English hash the translator worked against. If the current English hash for a
+// key differs from the stored one, the translation is stale. No manual bookkeeping —
+// any edit to an English string auto-invalidates dependent translations.
+//
+// Legacy: the older `_stale` array (explicit list of stale key paths) is still
+// accepted for translation files that haven't been migrated to hashes yet.
 
 let _lang = 'en';
 let _strings = {};
+// Per-language metadata kept out of _strings so it doesn't leak into key walks.
+// Shape: { [code]: { name, hashes: {key: hash} | null, staleKeys: [key, ...] } }
+let _meta = {};
 let _availableLanguages = [{ code: 'en', name: 'English' }];
 
+// djb2 → unsigned 32-bit → base36. ~6-7 char hashes, plenty for staleness detection.
+function _hashString(s) {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) {
+    h = ((h << 5) + h + s.charCodeAt(i)) | 0; // h * 33 + c
+  }
+  return (h >>> 0).toString(36);
+}
+
+// Walk a nested strings object and return { "dot.key": hash } for every string leaf.
+// Keys starting with _ are treated as metadata and skipped.
+function _computeHashes(obj, prefix) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k.startsWith('_')) continue;
+    const full = prefix ? prefix + '.' + k : k;
+    if (typeof v === 'string') {
+      out[full] = _hashString(v);
+    } else if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      Object.assign(out, _computeHashes(v, full));
+    }
+  }
+  return out;
+}
+
 // Called by lang/*.js files to register their string data.
-// Language files can include a "_stale" array listing dot-notation key paths
-// where English has changed since the translation was last updated.
-// When updating a stale translation, remove the key from the _stale array.
+// Metadata keys recognised on the payload:
+//   _hashes: { "dot.key": "hashstr" } — English hash each key was translated against
+//   _stale:  ["dot.key", ...]          — legacy explicit stale list (still honoured)
+// For English, hashes are computed live from the strings themselves.
 function registerLanguage(code, name, strings) {
-  const stale = strings._stale || [];
+  const storedHashes = strings._hashes || null;
+  const staleKeys = strings._stale || [];
+  delete strings._hashes;
   delete strings._stale;
   _strings[code] = strings;
-  _strings[code]._staleKeys = stale;
+  _meta[code] = {
+    name,
+    hashes: code === 'en' ? _computeHashes(strings) : storedHashes,
+    staleKeys,
+  };
   if (!_availableLanguages.find(l => l.code === code)) {
     _availableLanguages.push({ code, name });
   }
@@ -68,10 +113,11 @@ function setLanguage(code) {
   refreshAll();
 }
 
-// Collect all dot-notation keys from a nested object
+// Collect all dot-notation keys from a nested object. Skips _-prefixed metadata.
 function _collectKeys(obj, prefix) {
   const keys = [];
   for (const [k, v] of Object.entries(obj)) {
+    if (k.startsWith('_')) continue;
     const full = prefix ? prefix + '.' + k : k;
     if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
       keys.push(..._collectKeys(v, full));
@@ -82,19 +128,37 @@ function _collectKeys(obj, prefix) {
   return keys;
 }
 
-// Check all loaded languages for missing keys (vs English) and stale markers.
+// Check all loaded languages for missing and stale keys (vs English).
 // Returns { code: { name, missing: [...], stale: [...] } }
+// Staleness is detected by hash mismatch against the current English hashes.
+// Falls back to the legacy _stale array for translation files without _hashes.
 function checkLanguageCompleteness() {
-  const enKeys = _strings.en ? _collectKeys(_strings.en, '') : [];
+  const enHashes = _meta.en?.hashes || {};
+  const enKeys = Object.keys(enHashes);
   const results = {};
   for (const lang of _availableLanguages) {
     if (lang.code === 'en') continue;
     const strs = _strings[lang.code];
-    if (!strs) continue;
+    const meta = _meta[lang.code];
+    if (!strs || !meta) continue;
     const langKeys = _collectKeys(strs, '');
-    const missing = enKeys.filter(k => !langKeys.includes(k));
-    // Stale keys are tracked via _staleKeys set by registerLanguage
-    const stale = strs._staleKeys || [];
+    const langKeySet = new Set(langKeys);
+    const missing = enKeys.filter(k => !langKeySet.has(k));
+    let stale;
+    if (meta.hashes) {
+      // Hash-based: compare stored English hash to current. Mismatch = stale.
+      // Skip keys that aren't translated (already counted as missing) and keys
+      // translated but never stamped (unknown staleness — don't flag).
+      const missingSet = new Set(missing);
+      stale = enKeys.filter(k => {
+        if (missingSet.has(k)) return false;
+        const storedHash = meta.hashes[k];
+        if (!storedHash) return false;
+        return storedHash !== enHashes[k];
+      });
+    } else {
+      stale = meta.staleKeys || [];
+    }
     results[lang.code] = { name: lang.name, missing, stale };
   }
   return results;
