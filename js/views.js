@@ -83,17 +83,17 @@ function renderSettings() {
         <p class="text-dim" style="font-size:11px;margin-top:2px">${t('settings.jp_map_tiles_desc')}</p>
       </div>
       <div class="form-group">
-        <label style="font-size:13px;color:var(--text)">Default detail map view</label>
+        <label style="font-size:13px;color:var(--text)">${t('settings.default_detail_map')}</label>
         <select onchange="saveSetting('defaultDetailMap', this.value)" style="width:200px">
-          <option value="geo" ${(s.defaultDetailMap||'geo')==='geo'?'selected':''}>Geomap</option>
-          <option value="beck" ${s.defaultDetailMap==='beck'?'selected':''}>Railmap</option>
+          <option value="geo" ${(s.defaultDetailMap||'geo')==='geo'?'selected':''}>${t('nav.geomap')}</option>
+          <option value="beck" ${s.defaultDetailMap==='beck'?'selected':''}>${t('nav.railmap')}</option>
         </select>
       </div>
       <div class="form-group">
         <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
           <input type="checkbox" ${s.beckShowInfra ? 'checked' : ''} onchange="saveSetting('beckShowInfra', this.checked)">
-          Show all infrastructure on Railmap</label>
-        <p class="text-dim" style="font-size:11px;margin-top:2px">When enabled, all stations and segments are visible on the Railmap, even if not assigned to a service or line. Unassigned elements appear in grey.</p>
+          ${t('settings.beck_show_infra')}</label>
+        <p class="text-dim" style="font-size:11px;margin-top:2px">${t('settings.beck_show_infra_desc')}</p>
       </div>
       <div class="form-group" style="margin-top:24px">
         <button class="btn btn-danger" onclick="newSystem()">${t('btn.new_system')}</button>
@@ -369,7 +369,7 @@ function runIssueDetection() {
       const stop = svc.stops[i];
       if (stop.passThrough) continue;
       const node = getNode(stop.nodeId);
-      if (isPassengerStop(node) && (node.platforms||[]).length > 0 && !stop.platformId) {
+      if (node?.type === 'station' && (node.platforms||[]).length > 0 && !stop.platformId) {
         issues.push({ severity: 'medium', type: t('issue.type.missing_platform'), typeKey: 'missing_platform',
           desc: t('issue.desc.missing_platform', { name: svc.name, station: node.name }),
           detail: t('issue.detail.missing_platform', { n: i+1 }),
@@ -614,7 +614,7 @@ function runIssueDetection() {
   }
 
   for (const n of data.nodes) {
-    if (isPassengerStop(n) && (!n.platforms || n.platforms.length === 0)) {
+    if (n.type === 'station' && (!n.platforms || n.platforms.length === 0)) {
       issues.push({ severity: 'low', type: t('issue.type.no_platforms'), typeKey: 'no_platforms',
         desc: t('issue.desc.no_platforms', { name: n.name }),
         detail: t('issue.detail.no_platforms'),
@@ -908,6 +908,7 @@ function runIssueDetection() {
     const THRESHOLD = 0.05; // 50m average distance = suspicious
 
     function _modesCompatible(sA, sB) {
+      if ((sA.interchangeType || null) !== (sB.interchangeType || null)) return false;
       const modesA = (sA.allowedModes || []).slice().sort().join(',');
       const modesB = (sB.allowedModes || []).slice().sort().join(',');
       return !modesA || !modesB || modesA === modesB;
@@ -1040,6 +1041,9 @@ function runIssueDetection() {
         const endpointsA = [sA.nodeA, sA.nodeB].sort().join('::');
         const endpointsB = [sB.nodeA, sB.nodeB].sort().join('::');
         if (endpointsA === endpointsB) continue;
+
+        // Skip if different infrastructure types (road vs track never overlap)
+        if ((sA.interchangeType || null) !== (sB.interchangeType || null)) continue;
 
         // Skip if different modes (intentionally parallel)
         const modesA = (sA.allowedModes || []).slice().sort().join(',');
@@ -1174,7 +1178,43 @@ function runIssueDetection() {
     </div>`;
   }
 
+  // Verified segments section
+  const verifiedIds = data.settings?.verifiedSegments || [];
+  const verifiedSegs = verifiedIds.map(id => getSeg(id)).filter(Boolean);
+  if (verifiedSegs.length) {
+    html += `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+      <div class="clickable" style="font-size:12px;color:var(--text-muted);cursor:pointer" onclick="const el=document.getElementById('verified-segs-list');el.style.display=el.style.display==='none'?'':'none'">
+        ${t('issue.verified_summary', { n: verifiedSegs.length })} · <span style="color:var(--accent)">${t('issue_hidden.show')} / ${t('issue_hidden.hide')}</span>
+      </div>
+      <div id="verified-segs-list" style="display:none;margin-top:8px">
+        ${verifiedSegs.map(seg => {
+          const label = nodeName(seg.nodeA) + ' \u2014 ' + nodeName(seg.nodeB);
+          const typeLabel = isRoad(seg) ? 'Road' : 'Track';
+          return `<div class="issue-item severity-low" style="cursor:pointer" onclick="switchTab('segments');showSegmentDetail('${seg.id}')">
+            <div style="display:flex;align-items:center;justify-content:space-between">
+              <div><span style="font-size:12px;font-weight:600">${esc(label)}</span> <span class="text-dim" style="font-size:11px">${typeLabel} · ${seg.distance}km</span></div>
+              <button class="btn btn-sm" onclick="event.stopPropagation();unverifySegment('${seg.id}')">${t('issue.unverify_btn')}</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Clean stale verified IDs (segments that no longer exist)
+  if (verifiedIds.length !== verifiedSegs.length) {
+    data.settings.verifiedSegments = verifiedIds.filter(id => getSeg(id));
+    save();
+  }
+
   el.innerHTML = html;
+}
+
+function unverifySegment(segId) {
+  if (!data.settings?.verifiedSegments) return;
+  data.settings.verifiedSegments = data.settings.verifiedSegments.filter(id => id !== segId);
+  save();
+  runIssueDetection();
 }
 
 // ============================================================
@@ -1492,8 +1532,8 @@ function detailMapContainerHTML(containerId, hasGeo, hasBeck) {
   const showGeo = hasGeo && (!hasBeck || pref === 'geo');
   const showBeck = hasBeck && (!hasGeo || pref === 'beck');
   const tabBtns = (hasGeo && hasBeck ? `
-    <button class="${showGeo ? 'active' : ''}" onclick="detailMapToggle('${containerId}','geo')">Geomap</button>
-    <button class="${showBeck ? 'active' : ''}" onclick="detailMapToggle('${containerId}','beck')">Railmap</button>` : '') +
+    <button class="${showGeo ? 'active' : ''}" onclick="detailMapToggle('${containerId}','geo')">${t('nav.geomap')}</button>
+    <button class="${showBeck ? 'active' : ''}" onclick="detailMapToggle('${containerId}','beck')">${t('nav.railmap')}</button>` : '') +
     `<button class="dm-expand-btn" onclick="detailMapExpand('${containerId}')" title="Expand">⤢</button>`;
   const tabs = `<div class="detail-map-tabs">${tabBtns}</div>`;
   const h = hasGeo && hasBeck ? 'calc(100% - 28px)' : '100%';
@@ -1977,11 +2017,12 @@ function startRelationImport() {
   window._relImportState = {
     step: 1,
     config: {
-      relationId: '', defaultMaxSpeed: 120, maxspeedBoundary: 'default',
+      relationIds: '', defaultMaxSpeed: 120, maxspeedBoundary: 'default',
       allowedModes: [], defaultPlatformCount: getSetting('defaultPlatforms', 2),
-      defaultTrackCount: 2, disambiguationSuffix: ''
+      defaultTrackCount: 2,
+      createServices: false, serviceCategoryId: '', serviceStockId: '', serviceLineId: ''
     },
-    raw: null, stations: [], segments: [], warnings: []
+    relations: [], stations: [], segments: [], warnings: [], services: []
   };
   document.getElementById('sidebar').classList.add('sidebar-locked');
   _relRenderStep(1);
@@ -1997,7 +2038,7 @@ function _relRenderStep(n) {
   _relImportState.step = n;
   const el = document.getElementById('import-export-content');
   const s = _relImportState;
-  const totalSteps = 5;
+  const totalSteps = 6;
 
   const header = (step, title) => {
     return `<div class="csv-wizard-header">
@@ -2028,11 +2069,46 @@ function _relRenderStep(n) {
       }
       modesHtml += `</div>`;
     }
+
+    // Service creation options
+    let svcHtml = `<div class="form-group" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+        <input type="checkbox" ${c.createServices ? 'checked' : ''} onchange="_relImportState.config.createServices=this.checked;_relRenderStep(1)">
+        ${t('rel.create_services')}</label>
+      <p class="text-dim" style="font-size:12px;margin-top:4px">${t('rel.create_services_desc')}</p>
+    </div>`;
+    if (c.createServices) {
+      let catOpts = `<option value="">${t('label.select_default')}</option>`;
+      for (const cat of data.categories) {
+        catOpts += `<option value="${cat.id}" ${c.serviceCategoryId === cat.id ? 'selected' : ''}>${esc(cat.name)}</option>`;
+      }
+      let stockOpts = `<option value="">${t('label.none_default')}</option>`;
+      for (const st of (data.stock || [])) {
+        stockOpts += `<option value="${st.id}" ${c.serviceStockId === st.id ? 'selected' : ''}>${esc(st.name)}</option>`;
+      }
+      let lineOpts = `<option value="">${t('label.none_default')}</option>`;
+      for (const ln of (data.lines || [])) {
+        lineOpts += `<option value="${ln.id}" ${c.serviceLineId === ln.id ? 'selected' : ''}>${esc(ln.name)}</option>`;
+      }
+      svcHtml += `<div style="margin-left:24px;margin-top:8px">
+        <div class="form-group"><label>${t('rel.service_mode')}</label>
+          <select onchange="_relImportState.config.serviceCategoryId=this.value">${catOpts}</select></div>
+        <div class="form-row">
+          <div class="form-group"><label>${t('rel.service_stock')}</label>
+            <select onchange="_relImportState.config.serviceStockId=this.value">${stockOpts}</select></div>
+          <div class="form-group"><label>${t('rel.service_line')}</label>
+            <select onchange="_relImportState.config.serviceLineId=this.value">${lineOpts}</select></div>
+        </div>
+      </div>`;
+    }
+
     el.innerHTML = header(1, t('rel.step_config')) + `
       <div style="margin-top:20px;max-width:500px">
-        <div class="form-group"><label>${t('rel.relation_id')}</label>
-          <input type="text" id="rel-id" value="${esc(c.relationId)}" placeholder="${t('rel.relation_id_placeholder')}"
-            onchange="_relImportState.config.relationId=this.value.trim()"></div>
+        <div class="form-group"><label>${t('rel.relation_ids')}</label>
+          <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('rel.relation_ids_desc')}</p>
+          <textarea id="rel-ids" rows="3" placeholder="${t('rel.relation_ids_placeholder')}"
+            style="width:100%;font-family:var(--font-mono);font-size:13px"
+            onchange="_relImportState.config.relationIds=this.value">${esc(c.relationIds)}</textarea></div>
         <div class="form-row">
           <div class="form-group"><label>${t('csv.default_speed')}</label>
             <input type="number" min="1" max="500" value="${c.defaultMaxSpeed}"
@@ -2049,12 +2125,9 @@ function _relRenderStep(n) {
             <option value="default" ${c.maxspeedBoundary === 'default' ? 'selected' : ''}>${t('rel.maxspeed_default')}</option>
             <option value="waypoints" ${c.maxspeedBoundary === 'waypoints' ? 'selected' : ''}>${t('rel.maxspeed_waypoints')}</option>
           </select></div>
-        <div class="form-group"><label>${t('rel.disambig')}</label>
-          <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('csv.disambig_desc')}</p>
-          <input type="text" value="${esc(c.disambiguationSuffix)}" placeholder="${t('csv.disambig_placeholder')}"
-            onchange="_relImportState.config.disambiguationSuffix=this.value.trim()"></div>
         ${modesHtml}
-        <button class="btn btn-primary" onclick="_relFetchAndProcess()" id="rel-fetch-btn">${t('rel.fetch_btn')}</button>
+        ${svcHtml}
+        <button class="btn btn-primary" onclick="_relFetchAndProcess()" id="rel-fetch-btn" style="margin-top:12px">${t('rel.fetch_btn')}</button>
       </div>`;
     return;
   }
@@ -2062,17 +2135,26 @@ function _relRenderStep(n) {
   // ---- Step 2: Station Review ----
   if (n === 2) {
     const stations = s.stations;
+    const multiRel = s.relations.length > 1;
     let table = `<table class="data-table csv-preview-table"><thead><tr>
       <th></th><th>${t('field.name')}</th><th>${t('field.type')}</th><th>OGF ID</th>
       <th>${t('rel.snap_dist')}</th><th></th></tr></thead><tbody>`;
+    let lastRelIdx = -1;
     for (let i = 0; i < stations.length; i++) {
       const st = stations[i];
-      if (st._isWaypoint) continue; // hide auto-generated waypoints
+      if (st._isWaypoint) continue;
+      if (multiRel && st._relIdx !== lastRelIdx) {
+        lastRelIdx = st._relIdx;
+        const rel = s.relations[st._relIdx];
+        table += `<tr><td colspan="6" style="font-weight:600;font-size:12px;background:var(--bg-hover);padding:6px 8px">${esc(rel.relName)}</td></tr>`;
+      }
       const snapM = Math.round((st._snap?.dist || 0) * 1000);
       const snapWarn = snapM > 50 ? ` style="color:var(--warn)"` : '';
       const dupWarn = st._dupType ? ` style="background:var(--warn-dim)"` : '';
       const dupLabel = st._dupType === 'ogf' ? t('csv.warn_dup_ogf_existing', { name: st._dupExistingName })
-        : st._dupType === 'batch' ? t('csv.warn_dup_ogf') : '';
+        : st._dupType === 'batch' ? t('csv.warn_dup_ogf')
+        : st._dupType === 'cross' ? t('rel.dup_cross_relation', { name: st._dupExistingName })
+        : st._dupType === 'proximity' ? t('rel.dup_proximity', { name: st._dupExistingName }) : '';
       table += `<tr${dupWarn}>
         <td><input type="checkbox" ${st._include !== false ? 'checked' : ''} onchange="_relImportState.stations[${i}]._include=this.checked"></td>
         <td><input type="text" value="${esc(st.name)}" onchange="_relImportState.stations[${i}].name=this.value.trim()" style="width:180px;font-size:12px"></td>
@@ -2090,7 +2172,7 @@ function _relRenderStep(n) {
         <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
         <div class="flex gap-8" style="margin-top:16px">
           <button class="btn" onclick="_relRenderStep(1)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_relRenderStep(3)">${t('btn.next')}</button>
+          <button class="btn btn-primary" onclick="_relAdvanceFromStations()">${t('btn.next')}</button>
         </div>
       </div>`;
     return;
@@ -2099,20 +2181,29 @@ function _relRenderStep(n) {
   // ---- Step 3: Segment Review ----
   if (n === 3) {
     const segs = s.segments;
+    const multiRel = s.relations.length > 1;
     let table = `<table class="data-table csv-preview-table"><thead><tr>
       <th></th><th>${t('field.from_node')}</th><th>${t('field.to_node')}</th>
-      <th>${t('field.distance')}</th><th>${t('field.max_speed')}</th><th></th>
+      <th>${t('field.segment_type')}</th><th>${t('field.distance')}</th><th>${t('field.max_speed')}</th><th></th>
     </tr></thead><tbody>`;
+    let lastRelIdx = -1;
     for (let i = 0; i < segs.length; i++) {
       const seg = segs[i];
+      if (multiRel && seg._relIdx !== lastRelIdx) {
+        lastRelIdx = seg._relIdx;
+        const rel = s.relations[seg._relIdx];
+        table += `<tr><td colspan="7" style="font-weight:600;font-size:12px;background:var(--bg-hover);padding:6px 8px">${esc(rel.relName)}</td></tr>`;
+      }
       const stA = s.stations.find(st => st.id === seg.nodeA) || getNode(seg.nodeA);
       const stB = s.stations.find(st => st.id === seg.nodeB) || getNode(seg.nodeB);
       const fromName = stA ? (stA.name || nodeDisplayName?.(stA.id) || stA.id) : '?';
       const toName = stB ? (stB.name || nodeDisplayName?.(stB.id) || stB.id) : '?';
       const dupWarn = seg._dupType ? ` style="background:var(--warn-dim)"` : '';
+      const segTypeLabel = seg.interchangeType === 'road' ? t('rel.seg_road') : t('rel.seg_track');
       table += `<tr${dupWarn}>
         <td><input type="checkbox" ${seg._include !== false ? 'checked' : ''} onchange="_relImportState.segments[${i}]._include=this.checked"></td>
         <td>${esc(fromName)}</td><td>${esc(toName)}</td>
+        <td style="font-size:11px">${segTypeLabel}</td>
         <td class="mono">${seg.distance}</td>
         <td><input type="number" value="${seg.maxSpeed}" min="1" max="500" onchange="_relImportState.segments[${i}].maxSpeed=parseInt(this.value)||120" style="width:70px;font-size:12px"></td>
         <td class="text-dim" style="font-size:11px">${seg._dupType ? t('csv.warn_dup_existing') : ''}</td>
@@ -2132,8 +2223,39 @@ function _relRenderStep(n) {
     return;
   }
 
-  // ---- Step 4: Warnings ----
+  // ---- Step 4: Services ----
   if (n === 4) {
+    let html = `<div style="margin-top:20px">`;
+    if (!s.config.createServices) {
+      html += `<p class="text-dim">${t('rel.services_disabled')}</p>`;
+    } else {
+      _relBuildServices();
+      html += `<p class="text-dim" style="margin-bottom:12px">${t('rel.services_preview_desc')}</p>`;
+      for (let i = 0; i < s.services.length; i++) {
+        const svc = s.services[i];
+        const stoppingCount = svc.stops.filter(st => !st.passThrough).length;
+        html += `<div class="ie-card" style="margin-bottom:12px;padding:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <input type="checkbox" ${svc.include ? 'checked' : ''} onchange="_relImportState.services[${i}].include=this.checked">
+            <input type="text" value="${esc(svc.name)}" onchange="_relImportState.services[${i}].name=this.value.trim()" style="font-weight:600;font-size:14px;flex:1">
+          </div>
+          <div class="text-dim" style="font-size:12px">${t('rel.service_stop_summary', { stops: stoppingCount, total: svc.stops.length })}</div>
+        </div>`;
+      }
+      if (!s.services.length) {
+        html += `<p class="text-dim">${t('rel.no_services_possible')}</p>`;
+      }
+    }
+    html += `<div class="flex gap-8" style="margin-top:16px">
+      <button class="btn" onclick="_relRenderStep(3)">${t('btn.back')}</button>
+      <button class="btn btn-primary" onclick="_relRenderStep(5)">${t('btn.next')}</button>
+    </div></div>`;
+    el.innerHTML = header(4, t('rel.step_services')) + html;
+    return;
+  }
+
+  // ---- Step 5: Warnings ----
+  if (n === 5) {
     const w = s.warnings;
     let html = `<div style="margin-top:20px">`;
     if (!w.length) {
@@ -2154,38 +2276,45 @@ function _relRenderStep(n) {
       }
     }
     html += `<div class="flex gap-8" style="margin-top:16px">
-      <button class="btn" onclick="_relRenderStep(3)">${t('btn.back')}</button>
-      <button class="btn btn-primary" onclick="_relRenderStep(5)">${t('btn.next')}</button>
+      <button class="btn" onclick="_relRenderStep(4)">${t('btn.back')}</button>
+      <button class="btn btn-primary" onclick="_relRenderStep(6)">${t('btn.next')}</button>
     </div></div>`;
-    el.innerHTML = header(4, t('rel.step_warnings')) + html;
+    el.innerHTML = header(5, t('rel.step_warnings')) + html;
     return;
   }
 
-  // ---- Step 5: Confirm ----
-  if (n === 5) {
+  // ---- Step 6: Confirm ----
+  if (n === 6) {
     const stCount = s.stations.filter(st => st._include !== false).length;
     const sgCount = s.segments.filter(sg => sg._include !== false).length;
-    el.innerHTML = header(5, t('rel.step_confirm')) + `
+    const svcCount = s.config.createServices ? s.services.filter(sv => sv.include).length : 0;
+    const totalItems = stCount + sgCount + svcCount;
+    let summaryLines = `<div>${t('rel.importing_stations', { n: stCount })}</div>
+          <div>${t('rel.importing_segments', { n: sgCount })}</div>`;
+    if (svcCount) summaryLines += `<div>${t('rel.importing_services', { n: svcCount })}</div>`;
+    if (s.warnings.length) summaryLines += `<div style="color:var(--warn)">${t('rel.warnings_count', { n: s.warnings.length })}</div>`;
+
+    let manualItems = `<li>${t('rel.manual_junctions')}</li>
+            <li>${t('rel.manual_tracks')}</li>
+            <li>${t('rel.manual_platforms')}</li>`;
+    if (!svcCount) manualItems += `<li>${t('rel.manual_services')}</li>`;
+    manualItems += `<li>${t('rel.manual_lines')}</li>`;
+
+    el.innerHTML = header(6, t('rel.step_confirm')) + `
       <div style="margin-top:20px;max-width:500px">
         <div class="ie-card" style="margin-bottom:20px">
           <div style="font-size:16px;font-weight:600;margin-bottom:8px">${t('rel.summary')}</div>
-          <div>${t('rel.importing_stations', { n: stCount })}</div>
-          <div>${t('rel.importing_segments', { n: sgCount })}</div>
-          ${s.warnings.length ? `<div style="color:var(--warn)">${t('rel.warnings_count', { n: s.warnings.length })}</div>` : ''}
+          ${summaryLines}
         </div>
         <div class="ie-card" style="margin-bottom:20px">
           <div style="font-size:13px;font-weight:600;margin-bottom:8px">${t('rel.whats_left')}</div>
           <ul class="text-dim" style="font-size:12px;margin-left:16px;line-height:1.8">
-            <li>${t('rel.manual_junctions')}</li>
-            <li>${t('rel.manual_tracks')}</li>
-            <li>${t('rel.manual_platforms')}</li>
-            <li>${t('rel.manual_services')}</li>
-            <li>${t('rel.manual_lines')}</li>
+            ${manualItems}
           </ul>
         </div>
         <div class="flex gap-8">
-          <button class="btn" onclick="_relRenderStep(4)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_relConfirmImport()">${t('csv.btn_import', { n: stCount + sgCount })}</button>
+          <button class="btn" onclick="_relRenderStep(5)">${t('btn.back')}</button>
+          <button class="btn btn-primary" onclick="_relConfirmImport()">${t('csv.btn_import', { n: totalItems })}</button>
         </div>
       </div>`;
     return;
@@ -2201,27 +2330,290 @@ function _relToggleMode(catId, checked) {
 async function _relFetchAndProcess() {
   const s = _relImportState;
   const c = s.config;
-  const relId = c.relationId.replace(/\D/g, '');
-  if (!relId) { toast(t('rel.no_id'), 'error'); return; }
+
+  // Parse relation IDs from textarea (comma, space, newline separated)
+  const ids = c.relationIds.split(/[\s,;]+/).map(x => x.replace(/\D/g, '')).filter(Boolean);
+  const uniqueIds = [...new Set(ids)];
+  if (!uniqueIds.length) { toast(t('rel.no_ids'), 'error'); return; }
 
   const btn = document.getElementById('rel-fetch-btn');
-  if (btn) { btn.disabled = true; btn.textContent = t('rel.fetching'); }
+  if (btn) { btn.disabled = true; }
 
   try {
-    toast(t('rel.fetching'), 'info');
-    s.raw = await fetchRelationFull(relId);
-    console.log('[Relation Import] Raw fetch result:', s.raw);
-    console.log(`[Relation Import] ${s.raw.ways.length} ways, ${s.raw.stops.length} stops, ${s.raw.warnings.length} warnings`);
-    const result = processRelationImport(c, s.raw);
-    console.log('[Relation Import] Processed:', result.stations.length, 'stations,', result.segments.length, 'segments,', result.warnings.length, 'warnings');
-    s.stations = result.stations;
-    s.segments = result.segments;
-    s.warnings = result.warnings;
+    s.relations = [];
+    s.stations = [];
+    s.segments = [];
+    s.warnings = [];
+    s.services = [];
+
+    for (let ri = 0; ri < uniqueIds.length; ri++) {
+      const relId = uniqueIds[ri];
+      const label = uniqueIds.length > 1
+        ? t('rel.fetching_n', { n: ri + 1, total: uniqueIds.length })
+        : t('rel.fetching');
+      if (btn) btn.textContent = label;
+      toast(label, 'info');
+
+      const raw = await fetchRelationFull(relId);
+      const result = processRelationImport(c, raw);
+
+      // Tag each station and segment with relation index
+      for (const st of result.stations) st._relIdx = ri;
+      for (const sg of result.segments) sg._relIdx = ri;
+
+      s.relations.push({ id: relId, relName: raw.relName });
+      s.stations.push(...result.stations);
+      s.segments.push(...result.segments);
+      s.warnings.push(...result.warnings);
+    }
+
+    // Cross-relation duplicate resolution
+    if (s.relations.length > 1) _relCrossDedup(s);
+
+    // Proximity-based auto-merge (catches bidirectional bus stop duplicates etc.)
+    _relProximityDedup(s);
+
+    console.log(`[Relation Import] Total: ${s.stations.length} stations, ${s.segments.length} segments, ${s.warnings.length} warnings from ${uniqueIds.length} relation(s)`);
     _relRenderStep(2);
   } catch (err) {
     console.error('Relation import failed:', err);
     toast(t('rel.fetch_error', { msg: err.message }), 'error');
     if (btn) { btn.disabled = false; btn.textContent = t('rel.fetch_btn'); }
+  }
+}
+
+function _relCrossDedup(s) {
+  // Mark stations that duplicate a station from an earlier relation in the same batch
+  const ogfIdMap = {};   // ogfId -> canonical resolved ID
+  const remapIds = {};   // newStationId -> canonicalId (for segment endpoint remapping)
+
+  for (const st of s.stations) {
+    if (!st.ogfNode) continue;
+    const resolved = st._existingId || st.id;
+
+    if (ogfIdMap[st.ogfNode] != null) {
+      // This station duplicates one already seen
+      if (!st._dupType) {
+        const canonicalId = ogfIdMap[st.ogfNode];
+        st._dupType = 'cross';
+        const canonical = s.stations.find(x => (x._existingId || x.id) === canonicalId) || getNode(canonicalId);
+        st._dupExistingName = canonical?.name || '';
+        st._existingId = canonicalId;
+        st._include = false;
+        remapIds[st.id] = canonicalId;
+      }
+    } else {
+      ogfIdMap[st.ogfNode] = resolved;
+    }
+  }
+
+  // Remap segment endpoints to canonical node IDs
+  for (const seg of s.segments) {
+    if (remapIds[seg.nodeA]) seg.nodeA = remapIds[seg.nodeA];
+    if (remapIds[seg.nodeB]) seg.nodeB = remapIds[seg.nodeB];
+  }
+
+  // Re-check segment duplicates after remapping
+  for (let i = 0; i < s.segments.length; i++) {
+    const seg = s.segments[i];
+    if (seg._dupType) continue;
+
+    // Against existing data
+    const existDup = data.segments.some(ex =>
+      !isInterchange(ex) && (
+        (ex.nodeA === seg.nodeA && ex.nodeB === seg.nodeB) ||
+        (ex.nodeA === seg.nodeB && ex.nodeB === seg.nodeA)
+      )
+    );
+    if (existDup) { seg._dupType = 'pair'; seg._include = false; continue; }
+
+    // Against earlier segments in the batch
+    const batchDup = s.segments.slice(0, i).some(prev =>
+      !prev._dupType && (
+        (prev.nodeA === seg.nodeA && prev.nodeB === seg.nodeB) ||
+        (prev.nodeA === seg.nodeB && prev.nodeB === seg.nodeA)
+      )
+    );
+    if (batchDup) { seg._dupType = 'pair'; seg._include = false; }
+  }
+}
+
+// Auto-merge stations with matching name+type within proximity threshold.
+// Primary use case: bidirectional bus/tram relations where each direction has
+// a separate OGF node per stop, but the stops represent the same physical place.
+function _relProximityDedup(s) {
+  const MERGE_DIST_KM = 0.1; // 100m
+  const normName = x => (x || '').trim().toLowerCase();
+  const remapIds = {};
+  let mergedToExisting = 0, mergedInBatch = 0;
+
+  // Save pre-proximity segment state so we can reset and re-run after name edits
+  for (const seg of s.segments) {
+    seg._preProxNodeA = seg.nodeA;
+    seg._preProxNodeB = seg.nodeB;
+  }
+
+  for (let i = 0; i < s.stations.length; i++) {
+    const st = s.stations[i];
+    if (st._dupType || st._isWaypoint) continue;
+    if (!st.name || st.lat == null) continue;
+    const nameKey = normName(st.name);
+    if (!nameKey) continue;
+
+    // Match against existing data.nodes first
+    let matched = false;
+    for (const existing of data.nodes) {
+      if (existing.type !== st.type) continue;
+      if (normName(existing.name) !== nameKey) continue;
+      if (existing.lat == null) continue;
+      const dist = _ptDist([st.lat, st.lon], [existing.lat, existing.lon]);
+      if (dist > MERGE_DIST_KM) continue;
+      st._dupType = 'proximity';
+      st._dupExistingName = existing.name;
+      st._existingId = existing.id;
+      st._include = false;
+      remapIds[st.id] = existing.id;
+      mergedToExisting++;
+      matched = true;
+      break;
+    }
+    if (matched) continue;
+
+    // Match against earlier imported stations in the same batch
+    for (let j = 0; j < i; j++) {
+      const earlier = s.stations[j];
+      if (earlier._isWaypoint) continue;
+      if (earlier.type !== st.type) continue;
+      if (normName(earlier.name) !== nameKey) continue;
+      if (earlier.lat == null) continue;
+      const dist = _ptDist([st.lat, st.lon], [earlier.lat, earlier.lon]);
+      if (dist > MERGE_DIST_KM) continue;
+      const canonicalId = earlier._existingId || earlier.id;
+      st._dupType = 'proximity';
+      st._dupExistingName = earlier.name;
+      st._existingId = canonicalId;
+      st._include = false;
+      remapIds[st.id] = canonicalId;
+      mergedInBatch++;
+      break;
+    }
+  }
+
+  if (!Object.keys(remapIds).length) return;
+
+  // Remap segment endpoints to the canonical node
+  for (const seg of s.segments) {
+    if (remapIds[seg.nodeA]) seg.nodeA = remapIds[seg.nodeA];
+    if (remapIds[seg.nodeB]) seg.nodeB = remapIds[seg.nodeB];
+  }
+
+  // Exclude self-loop segments (both endpoints merged into the same node)
+  for (const seg of s.segments) {
+    if (seg.nodeA === seg.nodeB && !seg._dupType) {
+      seg._dupType = 'selfloop';
+      seg._include = false;
+      seg._dupByProximity = true;
+    }
+  }
+
+  // Re-check segment duplicates against existing data and earlier batch segments
+  for (let i = 0; i < s.segments.length; i++) {
+    const seg = s.segments[i];
+    if (seg._dupType) continue;
+
+    const existDup = data.segments.some(ex =>
+      !isInterchange(ex) && (
+        (ex.nodeA === seg.nodeA && ex.nodeB === seg.nodeB) ||
+        (ex.nodeA === seg.nodeB && ex.nodeB === seg.nodeA)
+      )
+    );
+    if (existDup) { seg._dupType = 'pair'; seg._include = false; seg._dupByProximity = true; continue; }
+
+    const batchDup = s.segments.slice(0, i).some(prev =>
+      !prev._dupType && (
+        (prev.nodeA === seg.nodeA && prev.nodeB === seg.nodeB) ||
+        (prev.nodeA === seg.nodeB && prev.nodeB === seg.nodeA)
+      )
+    );
+    if (batchDup) { seg._dupType = 'pair'; seg._include = false; seg._dupByProximity = true; }
+  }
+
+  // Remove any stale proximity_merge warnings, then add fresh one
+  s.warnings = s.warnings.filter(w => w.type !== 'proximity_merge');
+  s.warnings.push({
+    type: 'proximity_merge',
+    message: t('rel.proximity_merge_summary', {
+      n: Object.keys(remapIds).length,
+      existing: mergedToExisting,
+      batch: mergedInBatch
+    })
+  });
+}
+
+function _relResetProximityDedup(s) {
+  for (const st of s.stations) {
+    if (st._dupType === 'proximity') {
+      st._dupType = null;
+      st._dupExistingName = '';
+      st._existingId = null;
+      st._include = true;
+    }
+  }
+  for (const seg of s.segments) {
+    if (seg._preProxNodeA != null) {
+      seg.nodeA = seg._preProxNodeA;
+      seg.nodeB = seg._preProxNodeB;
+      delete seg._preProxNodeA;
+      delete seg._preProxNodeB;
+    }
+    if (seg._dupByProximity) {
+      seg._dupType = null;
+      seg._include = true;
+      delete seg._dupByProximity;
+    }
+  }
+  s.warnings = s.warnings.filter(w => w.type !== 'proximity_merge');
+}
+
+function _relAdvanceFromStations() {
+  const s = _relImportState;
+  _relResetProximityDedup(s);
+  _relProximityDedup(s);
+  _relRenderStep(3);
+}
+
+function _relBuildServices() {
+  const s = _relImportState;
+  // Preserve user edits (name, include) from a previous build
+  const saved = {};
+  for (const svc of s.services) saved[svc.relIdx] = { name: svc.name, include: svc.include };
+  s.services = [];
+
+  for (let ri = 0; ri < s.relations.length; ri++) {
+    const rel = s.relations[ri];
+    // Get this relation's stations in polyline order (including waypoints for routing)
+    const relStations = s.stations.filter(st => st._relIdx === ri).slice();
+    relStations.sort((a, b) => {
+      if (a._snap.edgeIdx !== b._snap.edgeIdx) return a._snap.edgeIdx - b._snap.edgeIdx;
+      return a._snap.t - b._snap.t;
+    });
+
+    if (relStations.length < 2) continue;
+
+    const stops = [];
+    for (const st of relStations) {
+      const nodeId = st._existingId || st.id;
+      const passThrough = st._isWaypoint || st.type === 'waypoint' || st.type === 'junction' || st.type === 'depot' || st.type === 'freight_yard';
+      stops.push({ nodeId, platformId: null, dwell: null, passThrough, trackId: null });
+    }
+
+    const prev = saved[ri];
+    s.services.push({
+      relIdx: ri,
+      name: prev?.name ?? rel.relName,
+      include: prev?.include ?? true,
+      stops
+    });
   }
 }
 
@@ -2237,23 +2629,40 @@ async function _relConfirmImport() {
   // Clean temp properties
   for (const st of stationsToImport) {
     delete st._snap; delete st._include; delete st._dupType;
-    delete st._dupExistingName; delete st._disambig; delete st._isWaypoint;
+    delete st._dupExistingName; delete st._isWaypoint;
+    delete st._existingId; delete st._relIdx;
   }
   for (const sg of segmentsToImport) {
-    delete sg._include; delete sg._dupType;
-    // Remap segment nodeA/nodeB if their station was excluded
-    // (segments referencing excluded stations should have been unchecked too)
+    delete sg._include; delete sg._dupType; delete sg._relIdx;
   }
 
   data.nodes.push(...stationsToImport);
   data.segments.push(...segmentsToImport);
+
+  // Create services if enabled
+  let svcCount = 0;
+  if (s.config.createServices) {
+    for (const svc of s.services) {
+      if (!svc.include || svc.stops.length < 2) continue;
+      data.services.push({
+        id: uid(), name: svc.name,
+        categoryId: s.config.serviceCategoryId || '',
+        stockId: s.config.serviceStockId || null,
+        groupId: s.config.serviceLineId || null,
+        description: '',
+        stops: svc.stops,
+        schedulePattern: { days: [0, 1, 2, 3, 4, 5, 6], dateRanges: [], excludeDates: [], specificDates: [] }
+      });
+      svcCount++;
+    }
+  }
 
   save();
   document.getElementById('sidebar').classList.remove('sidebar-locked');
   window._relImportState = null;
   _relImporting = false;
   refreshAll();
-  toast(t('csv.import_success', { n: stationsToImport.length + segmentsToImport.length }), 'success');
+  toast(t('csv.import_success', { n: stationsToImport.length + segmentsToImport.length + svcCount }), 'success');
   renderImportExport();
 }
 
@@ -2552,9 +2961,9 @@ function _csvBuildNodePreview() {
     const platRaw = fieldCol.platforms != null ? (row[fieldCol.platforms] || '').trim() : '';
 
     let platforms = [];
-    if (platRaw) {
+    if (platRaw && type !== 'bus_stop') {
       platforms = platRaw.split('|').map(p => ({ id: uid(), name: p.trim() })).filter(p => p.name);
-    } else if (type === 'station' || type === 'bus_stop') {
+    } else if (type === 'station') {
       const count = s.defaults.platformCount || 0;
       for (let i = 1; i <= count; i++) platforms.push({ id: uid(), name: `Platform ${i}` });
     }

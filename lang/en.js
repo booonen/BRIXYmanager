@@ -65,8 +65,8 @@ registerLanguage('en', 'English', {
     "json_title": "JSON Save File",
     "json_desc": "Export the entire current system as a JSON file, or import a previously exported save file as a new system.",
     "ogf_title": "OGF Relation Import",
-    "ogf_desc": "Import stations and segments from an OGF route relation.",
-    "ogf_btn": "Import Relation",
+    "ogf_desc": "Import stations, segments and services from one or more OGF route relations.",
+    "ogf_btn": "Import Relations",
     "csv_node_title": "CSV Node Import",
     "csv_node_desc": "Import stations and other nodes from a CSV or TSV file.",
     "csv_seg_title": "CSV Segment Import",
@@ -153,17 +153,33 @@ registerLanguage('en', 'English', {
     "step_config": "Configure",
     "step_stations": "Stations",
     "step_segments": "Segments",
+    "step_services": "Services",
     "step_warnings": "Warnings",
     "step_confirm": "Confirm",
-    "relation_id": "Relation ID",
-    "relation_id_placeholder": "e.g. 12345",
+    "relation_ids": "Relation IDs",
+    "relation_ids_desc": "Enter one or more OGF relation IDs. Multiple relations will be imported together with the same defaults.",
+    "relation_ids_placeholder": "e.g. 12345, 67890",
     "maxspeed_boundary": "Speed Boundary Handling",
     "maxspeed_default": "Use default speed everywhere",
     "maxspeed_waypoints": "Insert waypoints at speed changes",
-    "disambig": "Disambiguation Suffix",
+    "create_services": "Create services from relations",
+    "create_services_desc": "Automatically create one service per relation using the imported route.",
+    "service_mode": "Service Mode",
+    "service_stock": "Rolling Stock (optional)",
+    "service_line": "Line (optional)",
+    "services_disabled": "Service creation is disabled. You can go back to Step 1 to enable it.",
+    "services_preview_desc": "One service will be created per relation. You can rename them or exclude individual services.",
+    "service_stop_summary": "{stops} stopping, {total} total stops",
+    "no_services_possible": "No services could be created — not enough stations per relation.",
+    "seg_track": "Track",
+    "seg_road": "Road",
+    "dup_cross_relation": "Already imported from another relation: {name}",
+    "dup_proximity": "Auto-merged with nearby node: {name}",
+    "proximity_merge_summary": "{n} node(s) auto-merged based on name and proximity (within 100m) — {existing} with existing, {batch} within import. Review in the Stations step to override.",
     "fetch_btn": "Fetch & Process",
     "fetching": "Fetching relation...",
-    "no_id": "Enter a relation ID.",
+    "fetching_n": "Fetching relation {n} of {total}...",
+    "no_ids": "Enter at least one relation ID.",
     "fetch_error": "Relation fetch failed: {msg}",
     "snap_dist": "Snap",
     "station_count": "{n} stations found",
@@ -171,6 +187,7 @@ registerLanguage('en', 'English', {
     "summary": "Import Summary",
     "importing_stations": "{n} stations to import",
     "importing_segments": "{n} segments to import",
+    "importing_services": "{n} services to create",
     "warnings_count": "{n} warning(s)",
     "whats_left": "What's left to do manually",
     "manual_junctions": "Junctions (branching points)",
@@ -408,7 +425,8 @@ registerLanguage('en', 'English', {
     "select_origin_dest": "Select both origin and destination",
     "origin_dest_differ": "Origin and destination must be different",
     "split_done": "Split into \"{name}\"",
-    "merge_done": "Merged into \"{name}\""
+    "merge_done": "Merged into \"{name}\"",
+    "merge_done_with_segs": "Merged into \"{name}\" — {n} duplicate segment(s) also merged"
   },
   "modal": {
     "edit_node": "Edit Node",
@@ -560,6 +578,7 @@ registerLanguage('en', 'English', {
   },
   "seg": {
     "track_segment": "Track segment",
+    "road_segment": "Road segment",
     "walking_interchange": "Walking interchange",
     "osi": "OSI (Out of Station)",
     "isi": "ISI (In-Station)",
@@ -573,6 +592,10 @@ registerLanguage('en', 'English', {
   "sch": {
     "frequency": "Frequency",
     "explicit": "Explicit Times",
+    "custom_freq": "Custom (min)",
+    "custom_freq_placeholder": "e.g. 7, 12",
+    "suggested_schedules": "Suggested Schedules",
+    "every_n_min": "Every {n}m",
     "free": "Free",
     "partial": "Partial",
     "blocked": "Blocked",
@@ -671,7 +694,8 @@ registerLanguage('en', 'English', {
     "earlier": "\u2190 Earlier departures",
     "later": "Later departures \u2192",
     "showing_results": "Showing {start}\u2013{end}",
-    "terminus": "Terminus"
+    "terminus": "Terminus",
+    "searching": "Searching..."
   },
   "issue": {
     "no_issues": "No issues detected",
@@ -808,7 +832,9 @@ registerLanguage('en', 'English', {
       "suspicious_chain": "This segment's path matches a chain of shorter segments. It may be a redundant express route that skips intermediate stations.",
       "segment_overlap": "These segments share physical track. Consider inserting a junction at the split point to enable proper conflict detection."
     },
-    "verify_btn": "Mark as verified"
+    "verify_btn": "Mark as verified",
+    "unverify_btn": "Unverify",
+    "verified_summary": "{n} verified segment(s)"
   },
   "resolve": {
     "title": "Resolve Segment Overlap",
@@ -851,7 +877,10 @@ registerLanguage('en', 'English', {
     "light": "Light",
     "system_pref": "System preference",
     "check_translations": "Check Translations",
-    "show_low_severity": "Show low-severity issues"
+    "show_low_severity": "Show low-severity issues",
+    "default_detail_map": "Default detail map view",
+    "beck_show_infra": "Show all infrastructure on Railmap",
+    "beck_show_infra_desc": "When enabled, all stations and segments are visible on the Railmap, even if not assigned to a service or line. Unassigned elements appear in grey."
   },
   "l10n": {
     "report_title": "Translation Report",

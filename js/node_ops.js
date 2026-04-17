@@ -736,13 +736,72 @@ function applyMerge() {
 
   // 3. Redirect segments; delete direct ISI/OSI between the two
   const toDelete = [];
+  const redirectedSegIds = new Set();
   for (const seg of data.segments) {
     const aT = seg.nodeA === ms.targetId, bT = seg.nodeB === ms.targetId;
     const aS = seg.nodeA === ms.thisId, bS = seg.nodeB === ms.thisId;
     if (isInterchange(seg) && ((aT && bS) || (bT && aS))) { toDelete.push(seg.id); continue; }
     if (aT) seg.nodeA = ms.thisId;
     if (bT) seg.nodeB = ms.thisId;
+    if (aT || bT) redirectedSegIds.add(seg.id);
+    // Move the wayGeometry endpoint that was on the target node to the surviving node
+    if ((aT || bT) && seg.wayGeometry?.length >= 2 && targetNode.lat != null && thisNode.lat != null) {
+      const tCoord = [targetNode.lat, targetNode.lon];
+      const mCoord = [thisNode.lat, thisNode.lon];
+      const dFirst = _ptDist(seg.wayGeometry[0], tCoord);
+      const dLast = _ptDist(seg.wayGeometry[seg.wayGeometry.length - 1], tCoord);
+      if (dFirst <= dLast) seg.wayGeometry[0] = mCoord;
+      else seg.wayGeometry[seg.wayGeometry.length - 1] = mCoord;
+    }
   }
+
+  // 3b. Merge duplicate segments (same endpoints + same type after redirection)
+  let mergedSegCount = 0;
+  const segsByPair = {};
+  for (const seg of data.segments) {
+    if (toDelete.includes(seg.id)) continue;
+    const typeKey = seg.interchangeType || 'track';
+    const key = [seg.nodeA, seg.nodeB].sort().join('::') + '::' + typeKey;
+    if (!segsByPair[key]) segsByPair[key] = [];
+    segsByPair[key].push(seg);
+  }
+  for (const segs of Object.values(segsByPair)) {
+    if (segs.length < 2) continue;
+    // Prefer the non-redirected segment (original on surviving node)
+    segs.sort((a, b) => (redirectedSegIds.has(a.id) ? 1 : 0) - (redirectedSegIds.has(b.id) ? 1 : 0));
+    const keep = segs[0];
+    for (let i = 1; i < segs.length; i++) {
+      const dup = segs[i];
+      // Remap service track references from deleted segment to surviving one
+      if (Array.isArray(dup.tracks)) {
+        for (const svc of data.services) {
+          for (const st of svc.stops) {
+            if (!st.trackId) continue;
+            const dupTrack = dup.tracks.find(tk => tk.id === st.trackId);
+            if (!dupTrack) continue;
+            const keepTrack = Array.isArray(keep.tracks)
+              ? (keep.tracks.find(tk => tk.name === dupTrack.name) || keep.tracks[0])
+              : null;
+            st.trackId = keepTrack?.id || null;
+          }
+        }
+      }
+      // Remap schematic references from deleted segment to surviving one
+      if (thisNode.schematic?.tracks) {
+        for (const trk of thisNode.schematic.tracks) {
+          for (const sk of ['sideA', 'sideB', 'sideC', 'sideD']) {
+            if (!trk[sk]) continue;
+            for (const conn of trk[sk]) {
+              if (conn.segId === dup.id) conn.segId = keep.id;
+            }
+          }
+        }
+      }
+      toDelete.push(dup.id);
+      mergedSegCount++;
+    }
+  }
+
   data.segments = data.segments.filter(seg => !toDelete.includes(seg.id));
 
   // 4. Redirect services and departures
@@ -819,6 +878,9 @@ function applyMerge() {
   const savedId = ms.thisId;
   _nodeOpsClose();
   save(); refreshAll();
-  toast(t('toast.merge_done', { name: thisNode.name }), 'success');
+  const mergeMsg = mergedSegCount
+    ? t('toast.merge_done_with_segs', { name: thisNode.name, n: mergedSegCount })
+    : t('toast.merge_done', { name: thisNode.name });
+  toast(mergeMsg, 'success');
   setTimeout(() => showNodeDetail(savedId), 150);
 }
