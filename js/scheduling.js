@@ -3,7 +3,7 @@
 // ============================================================
 function openScheduleModal(svcId) {
   const svc = getSvc(svcId);
-  if (!svc || svc.stops.length < 2) { toast(t('toast.svc_needs_stops'), 'error'); return; }
+  if (!svc || svc.stops.length < 2) { toast(t('services.toast.svc_needs_stops'), 'error'); return; }
   editingId = null;
 
   const routeProfile = buildRouteProfile(svc);
@@ -16,7 +16,7 @@ function openScheduleModal(svcId) {
   const platformCount = routeProfile.platformProfile.length;
   const existingDeps = data.departures.filter(d => d.serviceId === svcId).length;
 
-  openModal(t('modal.schedule', { name: svc.name }), `
+  openModal(t('schedule.modal.title', { name: svc.name }), `
     <div style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
       Route: <strong>${esc(nodeName(svc.stops[0].nodeId))} → ${esc(nodeName(svc.stops[svc.stops.length-1].nodeId))}</strong>
       · ~${Math.round(routeProfile.totalTime)} min
@@ -28,13 +28,13 @@ function openScheduleModal(svcId) {
         <input type="checkbox" id="sh-clear" checked onchange="refreshScheduleModal()">Clear existing departures for this service first</label></div>
     <div id="helper-timeline"></div>
     <div class="htabs">
-      <div class="htab active" id="htab-freq" onclick="switchScheduleTab('freq')">${t('sch.frequency')}</div>
-      <div class="htab" id="htab-explicit" onclick="switchScheduleTab('explicit')">${t('sch.explicit')}</div>
+      <div class="htab active" id="htab-freq" onclick="switchScheduleTab('freq')">${t('schedule.frequency')}</div>
+      <div class="htab" id="htab-explicit" onclick="switchScheduleTab('explicit')">${t('schedule.explicit')}</div>
     </div>
     <div id="sched-tab-freq">
       <div class="form-row mt-8" style="max-width:400px">
-        <div class="form-group" style="margin-bottom:8px"><label>${t('field.window_start')}</label><input type="time" id="sh-start" value="06:00" onchange="refreshScheduleModal()"></div>
-        <div class="form-group" style="margin-bottom:8px"><label>${t('field.window_end')}</label><input type="time" id="sh-end" value="23:00" onchange="refreshScheduleModal()"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>${t('schedule.field.window_start')}</label><input type="time" id="sh-start" value="06:00" onchange="refreshScheduleModal()"></div>
+        <div class="form-group" style="margin-bottom:8px"><label>${t('schedule.field.window_end')}</label><input type="time" id="sh-end" value="23:00" onchange="refreshScheduleModal()"></div>
       </div>
       <div id="helper-suggestions"></div>
       <div id="helper-free-list" class="mt-16"></div>
@@ -44,8 +44,8 @@ function openScheduleModal(svcId) {
         <textarea id="f-gTimes" rows="3" placeholder="06:00, 06:30, 07:00, 07:30..." oninput="checkExplicitConflicts()"></textarea></div>
       <div id="explicit-conflicts"></div>
     </div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" id="sched-apply-btn" onclick="applyScheduleModal('${svcId}')">${t('btn.apply')}</button>`);
+    `<button class="btn" onclick="closeModal()">${t('common.btn.cancel')}</button>
+     <button class="btn btn-primary" id="sched-apply-btn" onclick="applyScheduleModal('${svcId}')">${t('common.btn.apply')}</button>`);
 
   refreshScheduleModal();
 }
@@ -102,9 +102,9 @@ function refreshScheduleModal() {
   for (let h = 0; h < 24; h++) timelineHtml += `<div style="flex:1;text-align:center">${h}</div>`;
   timelineHtml += '</div>';
   timelineHtml += `<div style="font-size:11px;color:var(--text-muted);display:flex;gap:12px;margin-top:4px">
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--success);vertical-align:middle;margin-right:3px"></span>${t('sch.free')}</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--warn);vertical-align:middle;margin-right:3px"></span>${t('sch.partial')}</span>
-    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--danger);vertical-align:middle;margin-right:3px"></span>${t('sch.blocked')}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--success);vertical-align:middle;margin-right:3px"></span>${t('schedule.free')}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--warn);vertical-align:middle;margin-right:3px"></span>${t('schedule.partial')}</span>
+    <span><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--danger);vertical-align:middle;margin-right:3px"></span>${t('schedule.blocked')}</span>
   </div>`;
 
   const tlEl = document.getElementById('helper-timeline');
@@ -174,7 +174,7 @@ function updateHelperSuggestions(svcId) {
       <td class="mono">${bestCount}</td>
       <td class="mono" style="color:var(--warn)">${toTime(firstDep)}</td>
       <td style="color:${statusColor};font-weight:500">${statusText}</td>
-      <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="applyFrequencySchedule('${svcId}',${firstDep},${effectiveEnd},${freq})">${t('btn.apply')}</button></td>
+      <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="applyFrequencySchedule('${svcId}',${firstDep},${effectiveEnd},${freq})">${t('common.btn.apply')}</button></td>
     </tr>`;
   }
 
@@ -219,8 +219,8 @@ function checkExplicitConflicts() {
 function applyFrequencySchedule(svcId, firstDep, endTime, freq) {
   const svc = getSvc(svcId); if (!svc) return;
   const clearExisting = document.getElementById('sh-clear')?.checked;
-  const action = clearExisting ? t('btn.replace_schedule') : t('btn.add_departures');
-  appConfirm(t('confirm.apply_schedule', { action, name: svc.name, freq, start: toTime(firstDep), end: toTime(endTime) }), () => {
+  const action = clearExisting ? t('schedule.btn.replace_schedule') : t('schedule.btn.add_departures');
+  appConfirm(t('schedule.confirm.apply', { action, name: svc.name, freq, start: toTime(firstDep), end: toTime(endTime) }), () => {
     if (clearExisting) data.departures = data.departures.filter(d => d.serviceId !== svcId);
     let count = 0;
     for (let tm = firstDep; tm <= endTime; tm += freq) {
@@ -228,7 +228,7 @@ function applyFrequencySchedule(svcId, firstDep, endTime, freq) {
       const dep = makeDep(svc, tMod); if (dep) { data.departures.push(dep); count++; }
     }
     save(); closeModal(); renderServices();
-    toast(clearExisting ? t('toast.deps_replaced', { n: count }) : t('toast.deps_added', { n: count }), 'success');
+    toast(clearExisting ? t('schedule.toast.deps_replaced', { n: count }) : t('schedule.toast.deps_added', { n: count }), 'success');
   });
 }
 
@@ -242,7 +242,7 @@ function applyScheduleModal(svcId) {
     if (/^\d{1,2}:\d{2}$/.test(p)) times.push(toMin(p));
     else { toast(`Invalid time: "${p}"`, 'error'); return; }
   }
-  if (!times.length) { toast(t('toast.enter_times'), 'error'); return; }
+  if (!times.length) { toast(t('schedule.toast.enter_times'), 'error'); return; }
 
   const clearExisting = document.getElementById('sh-clear')?.checked;
   if (clearExisting) data.departures = data.departures.filter(d => d.serviceId !== svcId);
@@ -357,10 +357,10 @@ function recalcSvcAndRefresh(svcId) {
 }
 
 function recalcAllAndRefresh() {
-  appConfirm(t('confirm.recalc_all'), () => {
+  appConfirm(t('schedule.confirm.recalc_all'), () => {
     const count = recalculateAll();
     renderSchedule();
-    toast(t('toast.recalc_done', { n: count }), 'success');
+    toast(t('schedule.toast.recalc_done', { n: count }), 'success');
   });
 }
 
@@ -588,8 +588,8 @@ function showTrainSchedule(depId) {
       </div>
       ${stopsHtml}
     </div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.close')}</button>
-     <button class="btn" onclick="closeModal();openDepEditModal('${depId}')">${t('btn.edit_times')}</button>`);
+    `<button class="btn" onclick="closeModal()">${t('common.btn.close')}</button>
+     <button class="btn" onclick="closeModal();openDepEditModal('${depId}')">${t('schedule.btn.edit_times')}</button>`);
 }
 
 // ============================================================
@@ -625,34 +625,34 @@ function openDepEditModal(depId) {
       <div class="mono text-dim" style="font-size:12px;text-align:right">${t.arrive!=null?toTime(t.arrive):'—'}</div>
       <div class="mono" style="font-size:12px;text-align:right;color:var(--warn)">${t.depart!=null?toTime(t.depart):'—'}</div>
       <div>${isStation && !stop?.passThrough ? `<select class="dep-plat-sel" data-idx="${i}" style="font-size:11px;padding:3px 6px;width:95px;${isManualPlat?'border-color:var(--warn)':''}" title="${isManualPlat?'Overridden for this departure — preserved on recalculate':'Using service default'}"><option value="">—</option>${platOpts}</select>` : ''}</div>
-      <div>${(!isFirst && !isLast && (!stop?.passThrough || node?.type === 'waypoint')) ? `<input type="number" class="dep-dwell-input" value="${dwellSec}" min="0" style="width:70px;font-size:12px;padding:3px 6px;${isManualDwell?'border-color:var(--warn)':''}" data-idx="${i}" title="${isManualDwell?'Manually overridden — preserved on recalculate':'Default dwell time'}">` : `<span class="text-muted" style="font-size:11px">${isFirst?t('sch.stop_origin'):isLast?t('sch.stop_terminus'):t('sch.stop_pass')}</span>`}</div>
+      <div>${(!isFirst && !isLast && (!stop?.passThrough || node?.type === 'waypoint')) ? `<input type="number" class="dep-dwell-input" value="${dwellSec}" min="0" style="width:70px;font-size:12px;padding:3px 6px;${isManualDwell?'border-color:var(--warn)':''}" data-idx="${i}" title="${isManualDwell?'Manually overridden — preserved on recalculate':'Default dwell time'}">` : `<span class="text-muted" style="font-size:11px">${isFirst?t('schedule.stop_origin'):isLast?t('schedule.stop_terminus'):t('schedule.stop_pass')}</span>`}</div>
       <div>${(!isFirst && !isLast && isStation) ? `<label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:3px;cursor:pointer" title="Skip this stop (creates variant service)">
-        <input type="checkbox" class="dep-skip-cb" data-idx="${i}" ${stop?.passThrough?'checked':''}>${t('dep_edit.col_skip')}</label>` : ''}</div>
+        <input type="checkbox" class="dep-skip-cb" data-idx="${i}" ${stop?.passThrough?'checked':''}>${t('departures.edit.col_skip')}</label>` : ''}</div>
     </div>`;
   }).join('');
 
-  openModal(t('modal.edit_dep', { name: svc.name + ' @ ' + toTime(dep.startTime) }), `
+  openModal(t('schedule.modal.edit_dep_title', { name: svc.name + ' @ ' + toTime(dep.startTime) }), `
     <div class="flex gap-8 items-center mb-16" style="flex-wrap:wrap">
-      <div class="form-group" style="margin-bottom:0"><label>${t('field.stock_override')}</label>
+      <div class="form-group" style="margin-bottom:0"><label>${t('schedule.field.stock_override')}</label>
         <select id="dep-stock-override" style="font-size:12px;padding:5px 8px;width:200px">
-          <option value="">${t('dep_edit.use_default_stock')}${svc.stockId && getStock(svc.stockId) ? ' ('+esc(getStock(svc.stockId).name)+')' : ''}</option>
+          <option value="">${t('departures.edit.use_default_stock')}${svc.stockId && getStock(svc.stockId) ? ' ('+esc(getStock(svc.stockId).name)+')' : ''}</option>
           ${data.rollingStock.map(st => `<option value="${st.id}" ${dep.stockId===st.id?'selected':''}>${esc(st.name)}${st.code?' ['+esc(st.code)+']':''}</option>`).join('')}
         </select></div>
     </div>
     <p style="font-size:13px;color:var(--text-dim);margin-bottom:12px">
-      ${t('dep_edit.adjust_desc')}</p>
+      ${t('departures.edit.adjust_desc')}</p>
     <div style="display:grid;grid-template-columns:24px 1fr 90px 90px 100px 80px 50px;gap:4px;padding:4px 0;border-bottom:1px solid var(--border);margin-bottom:4px">
-      <div></div><div class="text-muted" style="font-size:10px;text-transform:uppercase">${t('dep_edit.col_station')}</div>
-      <div class="text-muted" style="font-size:10px;text-transform:uppercase;text-align:right">${t('dep_edit.col_arrive')}</div>
-      <div class="text-muted" style="font-size:10px;text-transform:uppercase;text-align:right">${t('dep_edit.col_depart')}</div>
-      <div class="text-muted" style="font-size:10px;text-transform:uppercase">${t('dep_edit.col_platform')}</div>
-      <div class="text-muted" style="font-size:10px;text-transform:uppercase">${t('dep_edit.col_dwell')}</div>
+      <div></div><div class="text-muted" style="font-size:10px;text-transform:uppercase">${t('departures.edit.col_station')}</div>
+      <div class="text-muted" style="font-size:10px;text-transform:uppercase;text-align:right">${t('departures.edit.col_arrive')}</div>
+      <div class="text-muted" style="font-size:10px;text-transform:uppercase;text-align:right">${t('departures.edit.col_depart')}</div>
+      <div class="text-muted" style="font-size:10px;text-transform:uppercase">${t('departures.edit.col_platform')}</div>
+      <div class="text-muted" style="font-size:10px;text-transform:uppercase">${t('departures.edit.col_dwell')}</div>
       <div></div>
     </div>
     <div id="dep-edit-stops">${stopsHtml}</div>
-    <p class="text-dim mt-8" style="font-size:11px">${t('dep_edit.skip_desc')}</p>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="saveDepEdit('${depId}')">${t('dep_edit.save_cascade')}</button>`);
+    <p class="text-dim mt-8" style="font-size:11px">${t('departures.edit.skip_desc')}</p>`,
+    `<button class="btn" onclick="closeModal()">${t('common.btn.cancel')}</button>
+     <button class="btn btn-primary" onclick="saveDepEdit('${depId}')">${t('departures.edit.save_cascade')}</button>`);
 }
 
 function saveDepEdit(depId) {
@@ -821,12 +821,12 @@ function saveDepEdit(depId) {
   save(); closeModal();
   const activeSvcDetail = document.getElementById('service-detail');
   if (activeSvcDetail?.innerHTML) showServiceDetail(svc.id);
-  toast(t('toast.dep_updated'), 'success');
+  toast(t('schedule.toast.dep_updated'), 'success');
 }
 
 function delDep(id) {
   data.departures = data.departures.filter(d => d.id !== id);
-  save(); toast(t('toast.dep_deleted'), 'success');
+  save(); toast(t('schedule.toast.dep_deleted'), 'success');
 }
 
 // ============================================================
@@ -835,14 +835,14 @@ function delDep(id) {
 function renderSchedule() {
   const c = document.getElementById('schedule-content');
   if (!data.services.length && !data.departures.length) {
-    c.innerHTML = `<div class="empty-state"><div class="empty-icon">◷</div><h3>${t('empty.no_services_schedule')}</h3><p>${t('empty.no_services_schedule_desc')}</p></div>`;
+    c.innerHTML = `<div class="empty-state"><div class="empty-icon">◷</div><h3>${t('schedule.empty.no_services')}</h3><p>${t('schedule.empty.no_services_desc')}</p></div>`;
     return;
   }
   const orphanCount = data.departures.filter(d => !getSvc(d.serviceId)).length;
-  c.innerHTML = `<div class="form-group" style="max-width:300px;"><label>${t('th.filter_service')}</label>
-    <select id="sch-filter" onchange="renderSchTable()"><option value="">${t('label.all_services')}</option>
+  c.innerHTML = `<div class="form-group" style="max-width:300px;"><label>${t('schedule.th.filter_service')}</label>
+    <select id="sch-filter" onchange="renderSchTable()"><option value="">${t('schedule.label.all_services')}</option>
     ${data.services.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('')}
-    ${orphanCount ? `<option value="__orphaned__">${t('label.orphaned_deps', { n: orphanCount })}</option>` : ''}
+    ${orphanCount ? `<option value="__orphaned__">${t('schedule.label.orphaned_deps', { n: orphanCount })}</option>` : ''}
     </select></div>
     <div id="sch-table"></div>`;
   renderSchTable();
@@ -864,14 +864,14 @@ function renderSchTable() {
   });
   const el = document.getElementById('sch-table');
   if (!deps.length) {
-    el.innerHTML = `<div class="text-dim mt-16" style="font-size:13px;">${t('empty.no_departures')}</div>`;
+    el.innerHTML = `<div class="text-dim mt-16" style="font-size:13px;">${t('schedule.empty.no_departures')}</div>`;
     return;
   }
 
   if (isOrphan) {
     el.innerHTML = `<p style="font-size:13px;color:var(--warn);margin-bottom:12px">These departures reference services that no longer exist.</p>
-      <button class="btn btn-sm btn-danger mb-16" onclick="cleanOrphans()">${t('btn.delete_orphans')}</button>
-      <table class="schedule-table"><thead><tr><th>${t('th.depart')}</th><th>${t('th.service_id')}</th><th>${t('th.stops')}</th><th></th></tr></thead><tbody>` +
+      <button class="btn btn-sm btn-danger mb-16" onclick="cleanOrphans()">${t('schedule.btn.delete_orphans')}</button>
+      <table class="schedule-table"><thead><tr><th>${t('schedule.th.depart')}</th><th>${t('schedule.th.service_id')}</th><th>${t('services.th.stops')}</th><th></th></tr></thead><tbody>` +
       deps.map(d => {
         const first = d.times[0], last = d.times[d.times.length - 1];
         return `<tr>
@@ -884,7 +884,7 @@ function renderSchTable() {
     return;
   }
 
-  el.innerHTML = `<table class="schedule-table"><thead><tr><th>${t('th.depart')}</th><th>${t('th.service')}</th><th>${t('th.pattern')}</th><th>${t('th.route')}</th><th>${t('th.arrival')}</th><th></th></tr></thead><tbody>` +
+  el.innerHTML = `<table class="schedule-table"><thead><tr><th>${t('schedule.th.depart')}</th><th>${t('schedule.th.service')}</th><th>${t('services.th.pattern')}</th><th>${t('services.th.route')}</th><th>${t('schedule.th.arrival')}</th><th></th></tr></thead><tbody>` +
     deps.map(d => {
       const svc = getSvc(d.serviceId); if (!svc) return '';
       const first = d.times[0], last = d.times[d.times.length - 1];
@@ -903,8 +903,8 @@ function renderSchTable() {
 
 function cleanOrphans() {
   const count = data.departures.filter(d => !getSvc(d.serviceId)).length;
-  appConfirm(t('confirm.delete_orphans', { n: count }), () => {
+  appConfirm(t('schedule.confirm.delete_orphans', { n: count }), () => {
     data.departures = data.departures.filter(d => getSvc(d.serviceId));
-    save(); renderSchedule(); toast(t('toast.orphans_removed', { n: count }), 'success');
+    save(); renderSchedule(); toast(t('schedule.toast.orphans_removed', { n: count }), 'success');
   });
 }

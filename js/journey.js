@@ -16,13 +16,13 @@ function initJourneyPlanner() {
     const jpFilter = n => isPassengerStop(n);
     createNodePicker({
       containerId: 'jp-origin-picker', pickerId: 'np-jpOrigin',
-      placeholder: t('placeholder.origin_station'),
+      placeholder: t('journey.origin'),
       filterFn: jpFilter, displayNameFn: nodeDisplayName,
       onEnterSelect: () => { const el = document.getElementById('np-jpDest-input'); if (el) { el.style.display = ''; el.focus(); } }
     });
     createNodePicker({
       containerId: 'jp-dest-picker', pickerId: 'np-jpDest',
-      placeholder: t('placeholder.destination_station'),
+      placeholder: t('journey.destination'),
       filterFn: jpFilter, displayNameFn: nodeDisplayName,
       onEnterSelect: () => jpSearch()
     });
@@ -531,14 +531,14 @@ function jpSearch() {
 
   const originId = nodePickerGetValue('np-jpOrigin');
   const destId = nodePickerGetValue('np-jpDest');
-  if (!originId || !destId) { toast(t('toast.select_origin_dest'), 'error'); return; }
+  if (!originId || !destId) { toast(t('journey.toast.select_origin_dest'), 'error'); return; }
 
   // Expand to station groups
   const originGroup = stationGroup(originId);
   const destGroup = stationGroup(destId);
 
   // Check no overlap between origin and dest groups
-  if (originGroup.some(id => destGroup.includes(id))) { toast(t('toast.origin_dest_differ'), 'error'); return; }
+  if (originGroup.some(id => destGroup.includes(id))) { toast(t('journey.toast.origin_dest_differ'), 'error'); return; }
 
   const timeStr = document.getElementById('jp-time').value || '08:00';
   const startTime = toMin(timeStr);
@@ -613,15 +613,15 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
   const el = document.getElementById('jp-results');
   if (!visible.length && start === 0) {
     el.innerHTML = `<div class="empty-state mt-16"><div class="empty-icon">⇄</div>
-      <h3>${t('jp.no_journeys')}</h3><p>${t('jp.no_journeys_desc')}</p></div>`;
+      <h3>${t('journey.no_journeys')}</h3><p>${t('journey.no_journeys_desc')}</p></div>`;
     return;
   }
 
   let html = `<div class="mt-16" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Showing ${start+1}–${start+visible.length}</strong>
     <div class="flex gap-8">
-      ${hasPrev ? `<button class="btn btn-sm" onclick="jpPageEarlier()">← ${t('btn.earlier')}</button>` : ''}
-      ${hasNext ? `<button class="btn btn-sm" onclick="jpPageLater()">${t('btn.later')} →</button>` : ''}
+      ${hasPrev ? `<button class="btn btn-sm" onclick="jpPageEarlier()">← ${t('journey.btn.earlier')}</button>` : ''}
+      ${hasNext ? `<button class="btn btn-sm" onclick="jpPageLater()">${t('journey.btn.later')} →</button>` : ''}
     </div>
   </div>`;
 
@@ -641,7 +641,7 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
       </div>
       <div style="text-align:right">
         <span style="font-size:14px;font-weight:600">${durationStr}</span>
-        <span class="text-muted" style="margin-left:8px;font-size:12px">${transfers === 0 ? t('jp.direct') : transfers === 1 ? t('jp.transfers_one') : t('jp.transfers_other', { n: transfers })}</span>
+        <span class="text-muted" style="margin-left:8px;font-size:12px">${transfers === 0 ? t('journey.direct') : transfers === 1 ? t('journey.transfers_one') : t('journey.transfers_other', { n: transfers })}</span>
       </div>
     </div>`;
 
@@ -654,8 +654,8 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
       const legDurStr = legDur < 60 ? `${Math.round(legDur)} min` : `${Math.floor(legDur/60)}h ${Math.round(legDur%60)}m`;
       const legId = `jp-leg-${jIdx}-${li}`;
       const displayName = leg.groupName || leg.catName;
-      const stopsText = leg.intermediateStops === 0 ? t('jp.no_intermediate') :
-        leg.intermediateStops === 1 ? t('jp.intermediate_one') : `${leg.intermediateStops} intermediate stops`;
+      const stopsText = leg.intermediateStops === 0 ? t('journey.no_intermediate') :
+        leg.intermediateStops === 1 ? t('journey.intermediate_one') : `${leg.intermediateStops} intermediate stops`;
 
       // Board — skip for walk legs UNLESS it's the first leg (no previous alight to show origin)
       if (!leg.isWalk || li === 0) {
@@ -672,7 +672,7 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
       if (leg.isWalk) {
         const nextLeg = li < journey.legs.length - 1 ? journey.legs[li + 1] : null;
         const totalTransferTime = nextLeg ? Math.round(nextLeg.boardTime - leg.boardTime) : Math.round(leg.walkMins);
-        const walkLabel = leg.interchangeType === 'isi' ? t('jp.transfer_within') : t('jp.walk_to_station');
+        const walkLabel = leg.interchangeType === 'isi' ? t('journey.transfer_within') : t('journey.walk_to_station');
 
         html += `<div style="padding:6px 0;position:relative">
           <div style="position:absolute;left:-15px;top:0;bottom:0;width:2px;background:var(--text-muted);border-left:2px dotted var(--text-muted);opacity:0.4"></div>
@@ -701,16 +701,16 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
           <div style="margin-left:4px;cursor:pointer" onclick="document.getElementById('${legId}').style.display=document.getElementById('${legId}').style.display==='none'?'':'none'">
             <div style="display:flex;align-items:center;gap:8px">
               <span class="chip" style="font-size:10px"><span class="dot" style="background:${leg.lineColor || leg.catColor}"></span>${esc(leg.catAbbr || leg.catName)}</span>
-              <span style="font-size:12px">${t('jp_detail.towards', { line: esc(displayName), terminus: esc(leg.terminusName) })}</span>
+              <span style="font-size:12px">${t('journey.detail.towards', { line: esc(displayName), terminus: esc(leg.terminusName) })}</span>
             </div>
             <div class="text-muted" style="font-size:11px;margin-top:2px">${legDurStr} · ${stopsText} <span style="opacity:0.5">▾</span></div>
           </div>
           <div id="${legId}" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border);font-size:12px">
             <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin-bottom:8px">
-              <span class="text-muted">${t('jp_detail.leg_service')}</span><span>${esc(leg.svcName)}</span>
-              ${leg.stockName ? `<span class="text-muted">${t('jp_detail.leg_stock')}</span><span>${esc(leg.stockName)}</span>` : ''}
-              ${leg.groupName ? `<span class="text-muted">${t('jp_detail.leg_line')}</span><span>${esc(leg.groupName)}</span>` : ''}
-              <span class="text-muted">${t('jp_detail.leg_terminus')}</span><span>${esc(leg.terminusName)}</span>
+              <span class="text-muted">${t('journey.detail.leg_service')}</span><span>${esc(leg.svcName)}</span>
+              ${leg.stockName ? `<span class="text-muted">${t('journey.detail.leg_stock')}</span><span>${esc(leg.stockName)}</span>` : ''}
+              ${leg.groupName ? `<span class="text-muted">${t('journey.detail.leg_line')}</span><span>${esc(leg.groupName)}</span>` : ''}
+              <span class="text-muted">${t('journey.detail.leg_terminus')}</span><span>${esc(leg.terminusName)}</span>
             </div>
             ${leg.intermediateStops > 0 ? jpRenderIntermediateStops(leg) : ''}
           </div>
@@ -736,7 +736,7 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
           if (waitTime > 0) {
             html += `<div style="padding:8px 0;position:relative">
               <div style="position:absolute;left:-15px;top:0;bottom:0;width:2px;background:var(--border);border-left:2px dashed var(--text-muted);opacity:0.3"></div>
-              <div style="margin-left:4px;font-size:11px;color:var(--text-muted)">${waitTime} min · ${t('jp_detail.transfer')}</div>
+              <div style="margin-left:4px;font-size:11px;color:var(--text-muted)">${waitTime} min · ${t('journey.detail.transfer')}</div>
             </div>`;
           }
         }
@@ -755,8 +755,8 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
   }
 
   html += `<div style="display:flex;justify-content:center;gap:8px;margin-top:12px">
-    ${hasPrev ? `<button class="btn" onclick="jpPageEarlier()">${t('jp.earlier')}</button>` : ''}
-    ${hasNext ? `<button class="btn" onclick="jpPageLater()">${t('jp.later')}</button>` : ''}
+    ${hasPrev ? `<button class="btn" onclick="jpPageEarlier()">${t('journey.earlier')}</button>` : ''}
+    ${hasNext ? `<button class="btn" onclick="jpPageLater()">${t('journey.later')}</button>` : ''}
   </div>`;
 
   el.innerHTML = html;

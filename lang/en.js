@@ -223,6 +223,9 @@ registerLanguage('en', 'English', {
       "track_info": "{n} tracks",
       "speed_info": "{n} km/h",
       "ogf_ways": "OGF: {n} ways, {pts} points"
+    },
+    "tooltip": {
+      "insert_waypoint": "Insert a waypoint on this segment"
     }
   },
   "lines": {
@@ -380,7 +383,11 @@ registerLanguage('en', 'English', {
     },
     "tooltip": {
       "reverse": "Create reversed copy",
-      "duplicate": "Duplicate service"
+      "duplicate": "Duplicate service",
+      "clear_route": "Clear route",
+      "remove_start": "Remove first stop",
+      "remove_end": "Remove last stop",
+      "mark_pass_through": "Mark as pass-through"
     },
     "toast": {
       "variant_created": "Created variant service: {name}",

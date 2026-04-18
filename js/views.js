@@ -52,18 +52,18 @@ function renderSettings() {
     </div>
 
     <div id="stab-general" class="settings-section">
-      <div class="form-group"><label>${t('field.system_name')}</label>
+      <div class="form-group"><label>${t('settings.field.system_name')}</label>
         <input type="text" id="set-name" value="${esc(s.systemName || '')}" placeholder="e.g. Hemstein Railway Network" onchange="saveSetting('systemName', this.value); updateSystemName()">
         <p class="text-dim" style="font-size:11px;margin-top:2px">${t('settings.system_name_desc')}</p>
       </div>
-      <div class="form-group"><label>${t('field.colour_scheme')}</label>
+      <div class="form-group"><label>${t('settings.field.colour_scheme')}</label>
         <select id="set-theme" onchange="saveSetting('theme', this.value); applyTheme()">
           <option value="dark" ${(s.theme||'dark')==='dark'?'selected':''}>${t('settings.dark')}</option>
           <option value="light" ${s.theme==='light'?'selected':''}>${t('settings.light')}</option>
           <option value="system" ${s.theme==='system'?'selected':''}>${t('settings.system_pref')}</option>
         </select>
       </div>
-      <div class="form-group"><label>${t('label.language')}</label>
+      <div class="form-group"><label>${t('common.language')}</label>
         <select id="set-language" onchange="setLanguage(this.value)">
           ${_availableLanguages.map(l => `<option value="${l.code}" ${l.code === _lang ? 'selected' : ''}>${esc(l.name)}</option>`).join('')}
         </select>
@@ -96,7 +96,7 @@ function renderSettings() {
         <p class="text-dim" style="font-size:11px;margin-top:2px">When enabled, all stations and segments are visible on the Railmap, even if not assigned to a service or line. Unassigned elements appear in grey.</p>
       </div>
       <div class="form-group" style="margin-top:24px">
-        <button class="btn btn-danger" onclick="newSystem()">${t('btn.new_system')}</button>
+        <button class="btn btn-danger" onclick="newSystem()">${t('import_export.btn.new_system')}</button>
         <p class="text-dim" style="font-size:11px;margin-top:4px">${t('settings.new_system_desc')}</p>
       </div>
     </div>
@@ -104,25 +104,25 @@ function renderSettings() {
     <div id="stab-defaults" class="settings-section" style="display:none">
       <p class="text-dim" style="font-size:13px;margin-bottom:16px">${t('settings.defaults_desc')}</p>
       <div class="form-row">
-        <div class="form-group"><label>${t('field.walking_speed')}</label>
+        <div class="form-group"><label>${t('settings.field.walking_speed')}</label>
           <input type="number" id="set-walk" value="${s.walkingSpeed ?? 4.5}" min="1" max="10" step="0.1" onchange="saveSetting('walkingSpeed', parseFloat(this.value))"></div>
-        <div class="form-group"><label>${t('field.transfer_time')}</label>
+        <div class="form-group"><label>${t('settings.field.transfer_time')}</label>
           <input type="number" id="set-xfer" value="${s.transferTime ?? 5}" min="0" max="30" onchange="saveSetting('transferTime', parseInt(this.value))"></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>${t('field.day_cutoff')}</label>
+        <div class="form-group"><label>${t('settings.field.day_cutoff')}</label>
           <input type="time" id="set-cutoff" value="${(() => { const c = s.dayCutoff ?? 240; return String(Math.floor(c/60)).padStart(2,'0') + ':' + String(c%60).padStart(2,'0'); })()}" onchange="saveSetting('dayCutoff', toMin(this.value))">
           <p class="text-dim" style="font-size:11px;margin-top:2px">${t('settings.cutoff_desc')}</p></div>
-        <div class="form-group"><label>${t('field.default_plt_clearance')}</label>
+        <div class="form-group"><label>${t('settings.field.default_plt_clearance')}</label>
           <input type="number" id="set-plcl" value="${s.platformClearance ?? 3}" min="0" max="30" onchange="saveSetting('platformClearance', parseInt(this.value))">
           <p class="text-dim" style="font-size:11px;margin-top:2px">${t('settings.clearance_desc')}</p></div>
       </div>
       <div class="form-row">
-        <div class="form-group"><label>${t('field.default_accel')}</label>
+        <div class="form-group"><label>${t('settings.field.default_accel')}</label>
           <input type="number" id="set-accel" value="${s.defaultAcceleration ?? 1.0}" min="0.1" max="5" step="0.1" onchange="saveSetting('defaultAcceleration', parseFloat(this.value))"></div>
-        <div class="form-group"><label>${t('field.default_dwell_time')}</label>
+        <div class="form-group"><label>${t('settings.field.default_dwell_time')}</label>
           <input type="number" id="set-dwell" value="${s.defaultDwell ?? 60}" min="0" max="600" onchange="saveSetting('defaultDwell', parseInt(this.value))"></div>
-        <div class="form-group"><label>${t('field.default_platforms')}</label>
+        <div class="form-group"><label>${t('settings.field.default_platforms')}</label>
           <input type="number" id="set-plats" value="${s.defaultPlatforms ?? 2}" min="0" max="20" onchange="saveSetting('defaultPlatforms', parseInt(this.value))"></div>
       </div>
     </div>
@@ -135,7 +135,7 @@ function renderSettings() {
           ${t('settings.show_low_severity')}</label>
       </div>
       <div style="border-top:1px solid var(--border);padding-top:12px">
-        <strong style="font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('label.individual_issue_types')}</strong>
+        <strong style="font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('settings.label.individual_issue_types')}</strong>
         <div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
           ${issueTypes.map(it => {
             const isLow = it.sev === "low";
@@ -188,7 +188,7 @@ function applyTheme() {
   // Placeholder for future light/system theme support
   const theme = data.settings?.theme || 'dark';
   // For now, only dark is implemented
-  if (theme !== 'dark') toast(t('toast.theme_coming'), 'info');
+  if (theme !== 'dark') toast(t('settings.toast.theme_coming'), 'info');
 }
 
 // ============================================================
@@ -197,11 +197,11 @@ function applyTheme() {
 
 function showOverlapResolutionModal(segAId, segBId) {
   const segA = getSeg(segAId), segB = getSeg(segBId);
-  if (!segA || !segB) { toast(t('resolve.error'), 'error'); return; }
-  if (!segA.wayGeometry?.length || !segB.wayGeometry?.length) { toast(t('resolve.no_geometry'), 'error'); return; }
+  if (!segA || !segB) { toast(t('issues.resolve.error'), 'error'); return; }
+  if (!segA.wayGeometry?.length || !segB.wayGeometry?.length) { toast(t('issues.resolve.no_geometry'), 'error'); return; }
 
   const divergence = findDivergencePoint(segA, segB, 0.05);
-  if (!divergence) { toast(t('resolve.no_divergence'), 'error'); return; }
+  if (!divergence) { toast(t('issues.resolve.no_divergence'), 'error'); return; }
 
   const proposal = buildOverlapResolution(segA, segB, divergence);
   const sharedName = nodeName(proposal.sharedNode);
@@ -215,19 +215,19 @@ function showOverlapResolutionModal(segAId, segBId) {
       <div id="${mapId}" style="height:280px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--bg)"></div>
     </div>
     <div style="margin-bottom:16px">
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">${t('resolve.proposed')}</div>
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">${t('issues.resolve.proposed')}</div>
       <ul style="font-size:13px;color:var(--text-dim);margin-left:16px;line-height:1.8">
-        <li>${t('resolve.insert_junction', { lat: divergence.coord[0].toFixed(4), lon: divergence.coord[1].toFixed(4) })}</li>
-        <li>${t('resolve.create_shared', { from: sharedName, dist: sharedM })}</li>
-        <li>${t('resolve.modify_seg', { from: 'Junction', to: farAName, dist: Math.round(proposal.remainderADist * 1000) })}</li>
-        <li>${t('resolve.modify_seg', { from: 'Junction', to: farBName, dist: Math.round(proposal.remainderBDist * 1000) })}</li>
-        <li>${t('resolve.update_services', { n: proposal.affectedServices.length })}</li>
+        <li>${t('issues.resolve.insert_junction', { lat: divergence.coord[0].toFixed(4), lon: divergence.coord[1].toFixed(4) })}</li>
+        <li>${t('issues.resolve.create_shared', { from: sharedName, dist: sharedM })}</li>
+        <li>${t('issues.resolve.modify_seg', { from: 'Junction', to: farAName, dist: Math.round(proposal.remainderADist * 1000) })}</li>
+        <li>${t('issues.resolve.modify_seg', { from: 'Junction', to: farBName, dist: Math.round(proposal.remainderBDist * 1000) })}</li>
+        <li>${t('issues.resolve.update_services', { n: proposal.affectedServices.length })}</li>
       </ul>
     </div>`;
 
-  openModal(t('resolve.title'), body,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="_executeOverlapResolution('${segAId}','${segBId}')">${t('resolve.apply')}</button>`);
+  openModal(t('issues.resolve.title'), body,
+    `<button class="btn" onclick="closeModal()">${t('common.btn.cancel')}</button>
+     <button class="btn btn-primary" onclick="_executeOverlapResolution('${segAId}','${segBId}')">${t('issues.resolve.apply')}</button>`);
 
   // Render map after modal is open
   setTimeout(() => {
@@ -243,12 +243,12 @@ function showOverlapResolutionModal(segAId, segBId) {
     L.polyline(segB.wayGeometry, { color: '#5b8af5', weight: 4, opacity: 0.7, dashArray: '8,4' }).addTo(map).bindTooltip(sharedName + ' \u2014 ' + farBName);
 
     // Draw proposed segments
-    L.polyline(proposal.sharedGeo, { color: '#55c07a', weight: 5, opacity: 1 }).addTo(map).bindTooltip(t('resolve.shared_label'));
+    L.polyline(proposal.sharedGeo, { color: '#55c07a', weight: 5, opacity: 1 }).addTo(map).bindTooltip(t('issues.resolve.shared_label'));
     L.polyline(proposal.remainderA, { color: '#e05555', weight: 3, opacity: 1 }).addTo(map);
     L.polyline(proposal.remainderB, { color: '#5b8af5', weight: 3, opacity: 1 }).addTo(map);
 
     // Mark junction point
-    L.circleMarker(divergence.coord, { radius: 7, fillColor: '#ffc917', color: '#333', weight: 2, fillOpacity: 1 }).addTo(map).bindTooltip(t('resolve.junction_label'));
+    L.circleMarker(divergence.coord, { radius: 7, fillColor: '#ffc917', color: '#333', weight: 2, fillOpacity: 1 }).addTo(map).bindTooltip(t('issues.resolve.junction_label'));
 
     // Mark endpoints
     const endNodes = [proposal.sharedNode, proposal.farNodeA, proposal.farNodeB].map(getNode).filter(n => n?.lat);
@@ -274,7 +274,7 @@ function _executeOverlapResolution(segAId, segBId) {
 
   closeModal();
   refreshAll();
-  toast(t('resolve.success', { n: result.servicesUpdated }), 'success');
+  toast(t('issues.resolve.success', { n: result.servicesUpdated }), 'success');
 }
 
 function verifySegment(segId) {
@@ -327,9 +327,9 @@ function runIssueDetection() {
       const a = occs[i], b = occs[j];
       if (!patternsOverlap(getSvc(a.svcId)?.schedulePattern, getSvc(b.svcId)?.schedulePattern)) continue;
       if (a.enter < b.exit && b.enter < a.exit)
-        issues.push({ severity: 'high', type: t('issue.type.single_track_conflict'), typeKey: 'single_track_conflict',
-          desc: t('issue.desc.single_track_conflict', { a: getSvc(a.svcId)?.name||'?', b: getSvc(b.svcId)?.name||'?', from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }) + (tkName ? ' (' + tkName + ')' : ''),
-          detail: t('issue.detail.single_track_conflict', { a_time: toTime(a.enter)+'–'+toTime(a.exit), b_time: toTime(b.enter)+'–'+toTime(b.exit) }),
+        issues.push({ severity: 'high', type: t('issues.type.single_track_conflict'), typeKey: 'single_track_conflict',
+          desc: t('issues.desc.single_track_conflict', { a: getSvc(a.svcId)?.name||'?', b: getSvc(b.svcId)?.name||'?', from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }) + (tkName ? ' (' + tkName + ')' : ''),
+          detail: t('issues.detail.single_track_conflict', { a_time: toTime(a.enter)+'–'+toTime(a.exit), b_time: toTime(b.enter)+'–'+toTime(b.exit) }),
           action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${segId}')` });
     }
   }
@@ -346,9 +346,9 @@ function runIssueDetection() {
       const aEnd = a.depart + clearance;
       const bEnd = b.depart + clearance;
       if (a.arrive < bEnd && b.arrive < aEnd)
-        issues.push({ severity: 'high', type: t('issue.type.platform_conflict'), typeKey: 'platform_conflict',
-          desc: t('issue.desc.platform_conflict', { a: getSvc(a.svcId)?.name||'?', b: getSvc(b.svcId)?.name||'?', station: nodeName(stId), platform: platName(stId, plId) }),
-          detail: t('issue.detail.platform_conflict', { a_time: toTime(a.arrive)+'–'+toTime(a.depart), b_time: toTime(b.arrive)+'–'+toTime(b.depart), clearance }),
+        issues.push({ severity: 'high', type: t('issues.type.platform_conflict'), typeKey: 'platform_conflict',
+          desc: t('issues.desc.platform_conflict', { a: getSvc(a.svcId)?.name||'?', b: getSvc(b.svcId)?.name||'?', station: nodeName(stId), platform: platName(stId, plId) }),
+          detail: t('issues.detail.platform_conflict', { a_time: toTime(a.arrive)+'–'+toTime(a.depart), b_time: toTime(b.arrive)+'–'+toTime(b.depart), clearance }),
           action: `setSearchValue('node-search','');switchTab('nodes');showNodeDetail('${stId}')` });
     }
   }
@@ -357,9 +357,9 @@ function runIssueDetection() {
 
   for (const svc of data.services) {
     if (!data.departures.some(d => d.serviceId === svc.id)) {
-      issues.push({ severity: 'medium', type: t('issue.type.no_departures'), typeKey: 'no_departures',
-        desc: t('issue.desc.no_departures', { name: svc.name }),
-        detail: t('issue.detail.no_departures'),
+      issues.push({ severity: 'medium', type: t('issues.type.no_departures'), typeKey: 'no_departures',
+        desc: t('issues.desc.no_departures', { name: svc.name }),
+        detail: t('issues.detail.no_departures'),
         action: `openScheduleModal('${svc.id}')` });
     }
   }
@@ -370,9 +370,9 @@ function runIssueDetection() {
       if (stop.passThrough) continue;
       const node = getNode(stop.nodeId);
       if (isPassengerStop(node) && (node.platforms||[]).length > 0 && !stop.platformId) {
-        issues.push({ severity: 'medium', type: t('issue.type.missing_platform'), typeKey: 'missing_platform',
-          desc: t('issue.desc.missing_platform', { name: svc.name, station: node.name }),
-          detail: t('issue.detail.missing_platform', { n: i+1 }),
+        issues.push({ severity: 'medium', type: t('issues.type.missing_platform'), typeKey: 'missing_platform',
+          desc: t('issues.desc.missing_platform', { name: svc.name, station: node.name }),
+          detail: t('issues.detail.missing_platform', { n: i+1 }),
           action: `openServiceModal('${svc.id}')` });
       }
     }
@@ -380,18 +380,18 @@ function runIssueDetection() {
 
   for (const svc of data.services) {
     if (!svc.categoryId || !getCat(svc.categoryId)) {
-      issues.push({ severity: 'medium', type: t('issue.type.no_mode'), typeKey: 'no_mode',
-        desc: t('issue.desc.no_mode', { name: svc.name }),
-        detail: t('issue.detail.no_mode'),
+      issues.push({ severity: 'medium', type: t('issues.type.no_mode'), typeKey: 'no_mode',
+        desc: t('issues.desc.no_mode', { name: svc.name }),
+        detail: t('issues.detail.no_mode'),
         action: `openServiceModal('${svc.id}','f-svcMode')` });
     }
   }
 
   const orphanDeps = data.departures.filter(d => !getSvc(d.serviceId));
   if (orphanDeps.length) {
-    issues.push({ severity: 'medium', type: t('issue.type.orphan_departures'), typeKey: 'orphan_departures',
-      desc: t('issue.desc.orphan_departures', { n: orphanDeps.length }),
-      detail: t('issue.detail.orphan_departures'),
+    issues.push({ severity: 'medium', type: t('issues.type.orphan_departures'), typeKey: 'orphan_departures',
+      desc: t('issues.desc.orphan_departures', { n: orphanDeps.length }),
+      detail: t('issues.detail.orphan_departures'),
       action: `switchTab('schedule');setTimeout(()=>{const s=document.getElementById('sch-filter');if(s){s.value='__orphaned__';renderSchTable();}},100)` });
   }
 
@@ -401,9 +401,9 @@ function runIssueDetection() {
     for (let i = 0; i < svc.stops.length - 1; i++) {
       const seg = findSeg(svc.stops[i].nodeId, svc.stops[i+1].nodeId);
       if (seg && !seg.electrification && !isRoad(seg)) {
-        issues.push({ severity: 'high', type: t('issue.type.electrification_mismatch'), typeKey: 'electrification_mismatch',
-          desc: t('issue.desc.electrification_mismatch', { name: svc.name, stock: stock.name, from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
-          detail: t('issue.detail.electrification_mismatch'),
+        issues.push({ severity: 'high', type: t('issues.type.electrification_mismatch'), typeKey: 'electrification_mismatch',
+          desc: t('issues.desc.electrification_mismatch', { name: svc.name, stock: stock.name, from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
+          detail: t('issues.detail.electrification_mismatch'),
           action: `openServiceModal('${svc.id}')` });
         break;
       }
@@ -420,9 +420,9 @@ function runIssueDetection() {
       if (!seg) continue;
       const segInfra = isRoad(seg) ? 'road' : 'rail';
       if (modeInfra !== segInfra) {
-        issues.push({ severity: 'medium', type: t('issue.type.infra_mismatch'), typeKey: 'infra_mismatch',
-          desc: t('issue.desc.infra_mismatch', { name: svc.name, mode: cat.name, modeInfra, segInfra, from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
-          detail: t('issue.detail.infra_mismatch'),
+        issues.push({ severity: 'medium', type: t('issues.type.infra_mismatch'), typeKey: 'infra_mismatch',
+          desc: t('issues.desc.infra_mismatch', { name: svc.name, mode: cat.name, modeInfra, segInfra, from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
+          detail: t('issues.detail.infra_mismatch'),
           action: `openServiceModal('${svc.id}')` });
         break;
       }
@@ -437,9 +437,9 @@ function runIssueDetection() {
       if (!seg || !seg.allowedModes?.length) continue;
       if (!seg.allowedModes.includes(svc.categoryId)) {
         const cat = getCat(svc.categoryId);
-        issues.push({ severity: 'medium', type: t('issue.type.mode_not_allowed'), typeKey: 'mode_not_allowed',
-          desc: t('issue.desc.mode_not_allowed', { name: svc.name, mode: cat?.name || '?', from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
-          detail: t('issue.detail.mode_not_allowed'),
+        issues.push({ severity: 'medium', type: t('issues.type.mode_not_allowed'), typeKey: 'mode_not_allowed',
+          desc: t('issues.desc.mode_not_allowed', { name: svc.name, mode: cat?.name || '?', from: nodeName(seg.nodeA), to: nodeName(seg.nodeB) }),
+          detail: t('issues.detail.mode_not_allowed'),
           action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${seg.id}')` });
         break;
       }
@@ -452,9 +452,9 @@ function runIssueDetection() {
     if (!stock || !cat) continue;
     const matVal = getMatrixValue(stock.id, cat.id);
     if (matVal === 'disallowed') {
-      issues.push({ severity: 'medium', type: t('issue.type.disallowed_stock_mode'), typeKey: 'disallowed_stock_mode',
-        desc: t('issue.desc.disallowed_stock_mode', { name: svc.name, stock: stock.name, mode: cat.name }),
-        detail: t('issue.detail.disallowed_stock_mode'),
+      issues.push({ severity: 'medium', type: t('issues.type.disallowed_stock_mode'), typeKey: 'disallowed_stock_mode',
+        desc: t('issues.desc.disallowed_stock_mode', { name: svc.name, stock: stock.name, mode: cat.name }),
+        detail: t('issues.detail.disallowed_stock_mode'),
         action: `openServiceModal('${svc.id}')` });
     }
   }
@@ -462,9 +462,9 @@ function runIssueDetection() {
   if (data.rollingStock.length > 0) {
     for (const svc of data.services) {
       if (!svc.stockId || !getStock(svc.stockId)) {
-        issues.push({ severity: 'medium', type: t('issue.type.no_stock_assigned'), typeKey: 'no_stock_assigned',
-          desc: t('issue.desc.no_stock_assigned', { name: svc.name }),
-          detail: t('issue.detail.no_stock_assigned'),
+        issues.push({ severity: 'medium', type: t('issues.type.no_stock_assigned'), typeKey: 'no_stock_assigned',
+          desc: t('issues.desc.no_stock_assigned', { name: svc.name }),
+          detail: t('issues.detail.no_stock_assigned'),
           action: `openServiceModal('${svc.id}','f-svcStock')` });
       }
     }
@@ -479,9 +479,9 @@ function runIssueDetection() {
       if (!node) continue;
       const plat = (node.platforms || []).find(p => p.id === stop.platformId);
       if (!plat) {
-        issues.push({ severity: 'medium', type: t('issue.type.invalid_platform_reference'), typeKey: 'invalid_platform_reference',
-          desc: t('issue.desc.invalid_platform_reference', { name: svc.name, station: node.name }),
-          detail: t('issue.detail.invalid_platform_reference'),
+        issues.push({ severity: 'medium', type: t('issues.type.invalid_platform_reference'), typeKey: 'invalid_platform_reference',
+          desc: t('issues.desc.invalid_platform_reference', { name: svc.name, station: node.name }),
+          detail: t('issues.detail.invalid_platform_reference'),
           action: `openServiceModal('${svc.id}')` });
       }
     }
@@ -496,9 +496,9 @@ function runIssueDetection() {
       const node = getNode(stop.nodeId); if (!node) continue;
       const plat = (node.platforms || []).find(p => p.id === platId);
       if (!plat) {
-        issues.push({ severity: 'medium', type: t('issue.type.invalid_platform_override'), typeKey: 'invalid_platform_override',
-          desc: t('issue.desc.invalid_platform_override', { name: svc.name, time: toTime(dep.startTime), station: node.name }),
-          detail: t('issue.detail.invalid_platform_override'),
+        issues.push({ severity: 'medium', type: t('issues.type.invalid_platform_override'), typeKey: 'invalid_platform_override',
+          desc: t('issues.desc.invalid_platform_override', { name: svc.name, time: toTime(dep.startTime), station: node.name }),
+          detail: t('issues.detail.invalid_platform_override'),
           action: `openDepEditModal('${dep.id}')` });
       }
     }
@@ -506,9 +506,9 @@ function runIssueDetection() {
 
   for (const svc of data.services) {
     if (!svc.groupId || !getGroup(svc.groupId)) {
-      issues.push({ severity: 'low', type: t('issue.type.ungrouped_service'), typeKey: 'ungrouped_service',
-        desc: t('issue.desc.ungrouped_service', { name: svc.name }),
-        detail: t('issue.detail.ungrouped_service'),
+      issues.push({ severity: 'low', type: t('issues.type.ungrouped_service'), typeKey: 'ungrouped_service',
+        desc: t('issues.desc.ungrouped_service', { name: svc.name }),
+        detail: t('issues.detail.ungrouped_service'),
         action: `openServiceModal('${svc.id}')` });
     }
   }
@@ -523,9 +523,9 @@ function runIssueDetection() {
   }
   for (const [key, svcs] of Object.entries(svcNames)) {
     if (svcs.length > 1) {
-      issues.push({ severity: 'low', type: t('issue.type.duplicate_name'), typeKey: 'duplicate_name',
-        desc: t('issue.desc.duplicate_name', { n: svcs.length, name: svcs[0].name }),
-        detail: t('issue.detail.duplicate_name'),
+      issues.push({ severity: 'low', type: t('issues.type.duplicate_name'), typeKey: 'duplicate_name',
+        desc: t('issues.desc.duplicate_name', { n: svcs.length, name: svcs[0].name }),
+        detail: t('issues.detail.duplicate_name'),
         action: `switchTab('services');setSearchValue('service-search','name:${svcs[0].name.replace(/'/g,"\\'")}');renderServices();highlightEntity('${svcs[0].id}')` });
     }
   }
@@ -538,9 +538,9 @@ function runIssueDetection() {
   }
   for (const [key, nodes] of Object.entries(nodeNamesMap)) {
     if (nodes.length > 1) {
-      issues.push({ severity: 'low', type: t('issue.type.duplicate_node_name'), typeKey: 'duplicate_node_name',
-        desc: t('issue.desc.duplicate_node_name', { n: nodes.length, name: nodes[0].name }),
-        detail: t('issue.detail.duplicate_node_name'),
+      issues.push({ severity: 'low', type: t('issues.type.duplicate_node_name'), typeKey: 'duplicate_node_name',
+        desc: t('issues.desc.duplicate_node_name', { n: nodes.length, name: nodes[0].name }),
+        detail: t('issues.detail.duplicate_node_name'),
         action: `switchTab('nodes');setSearchValue('node-search','name:${nodes[0].name.replace(/'/g,"\\'")}');renderNodes();highlightEntity('${nodes[0].id}')` });
     }
   }
@@ -562,9 +562,9 @@ function runIssueDetection() {
             !data.segments.some(s => (s.interchangeType === 'isi' || s.interchangeType === 'osi') &&
               ((s.nodeA === missingA && s.nodeB === prev) || (s.nodeB === missingA && s.nodeA === prev)))
           ) || nodeIds[0];
-          issues.push({ severity: 'medium', type: t('issue.type.unlinked_station_group'), typeKey: 'unlinked_station_group',
-            desc: t('issue.desc.unlinked_station_group', { name: dn }),
-            detail: t('issue.detail.unlinked_station_group'),
+          issues.push({ severity: 'medium', type: t('issues.type.unlinked_station_group'), typeKey: 'unlinked_station_group',
+            desc: t('issues.desc.unlinked_station_group', { name: dn }),
+            detail: t('issues.detail.unlinked_station_group'),
             action: `openSegmentModal();setTimeout(()=>{document.getElementById('f-sType').value='osi';document.getElementById('f-sType').dispatchEvent(new Event('change'));setTimeout(()=>{document.getElementById('btn-ich-isi').click();nodePickerSetValue('np-segA','${missingA}');nodePickerSetValue('np-segB','${missingB}');},80)},80)` });
           break;
         }
@@ -591,9 +591,9 @@ function runIssueDetection() {
         );
       });
       if (allISI) continue;
-      issues.push({ severity: 'low', type: t('issue.type.duplicate_ref_code'), typeKey: 'duplicate_ref_code',
-        desc: t('issue.desc.duplicate_ref_code_nodes', { n: nodes.length, code: nodes[0].refCode }),
-        detail: t('issue.detail.duplicate_ref_code'),
+      issues.push({ severity: 'low', type: t('issues.type.duplicate_ref_code'), typeKey: 'duplicate_ref_code',
+        desc: t('issues.desc.duplicate_ref_code_nodes', { n: nodes.length, code: nodes[0].refCode }),
+        detail: t('issues.detail.duplicate_ref_code'),
         action: `switchTab('nodes');setSearchValue('node-search','ref:${nodes[0].refCode.replace(/'/g,"\\'")}');renderNodes();highlightEntity('${nodes[0].id}')` });
     }
   }
@@ -606,27 +606,27 @@ function runIssueDetection() {
   }
   for (const [key, segs] of Object.entries(segRefs)) {
     if (segs.length > 1) {
-      issues.push({ severity: 'low', type: t('issue.type.duplicate_ref_code'), typeKey: 'duplicate_ref_code',
-        desc: t('issue.desc.duplicate_ref_code_segs', { n: segs.length, code: segs[0].refCode }),
-        detail: t('issue.detail.duplicate_ref_code'),
+      issues.push({ severity: 'low', type: t('issues.type.duplicate_ref_code'), typeKey: 'duplicate_ref_code',
+        desc: t('issues.desc.duplicate_ref_code_segs', { n: segs.length, code: segs[0].refCode }),
+        detail: t('issues.detail.duplicate_ref_code'),
         action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${segs[0].id}')` });
     }
   }
 
   for (const n of data.nodes) {
     if (isPassengerStop(n) && (!n.platforms || n.platforms.length === 0)) {
-      issues.push({ severity: 'low', type: t('issue.type.no_platforms'), typeKey: 'no_platforms',
-        desc: t('issue.desc.no_platforms', { name: n.name }),
-        detail: t('issue.detail.no_platforms'),
+      issues.push({ severity: 'low', type: t('issues.type.no_platforms'), typeKey: 'no_platforms',
+        desc: t('issues.desc.no_platforms', { name: n.name }),
+        detail: t('issues.detail.no_platforms'),
         action: `openNodeModal('${n.id}','plat-list')` });
     }
   }
 
   for (const svc of data.services) {
     if (/\(rev\)|\(var\)|\(copy\)/.test(svc.name)) {
-      issues.push({ severity: 'low', type: t('issue.type.auto_generated_name'), typeKey: 'auto_generated_name',
-        desc: t('issue.desc.auto_generated_name', { name: svc.name }),
-        detail: t('issue.detail.auto_generated_name'),
+      issues.push({ severity: 'low', type: t('issues.type.auto_generated_name'), typeKey: 'auto_generated_name',
+        desc: t('issues.desc.auto_generated_name', { name: svc.name }),
+        detail: t('issues.detail.auto_generated_name'),
         action: `openServiceModal('${svc.id}')` });
     }
   }
@@ -638,9 +638,9 @@ function runIssueDetection() {
     if (!s.maxSpeed || s.maxSpeed <= 0) problems.push('max speed');
     if (!isRoad(s) && segTrackCount(s) <= 0) problems.push('track count');
     if (problems.length) {
-      issues.push({ severity: 'low', type: t('issue.type.incomplete_segment'), typeKey: 'incomplete_segment',
-        desc: t('issue.desc.incomplete_segment', { from: nodeName(s.nodeA), to: nodeName(s.nodeB), problems: problems.join(', ') }),
-        detail: t('issue.detail.incomplete_segment'),
+      issues.push({ severity: 'low', type: t('issues.type.incomplete_segment'), typeKey: 'incomplete_segment',
+        desc: t('issues.desc.incomplete_segment', { from: nodeName(s.nodeA), to: nodeName(s.nodeB), problems: problems.join(', ') }),
+        detail: t('issues.detail.incomplete_segment'),
         action: `openSegmentModal('${s.id}')` });
     }
     // Distance mismatch: stored distance vs way geometry distance
@@ -649,9 +649,9 @@ function runIssueDetection() {
       const diff = Math.abs(geoDist - s.distance);
       const pct = diff / geoDist * 100;
       if (pct > 15 && diff > 0.2) {
-        issues.push({ severity: 'low', type: t('issue.type.distance_mismatch'), typeKey: 'distance_mismatch',
-          desc: t('issue.desc.distance_mismatch', { from: nodeName(s.nodeA), to: nodeName(s.nodeB), stored: s.distance, geo: geoDist }),
-          detail: t('issue.detail.distance_mismatch', { pct: Math.round(pct) }),
+        issues.push({ severity: 'low', type: t('issues.type.distance_mismatch'), typeKey: 'distance_mismatch',
+          desc: t('issues.desc.distance_mismatch', { from: nodeName(s.nodeA), to: nodeName(s.nodeB), stored: s.distance, geo: geoDist }),
+          detail: t('issues.detail.distance_mismatch', { pct: Math.round(pct) }),
           action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${s.id}')` });
       }
     }
@@ -659,24 +659,24 @@ function runIssueDetection() {
 
   for (const n of data.nodes) {
     if (connectedNodes(n.id).length === 0) {
-      issues.push({ severity: 'low', type: t('issue.type.isolated_node'), typeKey: 'isolated_node',
-        desc: t('issue.desc.isolated_node', { name: n.name }),
-        detail: t('issue.detail.isolated_node'),
+      issues.push({ severity: 'low', type: t('issues.type.isolated_node'), typeKey: 'isolated_node',
+        desc: t('issues.desc.isolated_node', { name: n.name }),
+        detail: t('issues.detail.isolated_node'),
         action: `setSearchValue('node-search','');switchTab('nodes');showNodeDetail('${n.id}')` });
     }
     if (n.type === 'waypoint') {
       const conns = connectedNodes(n.id).length;
       if (conns !== 2) {
-        issues.push({ severity: 'medium', type: t('issue.type.waypoint_connection_count'), typeKey: 'waypoint_connection_count',
-          desc: t('issue.desc.waypoint_connection_count', { name: n.name, n: conns }),
-          detail: t('issue.detail.waypoint_connection_count'),
+        issues.push({ severity: 'medium', type: t('issues.type.waypoint_connection_count'), typeKey: 'waypoint_connection_count',
+          desc: t('issues.desc.waypoint_connection_count', { name: n.name, n: conns }),
+          detail: t('issues.detail.waypoint_connection_count'),
           action: `setSearchValue('node-search','');switchTab('nodes');showNodeDetail('${n.id}')` });
       }
     }
     if (!n.ogfNode && n.lat == null) {
-      issues.push({ severity: 'low', type: t('issue.type.missing_ogf_node'), typeKey: 'missing_ogf_node',
-        desc: t('issue.desc.missing_ogf_node', { name: n.name }),
-        detail: t('issue.detail.missing_ogf_node'),
+      issues.push({ severity: 'low', type: t('issues.type.missing_ogf_node'), typeKey: 'missing_ogf_node',
+        desc: t('issues.desc.missing_ogf_node', { name: n.name }),
+        detail: t('issues.detail.missing_ogf_node'),
         action: `openNodeModal('${n.id}','f-ogf')` });
     }
   }
@@ -714,9 +714,9 @@ function runIssueDetection() {
 
       if (!valid) {
         const platName = (node.platforms || []).find(p => p.id === stop.platformId)?.name || '?';
-        issues.push({ severity: 'medium', type: t('issue.type.schematic_mismatch'), typeKey: 'schematic_mismatch',
-          desc: t('issue.desc.schematic_mismatch', { name: svc.name, platform: platName, station: node.name }),
-          detail: t('issue.detail.schematic_mismatch'),
+        issues.push({ severity: 'medium', type: t('issues.type.schematic_mismatch'), typeKey: 'schematic_mismatch',
+          desc: t('issues.desc.schematic_mismatch', { name: svc.name, platform: platName, station: node.name }),
+          detail: t('issues.detail.schematic_mismatch'),
           action: `openServiceModal('${svc.id}')` });
       }
     }
@@ -754,9 +754,9 @@ function runIssueDetection() {
 
       if (!valid) {
         const platName = (node.platforms || []).find(p => p.id === platId)?.name || '?';
-        issues.push({ severity: 'medium', type: t('issue.type.departure_schematic_mismatch'), typeKey: 'departure_schematic_mismatch',
-          desc: t('issue.desc.departure_schematic_mismatch', { name: svc.name, time: toTime(dep.startTime), platform: platName, station: node.name }),
-          detail: t('issue.detail.departure_schematic_mismatch'),
+        issues.push({ severity: 'medium', type: t('issues.type.departure_schematic_mismatch'), typeKey: 'departure_schematic_mismatch',
+          desc: t('issues.desc.departure_schematic_mismatch', { name: svc.name, time: toTime(dep.startTime), platform: platName, station: node.name }),
+          detail: t('issues.detail.departure_schematic_mismatch'),
           action: `openDepEditModal('${dep.id}')` });
       }
     }
@@ -768,9 +768,9 @@ function runIssueDetection() {
     for (const plat of (node.platforms || [])) {
       const assigned = node.schematic.tracks.some(t => (t.platformIds || []).includes(plat.id));
       if (!assigned) {
-        issues.push({ severity: 'low', type: t('issue.type.unassigned_platform'), typeKey: 'unassigned_platform',
-          desc: t('issue.desc.unassigned_platform', { platform: plat.name, station: node.name }),
-          detail: t('issue.detail.unassigned_platform'),
+        issues.push({ severity: 'low', type: t('issues.type.unassigned_platform'), typeKey: 'unassigned_platform',
+          desc: t('issues.desc.unassigned_platform', { platform: plat.name, station: node.name }),
+          detail: t('issues.detail.unassigned_platform'),
           action: `openSchematicEditor('${node.id}')` });
       }
     }
@@ -797,9 +797,9 @@ function runIssueDetection() {
       for (const tk of segTracks) {
         if (!connectedTrackIds.has(tk.id)) {
           const segLabel = nodeName(seg.nodeA === node.id ? seg.nodeB : seg.nodeA);
-          issues.push({ severity: 'low', type: t('issue.type.unconnected_segment_track'), typeKey: 'unconnected_segment_track',
-            desc: t('issue.desc.unconnected_segment_track', { n: tk.name, label: segLabel, station: node.name }),
-            detail: t('issue.detail.unconnected_segment_track'),
+          issues.push({ severity: 'low', type: t('issues.type.unconnected_segment_track'), typeKey: 'unconnected_segment_track',
+            desc: t('issues.desc.unconnected_segment_track', { n: tk.name, label: segLabel, station: node.name }),
+            detail: t('issues.detail.unconnected_segment_track'),
             action: `openSchematicEditor('${node.id}')` });
         }
       }
@@ -812,9 +812,9 @@ function runIssueDetection() {
       const stop = svc.stops[i];
       const node = getNode(stop.nodeId);
       if (node && !isPassengerStop(node) && node.type !== 'waypoint' && !stop.passThrough) {
-        issues.push({ severity: 'medium', type: t('issue.type.non_station_stop'), typeKey: 'non_station_stop',
-          desc: t('issue.desc.non_station_stop', { name: svc.name, type: t('type.'+node.type), station: node.name }),
-          detail: t('issue.detail.non_station_stop', { n: i+1 }),
+        issues.push({ severity: 'medium', type: t('issues.type.non_station_stop'), typeKey: 'non_station_stop',
+          desc: t('issues.desc.non_station_stop', { name: svc.name, type: t('type.'+node.type), station: node.name }),
+          detail: t('issues.detail.non_station_stop', { n: i+1 }),
           action: `openServiceModal('${svc.id}')` });
       }
     }
@@ -825,15 +825,15 @@ function runIssueDetection() {
     if (svc.stops.length < 2) continue;
     const first = svc.stops[0], last = svc.stops[svc.stops.length - 1];
     if (first.passThrough) {
-      issues.push({ severity: 'medium', type: t('issue.type.pass_through_terminus'), typeKey: 'pass_through_terminus',
-        desc: t('issue.desc.pass_through_terminus_origin', { name: svc.name, station: nodeName(first.nodeId) }),
-        detail: t('issue.detail.pass_through_terminus'),
+      issues.push({ severity: 'medium', type: t('issues.type.pass_through_terminus'), typeKey: 'pass_through_terminus',
+        desc: t('issues.desc.pass_through_terminus_origin', { name: svc.name, station: nodeName(first.nodeId) }),
+        detail: t('issues.detail.pass_through_terminus'),
         action: `openServiceModal('${svc.id}')` });
     }
     if (last.passThrough) {
-      issues.push({ severity: 'medium', type: t('issue.type.pass_through_terminus'), typeKey: 'pass_through_terminus',
-        desc: t('issue.desc.pass_through_terminus_dest', { name: svc.name, station: nodeName(last.nodeId) }),
-        detail: t('issue.detail.pass_through_terminus'),
+      issues.push({ severity: 'medium', type: t('issues.type.pass_through_terminus'), typeKey: 'pass_through_terminus',
+        desc: t('issues.desc.pass_through_terminus_dest', { name: svc.name, station: nodeName(last.nodeId) }),
+        detail: t('issues.detail.pass_through_terminus'),
         action: `openServiceModal('${svc.id}')` });
     }
   }
@@ -843,9 +843,9 @@ function runIssueDetection() {
     for (let i = 0; i < svc.stops.length - 1; i++) {
       const seg = findSeg(svc.stops[i].nodeId, svc.stops[i+1].nodeId);
       if (!seg) {
-        issues.push({ severity: 'high', type: t('issue.type.broken_route'), typeKey: 'broken_route',
-          desc: t('issue.desc.broken_route', { name: svc.name, from: nodeName(svc.stops[i].nodeId), to: nodeName(svc.stops[i+1].nodeId) }),
-          detail: t('issue.detail.broken_route', { a: i+1, b: i+2 }),
+        issues.push({ severity: 'high', type: t('issues.type.broken_route'), typeKey: 'broken_route',
+          desc: t('issues.desc.broken_route', { name: svc.name, from: nodeName(svc.stops[i].nodeId), to: nodeName(svc.stops[i+1].nodeId) }),
+          detail: t('issues.detail.broken_route', { a: i+1, b: i+2 }),
           action: `openServiceModal('${svc.id}')` });
       }
     }
@@ -855,9 +855,9 @@ function runIssueDetection() {
   for (const svc of data.services) {
     for (let i = 0; i < svc.stops.length; i++) {
       if (!getNode(svc.stops[i].nodeId)) {
-        issues.push({ severity: 'high', type: t('issue.type.missing_node'), typeKey: 'missing_node',
-          desc: t('issue.desc.missing_node', { name: svc.name, n: i+1 }),
-          detail: t('issue.detail.missing_node'),
+        issues.push({ severity: 'high', type: t('issues.type.missing_node'), typeKey: 'missing_node',
+          desc: t('issues.desc.missing_node', { name: svc.name, n: i+1 }),
+          detail: t('issues.detail.missing_node'),
           action: `openServiceModal('${svc.id}')` });
         break;
       }
@@ -869,9 +869,9 @@ function runIssueDetection() {
     const svc = getSvc(dep.serviceId);
     if (!svc) continue;
     if (dep.times.length !== svc.stops.length) {
-      issues.push({ severity: 'medium', type: t('issue.type.stale_departure'), typeKey: 'stale_departure',
-        desc: t('issue.desc.stale_departure', { name: svc.name, time: toTime(dep.startTime), actual: dep.times.length, expected: svc.stops.length }),
-        detail: t('issue.detail.stale_departure'),
+      issues.push({ severity: 'medium', type: t('issues.type.stale_departure'), typeKey: 'stale_departure',
+        desc: t('issues.desc.stale_departure', { name: svc.name, time: toTime(dep.startTime), actual: dep.times.length, expected: svc.stops.length }),
+        detail: t('issues.detail.stale_departure'),
         action: `recalcSvcAndRefresh('${svc.id}')` });
     }
   }
@@ -890,9 +890,9 @@ function runIssueDetection() {
       const allSameOrEmpty = segs.every(s => !s.allowedModes?.length) ||
         (segs.every(s => s.allowedModes?.length) && segs.every(s => JSON.stringify(s.allowedModes?.sort()) === JSON.stringify(segs[0].allowedModes?.sort())));
       if (allSameOrEmpty) {
-        issues.push({ severity: 'medium', type: t('issue.type.duplicate_segment'), typeKey: 'duplicate_segment',
-          desc: t('issue.desc.duplicate_segment', { n: segs.length, type: segs[0].interchangeType ? segs[0].interchangeType.toUpperCase() : t('seg.type_track_display'), from: nodeName(segs[0].nodeA), to: nodeName(segs[0].nodeB) }),
-          detail: t('issue.detail.duplicate_segment'),
+        issues.push({ severity: 'medium', type: t('issues.type.duplicate_segment'), typeKey: 'duplicate_segment',
+          desc: t('issues.desc.duplicate_segment', { n: segs.length, type: segs[0].interchangeType ? segs[0].interchangeType.toUpperCase() : t('segments.type.track_short'), from: nodeName(segs[0].nodeA), to: nodeName(segs[0].nodeB) }),
+          detail: t('issues.detail.duplicate_segment'),
           action: `setSearchValue('segment-search','');switchTab('segments');showSegmentDetail('${segs[0].id}')` });
       }
     }
@@ -933,11 +933,11 @@ function runIssueDetection() {
             const fk = [sA.id, sB.id].sort().join('::');
             if (_suspFlagged.has(fk)) continue;
             _suspFlagged.add(fk);
-            issues.push({ severity: 'medium', type: t('issue.type.suspicious_segment'), typeKey: 'suspicious_segment',
-              desc: t('issue.desc.suspicious_segment', { from: nodeName(sA.nodeA), to: nodeName(sA.nodeB), dist: avgM }),
-              detail: t('issue.detail.suspicious_segment'),
+            issues.push({ severity: 'medium', type: t('issues.type.suspicious_segment'), typeKey: 'suspicious_segment',
+              desc: t('issues.desc.suspicious_segment', { from: nodeName(sA.nodeA), to: nodeName(sA.nodeB), dist: avgM }),
+              detail: t('issues.detail.suspicious_segment'),
               action: `switchTab('segments');showSegmentDetail('${sA.id}')`,
-              extraActions: `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${sA.id}');verifySegment('${sB.id}')">${t('issue.verify_btn')}</button>`
+              extraActions: `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${sA.id}');verifySegment('${sB.id}')">${t('issues.verify_btn')}</button>`
             });
           }
         }
@@ -999,11 +999,11 @@ function runIssueDetection() {
           // Also suppress pairwise overlap checks between the express segment and each chain segment
           for (const cid of chainIds) _suspFlagged.add([seg.id, cid].sort().join('::'));
           const chainNames = foundChain.path.map(e => nodeName(e.from) + ' \u2192 ' + nodeName(e.to)).join(', ');
-          issues.push({ severity: 'medium', type: t('issue.type.suspicious_segment'), typeKey: 'suspicious_segment',
-            desc: t('issue.desc.suspicious_chain', { from: nodeName(seg.nodeA), to: nodeName(seg.nodeB), dist: avgM, chain: chainNames }),
-            detail: t('issue.detail.suspicious_chain'),
+          issues.push({ severity: 'medium', type: t('issues.type.suspicious_segment'), typeKey: 'suspicious_segment',
+            desc: t('issues.desc.suspicious_chain', { from: nodeName(seg.nodeA), to: nodeName(seg.nodeB), dist: avgM, chain: chainNames }),
+            detail: t('issues.detail.suspicious_chain'),
             action: `switchTab('segments');showSegmentDetail('${seg.id}')`,
-            extraActions: `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${seg.id}')">${t('issue.verify_btn')}</button>`
+            extraActions: `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${seg.id}')">${t('issues.verify_btn')}</button>`
           });
         }
       }
@@ -1060,13 +1060,13 @@ function runIssueDetection() {
                                   sA.nodeB === sB.nodeA || sA.nodeB === sB.nodeB);
           const descKey = sharedEndpoint ? 'issue.desc.overlap_branching' : 'issue.desc.overlap_mid';
           const fixBtn = sharedEndpoint
-            ? `<button class="btn btn-sm btn-primary" style="margin-top:4px;margin-right:4px" onclick="event.stopPropagation();showOverlapResolutionModal('${sA.id}','${sB.id}')">${t('resolve.fix_btn')}</button>`
+            ? `<button class="btn btn-sm btn-primary" style="margin-top:4px;margin-right:4px" onclick="event.stopPropagation();showOverlapResolutionModal('${sA.id}','${sB.id}')">${t('issues.resolve.fix_btn')}</button>`
             : '';
-          issues.push({ severity: 'medium', type: t('issue.type.segment_overlap'), typeKey: 'segment_overlap',
+          issues.push({ severity: 'medium', type: t('issues.type.segment_overlap'), typeKey: 'segment_overlap',
             desc: t(descKey, { segA: nodeName(sA.nodeA) + ' \u2014 ' + nodeName(sA.nodeB), segB: nodeName(sB.nodeA) + ' \u2014 ' + nodeName(sB.nodeB), dist: overlapM }),
-            detail: t('issue.detail.segment_overlap'),
+            detail: t('issues.detail.segment_overlap'),
             action: `switchTab('segments');showSegmentDetail('${sA.id}')`,
-            extraActions: fixBtn + `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${sA.id}');verifySegment('${sB.id}')">${t('issue.verify_btn')}</button>`
+            extraActions: fixBtn + `<button class="btn btn-sm" style="margin-top:4px" onclick="event.stopPropagation();verifySegment('${sA.id}');verifySegment('${sB.id}')">${t('issues.verify_btn')}</button>`
           });
         }
       }
@@ -1085,9 +1085,9 @@ function runIssueDetection() {
       const lastAdj = lastTime < DAY_CUTOFF_() ? lastTime + 1440 : lastTime;
       if (lastAdj < firstAdj) {
         // Journey wraps across day boundary (arrives before departure in adjusted time = crosses cutoff)
-        issues.push({ severity: 'low', type: t('issue.type.cross_cutoff_journey'), typeKey: 'cross_cutoff_journey',
-          desc: t('issue.desc.cross_cutoff_journey', { name: svc.name, time: toTime(firstTime), cutoff: toTime(DAY_CUTOFF_()) }),
-          detail: t('issue.detail.cross_cutoff_journey', { dep_time: toTime(firstTime), arr_time: toTime(lastTime) }),
+        issues.push({ severity: 'low', type: t('issues.type.cross_cutoff_journey'), typeKey: 'cross_cutoff_journey',
+          desc: t('issues.desc.cross_cutoff_journey', { name: svc.name, time: toTime(firstTime), cutoff: toTime(DAY_CUTOFF_()) }),
+          detail: t('issues.detail.cross_cutoff_journey', { dep_time: toTime(firstTime), arr_time: toTime(lastTime) }),
           action: `showTrainSchedule('${dep.id}')` });
       }
     }
@@ -1116,14 +1116,14 @@ function runIssueDetection() {
 
   if (!filtered.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon" style="color:var(--success)">✓</div>
-      <h3>${t('issue.no_issues')}</h3><p>${t('issue.no_issues_desc')}${totalHidden ? ' ' + t('issue.hidden_count', { n: totalHidden }) : ''}</p></div>`;
+      <h3>${t('issues.no_issues')}</h3><p>${t('issues.no_issues_desc')}${totalHidden ? ' ' + t('issues.hidden_count', { n: totalHidden }) : ''}</p></div>`;
     return;
   }
 
   function renderIssueItem(i) {
     const clickAttr = i.action ? ` onclick="${i.action.replace(/"/g,'&quot;')}" style="cursor:pointer"` : '';
     return `<div class="issue-item severity-${i.severity}"${clickAttr}>
-      <div class="issue-type">${esc(i.type)}${i.action ? ` <span style="font-size:9px;opacity:0.6">\u2192 ${t('issue.click_to_fix')}</span>` : ''}</div>
+      <div class="issue-type">${esc(i.type)}${i.action ? ` <span style="font-size:9px;opacity:0.6">\u2192 ${t('issues.click_to_fix')}</span>` : ''}</div>
       <div class="issue-desc">${esc(i.desc)}</div>
       <div class="issue-detail">${esc(i.detail)}</div>
       ${i.extraActions || ''}
@@ -1133,17 +1133,17 @@ function runIssueDetection() {
   let html = '';
 
   if (highCount) {
-    html += `<div class="issue-section-header">${t('issue.section.conflicts', { n: highCount })}</div>`;
+    html += `<div class="issue-section-header">${t('issues.section.conflicts', { n: highCount })}</div>`;
     html += filtered.filter(i => i.severity === 'high').map(renderIssueItem).join('');
   }
 
   if (medCount) {
-    html += `<div class="issue-section-header">${t('issue.section.warnings', { n: medCount })}</div>`;
+    html += `<div class="issue-section-header">${t('issues.section.warnings', { n: medCount })}</div>`;
     html += filtered.filter(i => i.severity === 'medium').map(renderIssueItem).join('');
   }
 
   if (lowCount) {
-    html += `<div class="issue-section-header">${t('issue.section.data_quality', { n: lowCount })}</div>`;
+    html += `<div class="issue-section-header">${t('issues.section.data_quality', { n: lowCount })}</div>`;
     html += filtered.filter(i => i.severity === 'low').map(renderIssueItem).join('');
   }
 
@@ -1157,7 +1157,7 @@ function runIssueDetection() {
     }
     html += `<div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
       <div class="clickable" style="font-size:12px;color:var(--text-muted);cursor:pointer" onclick="const el=document.getElementById('hidden-issues-list');el.style.display=el.style.display==='none'?'':'none'">
-        ${t('issue_hidden.summary', { n: totalHidden })} · <span style="color:var(--accent)">${t('issue_hidden.show')} / ${t('issue_hidden.hide')}</span> · <span class="clickable" style="color:var(--accent)" onclick="event.stopPropagation();switchTab('settings');switchSettingsTab('issues')">${t('issue_hidden.edit_filters')}</span>
+        ${t('issues.hidden.summary', { n: totalHidden })} · <span style="color:var(--accent)">${t('issues.hidden.show')} / ${t('issues.hidden.hide')}</span> · <span class="clickable" style="color:var(--accent)" onclick="event.stopPropagation();switchTab('settings');switchSettingsTab('issues')">${t('issues.hidden.edit_filters')}</span>
       </div>
       <div id="hidden-issues-list" style="display:none;margin-top:8px;opacity:0.6">
         ${Object.entries(hiddenByType).map(([type, items]) => `
@@ -1221,7 +1221,7 @@ function toggleMapTiles() {
 function mapFitBounds() {
   if (!_map) return;
   const coords = data.nodes.filter(n => n.lat != null && n.lon != null).map(n => [n.lat, n.lon]);
-  if (coords.length === 0) { toast(t('toast.no_coords'), 'error'); return; }
+  if (coords.length === 0) { toast(t('nodes.toast.no_coords'), 'error'); return; }
   if (coords.length === 1) { _map.setView(coords[0], 14); return; }
   _map.fitBounds(L.latLngBounds(coords), { padding: [40, 40] });
 }
@@ -1938,32 +1938,32 @@ function renderImportExport() {
   el.innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:800px">
       <div class="ie-card">
-        <h3>${t('ie.json_title')}</h3>
-        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.json_desc')}</p>
+        <h3>${t('import_export.json_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.json_desc')}</p>
         <div class="flex gap-8">
-          <button class="btn" onclick="importData()">↑ ${t('btn.import_json')}</button>
-          <button class="btn" onclick="exportData()">↓ ${t('btn.export_json')}</button>
+          <button class="btn" onclick="importData()">↑ ${t('import_export.btn.import_json')}</button>
+          <button class="btn" onclick="exportData()">↓ ${t('import_export.btn.export_json')}</button>
         </div>
       </div>
       <div class="ie-card">
-        <h3>${t('ie.ogf_title')}</h3>
-        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.ogf_desc')}</p>
-        <button class="btn" onclick="startRelationImport()">${t('ie.ogf_btn')}</button>
+        <h3>${t('import_export.ogf_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.ogf_desc')}</p>
+        <button class="btn" onclick="startRelationImport()">${t('import_export.ogf_btn')}</button>
       </div>
       <div class="ie-card">
-        <h3>${t('ie.csv_node_title')}</h3>
-        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.csv_node_desc')}</p>
-        <button class="btn" onclick="startCSVNodeImport()">${t('ie.csv_btn')}</button>
+        <h3>${t('import_export.csv_node_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.csv_node_desc')}</p>
+        <button class="btn" onclick="startCSVNodeImport()">${t('import_export.csv_btn')}</button>
       </div>
       <div class="ie-card">
-        <h3>${t('ie.csv_seg_title')}</h3>
-        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.csv_seg_desc')}</p>
-        <button class="btn" onclick="startCSVSegmentImport()">${t('ie.csv_btn')}</button>
+        <h3>${t('import_export.csv_seg_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.csv_seg_desc')}</p>
+        <button class="btn" onclick="startCSVSegmentImport()">${t('import_export.csv_btn')}</button>
       </div>
       <div class="ie-card">
-        <h3>${t('ie.saves_title')}</h3>
-        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.saves_desc')}</p>
-        <button class="btn" onclick="openSaveManager()">${t('ie.manage_saves')}</button>
+        <h3>${t('import_export.saves_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.saves_desc')}</p>
+        <button class="btn" onclick="openSaveManager()">${t('import_export.manage_saves')}</button>
       </div>
     </div>`;
 }
@@ -2003,10 +2003,10 @@ function _relRenderStep(n) {
     return `<div class="csv-wizard-header">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
         <div>
-          <h2 style="font-family:var(--font-display);font-size:22px;font-weight:600;margin-bottom:2px">${t('rel.title')}</h2>
-          <div class="text-dim" style="font-size:13px">${t('csv.step_of', { n: step, total: totalSteps })}: ${title}</div>
+          <h2 style="font-family:var(--font-display);font-size:22px;font-weight:600;margin-bottom:2px">${t('import_export.rel.title')}</h2>
+          <div class="text-dim" style="font-size:13px">${t('import_export.csv.step_of', { n: step, total: totalSteps })}: ${title}</div>
         </div>
-        <button class="btn" onclick="_relCancel()">${t('btn.cancel')}</button>
+        <button class="btn" onclick="_relCancel()">${t('common.btn.cancel')}</button>
       </div>
       <div class="csv-step-bar">${Array.from({length: totalSteps}, (_, i) =>
         `<div class="csv-step-dot${i + 1 <= step ? ' active' : ''}${i + 1 === step ? ' current' : ''}"></div>`
@@ -2019,8 +2019,8 @@ function _relRenderStep(n) {
     const c = s.config;
     let modesHtml = '';
     if (data.categories.length) {
-      modesHtml = `<div class="form-group"><label>${t('field.allowed_modes')}</label>
-        <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('field.allowed_modes_help')}</p>`;
+      modesHtml = `<div class="form-group"><label>${t('segments.field.allowed_modes')}</label>
+        <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('segments.field.allowed_modes_help')}</p>`;
       for (const cat of data.categories) {
         const checked = c.allowedModes.includes(cat.id) ? 'checked' : '';
         modesHtml += `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:4px">
@@ -2028,33 +2028,33 @@ function _relRenderStep(n) {
       }
       modesHtml += `</div>`;
     }
-    el.innerHTML = header(1, t('rel.step_config')) + `
+    el.innerHTML = header(1, t('import_export.rel.step_config')) + `
       <div style="margin-top:20px;max-width:500px">
-        <div class="form-group"><label>${t('rel.relation_id')}</label>
-          <input type="text" id="rel-id" value="${esc(c.relationId)}" placeholder="${t('rel.relation_id_placeholder')}"
+        <div class="form-group"><label>${t('import_export.rel.relation_id')}</label>
+          <input type="text" id="rel-id" value="${esc(c.relationId)}" placeholder="${t('import_export.rel.relation_id_placeholder')}"
             onchange="_relImportState.config.relationId=this.value.trim()"></div>
         <div class="form-row">
-          <div class="form-group"><label>${t('csv.default_speed')}</label>
+          <div class="form-group"><label>${t('import_export.csv.default_speed')}</label>
             <input type="number" min="1" max="500" value="${c.defaultMaxSpeed}"
               onchange="_relImportState.config.defaultMaxSpeed=parseInt(this.value)||120"></div>
-          <div class="form-group"><label>${t('csv.default_tracks')}</label>
+          <div class="form-group"><label>${t('import_export.csv.default_tracks')}</label>
             <input type="number" min="1" max="20" value="${c.defaultTrackCount}"
               onchange="_relImportState.config.defaultTrackCount=parseInt(this.value)||2"></div>
         </div>
-        <div class="form-group"><label>${t('csv.default_platforms')}</label>
+        <div class="form-group"><label>${t('import_export.csv.default_platforms')}</label>
           <input type="number" min="0" max="50" value="${c.defaultPlatformCount}"
             onchange="_relImportState.config.defaultPlatformCount=parseInt(this.value)||0"></div>
-        <div class="form-group"><label>${t('rel.maxspeed_boundary')}</label>
+        <div class="form-group"><label>${t('import_export.rel.maxspeed_boundary')}</label>
           <select onchange="_relImportState.config.maxspeedBoundary=this.value">
-            <option value="default" ${c.maxspeedBoundary === 'default' ? 'selected' : ''}>${t('rel.maxspeed_default')}</option>
-            <option value="waypoints" ${c.maxspeedBoundary === 'waypoints' ? 'selected' : ''}>${t('rel.maxspeed_waypoints')}</option>
+            <option value="default" ${c.maxspeedBoundary === 'default' ? 'selected' : ''}>${t('import_export.rel.maxspeed_default')}</option>
+            <option value="waypoints" ${c.maxspeedBoundary === 'waypoints' ? 'selected' : ''}>${t('import_export.rel.maxspeed_waypoints')}</option>
           </select></div>
-        <div class="form-group"><label>${t('rel.disambig')}</label>
-          <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('csv.disambig_desc')}</p>
-          <input type="text" value="${esc(c.disambiguationSuffix)}" placeholder="${t('csv.disambig_placeholder')}"
+        <div class="form-group"><label>${t('import_export.rel.disambig')}</label>
+          <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('import_export.csv.disambig_desc')}</p>
+          <input type="text" value="${esc(c.disambiguationSuffix)}" placeholder="${t('import_export.csv.disambig_placeholder')}"
             onchange="_relImportState.config.disambiguationSuffix=this.value.trim()"></div>
         ${modesHtml}
-        <button class="btn btn-primary" onclick="_relFetchAndProcess()" id="rel-fetch-btn">${t('rel.fetch_btn')}</button>
+        <button class="btn btn-primary" onclick="_relFetchAndProcess()" id="rel-fetch-btn">${t('import_export.rel.fetch_btn')}</button>
       </div>`;
     return;
   }
@@ -2063,16 +2063,16 @@ function _relRenderStep(n) {
   if (n === 2) {
     const stations = s.stations;
     let table = `<table class="data-table csv-preview-table"><thead><tr>
-      <th></th><th>${t('field.name')}</th><th>${t('field.type')}</th><th>OGF ID</th>
-      <th>${t('rel.snap_dist')}</th><th></th></tr></thead><tbody>`;
+      <th></th><th>${t('common.field.name')}</th><th>${t('common.field.type')}</th><th>OGF ID</th>
+      <th>${t('import_export.rel.snap_dist')}</th><th></th></tr></thead><tbody>`;
     for (let i = 0; i < stations.length; i++) {
       const st = stations[i];
       if (st._isWaypoint) continue; // hide auto-generated waypoints
       const snapM = Math.round((st._snap?.dist || 0) * 1000);
       const snapWarn = snapM > 50 ? ` style="color:var(--warn)"` : '';
       const dupWarn = st._dupType ? ` style="background:var(--warn-dim)"` : '';
-      const dupLabel = st._dupType === 'ogf' ? t('csv.warn_dup_ogf_existing', { name: st._dupExistingName })
-        : st._dupType === 'batch' ? t('csv.warn_dup_ogf') : '';
+      const dupLabel = st._dupType === 'ogf' ? t('import_export.csv.warn_dup_ogf_existing', { name: st._dupExistingName })
+        : st._dupType === 'batch' ? t('import_export.csv.warn_dup_ogf') : '';
       table += `<tr${dupWarn}>
         <td><input type="checkbox" ${st._include !== false ? 'checked' : ''} onchange="_relImportState.stations[${i}]._include=this.checked"></td>
         <td><input type="text" value="${esc(st.name)}" onchange="_relImportState.stations[${i}].name=this.value.trim()" style="width:180px;font-size:12px"></td>
@@ -2084,13 +2084,13 @@ function _relRenderStep(n) {
     }
     table += `</tbody></table>`;
     const count = stations.filter(st => st._include !== false && !st._isWaypoint).length;
-    el.innerHTML = header(2, t('rel.step_stations')) + `
+    el.innerHTML = header(2, t('import_export.rel.step_stations')) + `
       <div style="margin-top:20px">
-        <div class="text-dim" style="margin-bottom:8px">${t('rel.station_count', { n: count })}</div>
+        <div class="text-dim" style="margin-bottom:8px">${t('import_export.rel.station_count', { n: count })}</div>
         <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
         <div class="flex gap-8" style="margin-top:16px">
-          <button class="btn" onclick="_relRenderStep(1)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_relRenderStep(3)">${t('btn.next')}</button>
+          <button class="btn" onclick="_relRenderStep(1)">${t('common.btn.back')}</button>
+          <button class="btn btn-primary" onclick="_relRenderStep(3)">${t('common.btn.next')}</button>
         </div>
       </div>`;
     return;
@@ -2100,8 +2100,8 @@ function _relRenderStep(n) {
   if (n === 3) {
     const segs = s.segments;
     let table = `<table class="data-table csv-preview-table"><thead><tr>
-      <th></th><th>${t('field.from_node')}</th><th>${t('field.to_node')}</th>
-      <th>${t('field.distance')}</th><th>${t('field.max_speed')}</th><th></th>
+      <th></th><th>${t('segments.field.from_node')}</th><th>${t('segments.field.to_node')}</th>
+      <th>${t('segments.field.distance')}</th><th>${t('segments.field.max_speed')}</th><th></th>
     </tr></thead><tbody>`;
     for (let i = 0; i < segs.length; i++) {
       const seg = segs[i];
@@ -2115,18 +2115,18 @@ function _relRenderStep(n) {
         <td>${esc(fromName)}</td><td>${esc(toName)}</td>
         <td class="mono">${seg.distance}</td>
         <td><input type="number" value="${seg.maxSpeed}" min="1" max="500" onchange="_relImportState.segments[${i}].maxSpeed=parseInt(this.value)||120" style="width:70px;font-size:12px"></td>
-        <td class="text-dim" style="font-size:11px">${seg._dupType ? t('csv.warn_dup_existing') : ''}</td>
+        <td class="text-dim" style="font-size:11px">${seg._dupType ? t('import_export.csv.warn_dup_existing') : ''}</td>
       </tr>`;
     }
     table += `</tbody></table>`;
     const count = segs.filter(sg => sg._include !== false).length;
-    el.innerHTML = header(3, t('rel.step_segments')) + `
+    el.innerHTML = header(3, t('import_export.rel.step_segments')) + `
       <div style="margin-top:20px">
-        <div class="text-dim" style="margin-bottom:8px">${t('csv.review_count', { n: count })}</div>
+        <div class="text-dim" style="margin-bottom:8px">${t('import_export.csv.review_count', { n: count })}</div>
         <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
         <div class="flex gap-8" style="margin-top:16px">
-          <button class="btn" onclick="_relRenderStep(2)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_relRenderStep(4)">${t('btn.next')}</button>
+          <button class="btn" onclick="_relRenderStep(2)">${t('common.btn.back')}</button>
+          <button class="btn btn-primary" onclick="_relRenderStep(4)">${t('common.btn.next')}</button>
         </div>
       </div>`;
     return;
@@ -2137,7 +2137,7 @@ function _relRenderStep(n) {
     const w = s.warnings;
     let html = `<div style="margin-top:20px">`;
     if (!w.length) {
-      html += `<p class="text-dim">${t('rel.no_warnings')}</p>`;
+      html += `<p class="text-dim">${t('import_export.rel.no_warnings')}</p>`;
     } else {
       const grouped = {};
       for (const warn of w) {
@@ -2154,10 +2154,10 @@ function _relRenderStep(n) {
       }
     }
     html += `<div class="flex gap-8" style="margin-top:16px">
-      <button class="btn" onclick="_relRenderStep(3)">${t('btn.back')}</button>
-      <button class="btn btn-primary" onclick="_relRenderStep(5)">${t('btn.next')}</button>
+      <button class="btn" onclick="_relRenderStep(3)">${t('common.btn.back')}</button>
+      <button class="btn btn-primary" onclick="_relRenderStep(5)">${t('common.btn.next')}</button>
     </div></div>`;
-    el.innerHTML = header(4, t('rel.step_warnings')) + html;
+    el.innerHTML = header(4, t('import_export.rel.step_warnings')) + html;
     return;
   }
 
@@ -2165,27 +2165,27 @@ function _relRenderStep(n) {
   if (n === 5) {
     const stCount = s.stations.filter(st => st._include !== false).length;
     const sgCount = s.segments.filter(sg => sg._include !== false).length;
-    el.innerHTML = header(5, t('rel.step_confirm')) + `
+    el.innerHTML = header(5, t('import_export.rel.step_confirm')) + `
       <div style="margin-top:20px;max-width:500px">
         <div class="ie-card" style="margin-bottom:20px">
-          <div style="font-size:16px;font-weight:600;margin-bottom:8px">${t('rel.summary')}</div>
-          <div>${t('rel.importing_stations', { n: stCount })}</div>
-          <div>${t('rel.importing_segments', { n: sgCount })}</div>
-          ${s.warnings.length ? `<div style="color:var(--warn)">${t('rel.warnings_count', { n: s.warnings.length })}</div>` : ''}
+          <div style="font-size:16px;font-weight:600;margin-bottom:8px">${t('import_export.rel.summary')}</div>
+          <div>${t('import_export.rel.importing_stations', { n: stCount })}</div>
+          <div>${t('import_export.rel.importing_segments', { n: sgCount })}</div>
+          ${s.warnings.length ? `<div style="color:var(--warn)">${t('import_export.rel.warnings_count', { n: s.warnings.length })}</div>` : ''}
         </div>
         <div class="ie-card" style="margin-bottom:20px">
-          <div style="font-size:13px;font-weight:600;margin-bottom:8px">${t('rel.whats_left')}</div>
+          <div style="font-size:13px;font-weight:600;margin-bottom:8px">${t('import_export.rel.whats_left')}</div>
           <ul class="text-dim" style="font-size:12px;margin-left:16px;line-height:1.8">
-            <li>${t('rel.manual_junctions')}</li>
-            <li>${t('rel.manual_tracks')}</li>
-            <li>${t('rel.manual_platforms')}</li>
-            <li>${t('rel.manual_services')}</li>
-            <li>${t('rel.manual_lines')}</li>
+            <li>${t('import_export.rel.manual_junctions')}</li>
+            <li>${t('import_export.rel.manual_tracks')}</li>
+            <li>${t('import_export.rel.manual_platforms')}</li>
+            <li>${t('import_export.rel.manual_services')}</li>
+            <li>${t('import_export.rel.manual_lines')}</li>
           </ul>
         </div>
         <div class="flex gap-8">
-          <button class="btn" onclick="_relRenderStep(4)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_relConfirmImport()">${t('csv.btn_import', { n: stCount + sgCount })}</button>
+          <button class="btn" onclick="_relRenderStep(4)">${t('common.btn.back')}</button>
+          <button class="btn btn-primary" onclick="_relConfirmImport()">${t('import_export.csv.btn_import', { n: stCount + sgCount })}</button>
         </div>
       </div>`;
     return;
@@ -2202,13 +2202,13 @@ async function _relFetchAndProcess() {
   const s = _relImportState;
   const c = s.config;
   const relId = c.relationId.replace(/\D/g, '');
-  if (!relId) { toast(t('rel.no_id'), 'error'); return; }
+  if (!relId) { toast(t('import_export.rel.no_id'), 'error'); return; }
 
   const btn = document.getElementById('rel-fetch-btn');
-  if (btn) { btn.disabled = true; btn.textContent = t('rel.fetching'); }
+  if (btn) { btn.disabled = true; btn.textContent = t('import_export.rel.fetching'); }
 
   try {
-    toast(t('rel.fetching'), 'info');
+    toast(t('import_export.rel.fetching'), 'info');
     s.raw = await fetchRelationFull(relId);
     console.log('[Relation Import] Raw fetch result:', s.raw);
     console.log(`[Relation Import] ${s.raw.ways.length} ways, ${s.raw.stops.length} stops, ${s.raw.warnings.length} warnings`);
@@ -2220,8 +2220,8 @@ async function _relFetchAndProcess() {
     _relRenderStep(2);
   } catch (err) {
     console.error('Relation import failed:', err);
-    toast(t('rel.fetch_error', { msg: err.message }), 'error');
-    if (btn) { btn.disabled = false; btn.textContent = t('rel.fetch_btn'); }
+    toast(t('import_export.rel.fetch_error', { msg: err.message }), 'error');
+    if (btn) { btn.disabled = false; btn.textContent = t('import_export.rel.fetch_btn'); }
   }
 }
 
@@ -2253,7 +2253,7 @@ async function _relConfirmImport() {
   window._relImportState = null;
   _relImporting = false;
   refreshAll();
-  toast(t('csv.import_success', { n: stationsToImport.length + segmentsToImport.length }), 'success');
+  toast(t('import_export.csv.import_success', { n: stationsToImport.length + segmentsToImport.length }), 'success');
   renderImportExport();
 }
 
@@ -2313,14 +2313,14 @@ function _csvCancel() {
 
 function _csvStepHeader(stepNum, totalSteps, title) {
   const s = _csvImportState;
-  const modeLabel = s.mode === 'nodes' ? t('csv.mode_nodes') : t('csv.mode_segments');
+  const modeLabel = s.mode === 'nodes' ? t('import_export.csv.mode_nodes') : t('import_export.csv.mode_segments');
   return `<div class="csv-wizard-header">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div>
         <h2 style="font-family:var(--font-display);font-size:22px;font-weight:600;margin-bottom:2px">${modeLabel}</h2>
-        <div class="text-dim" style="font-size:13px">${t('csv.step_of', { n: stepNum, total: totalSteps })}: ${title}</div>
+        <div class="text-dim" style="font-size:13px">${t('import_export.csv.step_of', { n: stepNum, total: totalSteps })}: ${title}</div>
       </div>
-      <button class="btn" onclick="_csvCancel()">${t('btn.cancel')}</button>
+      <button class="btn" onclick="_csvCancel()">${t('common.btn.cancel')}</button>
     </div>
     <div class="csv-step-bar">${Array.from({length: totalSteps}, (_, i) =>
       `<div class="csv-step-dot${i + 1 <= stepNum ? ' active' : ''}${i + 1 === stepNum ? ' current' : ''}"></div>`
@@ -2335,14 +2335,14 @@ function _csvRenderStep(n) {
   const totalSteps = s.mode === 'nodes' ? 6 : 7;
 
   if (n === 1) {
-    el.innerHTML = _csvStepHeader(1, totalSteps, t('csv.step_upload')) + `
+    el.innerHTML = _csvStepHeader(1, totalSteps, t('import_export.csv.step_upload')) + `
       <div class="ie-card" style="max-width:500px;margin-top:20px">
-        <p style="margin-bottom:16px">${t('csv.upload_desc')}</p>
+        <p style="margin-bottom:16px">${t('import_export.csv.upload_desc')}</p>
         <input type="file" accept=".csv,.tsv,.txt" onchange="_csvHandleFile(event)" style="font-size:13px">
         <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
-          <label style="font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px">${t('csv.or_paste')}</label>
-          <textarea id="csv-paste-area" placeholder="${t('csv.paste_placeholder')}" style="width:100%;height:120px;font-family:var(--font-mono);font-size:12px;resize:vertical"></textarea>
-          <button class="btn" style="margin-top:8px" onclick="_csvHandlePaste()">${t('csv.use_pasted')}</button>
+          <label style="font-size:12px;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px">${t('import_export.csv.or_paste')}</label>
+          <textarea id="csv-paste-area" placeholder="${t('import_export.csv.paste_placeholder')}" style="width:100%;height:120px;font-family:var(--font-mono);font-size:12px;resize:vertical"></textarea>
+          <button class="btn" style="margin-top:8px" onclick="_csvHandlePaste()">${t('import_export.csv.use_pasted')}</button>
         </div>
       </div>`;
     return;
@@ -2350,22 +2350,22 @@ function _csvRenderStep(n) {
 
   if (n === 2) {
     const rows = s.file.rows;
-    const delimLabel = s.file.delimiter === '\t' ? t('csv.delim_tab') : t('csv.delim_comma');
+    const delimLabel = s.file.delimiter === '\t' ? t('import_export.csv.delim_tab') : t('import_export.csv.delim_comma');
     let table = `<table class="data-table csv-preview-table"><thead><tr>`;
     const colCount = rows[0]?.length || 0;
-    for (let c = 0; c < colCount; c++) table += `<th>${t('csv.col')} ${c + 1}</th>`;
+    for (let c = 0; c < colCount; c++) table += `<th>${t('import_export.csv.col')} ${c + 1}</th>`;
     table += `</tr></thead><tbody>`;
     for (let r = 0; r < Math.min(rows.length, 5); r++) {
       table += `<tr>${rows[r].map(v => `<td>${esc(v)}</td>`).join('')}</tr>`;
     }
     table += `</tbody></table>`;
-    el.innerHTML = _csvStepHeader(2, totalSteps, t('csv.step_preview')) + `
+    el.innerHTML = _csvStepHeader(2, totalSteps, t('import_export.csv.step_preview')) + `
       <div style="margin-top:20px">
-        <div class="text-dim" style="margin-bottom:8px">${t('csv.detected', { delim: delimLabel, rows: rows.length, cols: colCount })}</div>
+        <div class="text-dim" style="margin-bottom:8px">${t('import_export.csv.detected', { delim: delimLabel, rows: rows.length, cols: colCount })}</div>
         <div style="overflow-x:auto">${table}</div>
         <div class="flex gap-8" style="margin-top:16px">
-          <button class="btn" onclick="_csvRenderStep(1)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_csvRenderStep(3)">${t('btn.next')}</button>
+          <button class="btn" onclick="_csvRenderStep(1)">${t('common.btn.back')}</button>
+          <button class="btn btn-primary" onclick="_csvRenderStep(3)">${t('common.btn.next')}</button>
         </div>
       </div>`;
     return;
@@ -2380,11 +2380,11 @@ function _csvRenderStep(n) {
       for (let c = 0; c < colCount; c++) s.columnMap[c] = 'skip';
     }
     let html = `<div style="margin-top:20px;max-width:700px">`;
-    html += `<p class="text-dim" style="margin-bottom:12px">${t('csv.assign_desc')}</p>`;
+    html += `<p class="text-dim" style="margin-bottom:12px">${t('import_export.csv.assign_desc')}</p>`;
     for (let c = 0; c < colCount; c++) {
       const sample = firstRow[c] || '';
       html += `<div class="csv-assign-row">
-        <div class="csv-assign-label">${t('csv.col')} ${c + 1}</div>
+        <div class="csv-assign-label">${t('import_export.csv.col')} ${c + 1}</div>
         <div class="csv-assign-sample mono">${esc(sample.length > 30 ? sample.slice(0, 30) + '...' : sample)}</div>
         <select onchange="_csvImportState.columnMap[${c}]=this.value" class="csv-assign-select">
           ${fields.map(f => `<option value="${f.key}" ${s.columnMap[c] === f.key ? 'selected' : ''}>${f.label}</option>`).join('')}
@@ -2392,10 +2392,10 @@ function _csvRenderStep(n) {
       </div>`;
     }
     html += `<div class="flex gap-8" style="margin-top:16px">
-      <button class="btn" onclick="_csvRenderStep(2)">${t('btn.back')}</button>
-      <button class="btn btn-primary" onclick="_csvRenderStep(4)">${t('btn.next')}</button>
+      <button class="btn" onclick="_csvRenderStep(2)">${t('common.btn.back')}</button>
+      <button class="btn btn-primary" onclick="_csvRenderStep(4)">${t('common.btn.next')}</button>
     </div></div>`;
-    el.innerHTML = _csvStepHeader(3, totalSteps, t('csv.step_assign')) + html;
+    el.innerHTML = _csvStepHeader(3, totalSteps, t('import_export.csv.step_assign')) + html;
     return;
   }
 
@@ -2419,7 +2419,7 @@ function _csvHandleFile(e) {
 
 function _csvHandlePaste() {
   const raw = (document.getElementById('csv-paste-area')?.value || '').trim();
-  if (!raw) { toast(t('csv.paste_empty'), 'error'); return; }
+  if (!raw) { toast(t('import_export.csv.paste_empty'), 'error'); return; }
   const parsed = parseCSV(raw);
   _csvImportState.file = { name: 'pasted data', raw, delimiter: parsed.delimiter, rows: parsed.rows };
   _csvImportState.columnMap = {};
@@ -2436,7 +2436,7 @@ function _csvRenderNodeStep(n, totalSteps) {
     const hasTypeCol = Object.values(s.columnMap).includes('type');
     let html = `<div style="margin-top:20px;max-width:500px">`;
     if (!hasTypeCol) {
-      html += `<div class="form-group"><label>${t('csv.default_type')}</label>
+      html += `<div class="form-group"><label>${t('import_export.csv.default_type')}</label>
         <select id="csv-def-type" onchange="_csvImportState.defaults.type=this.value">
           <option value="station" ${s.defaults.type === 'station' ? 'selected' : ''}>Station</option>
           <option value="bus_stop" ${s.defaults.type === 'bus_stop' ? 'selected' : ''}>Bus Stop</option>
@@ -2448,14 +2448,14 @@ function _csvRenderNodeStep(n, totalSteps) {
     }
     const hasPlatCol = Object.values(s.columnMap).includes('platforms');
     if (!hasPlatCol) {
-      html += `<div class="form-group"><label>${t('csv.default_platforms')}</label>
+      html += `<div class="form-group"><label>${t('import_export.csv.default_platforms')}</label>
         <input type="number" min="0" max="50" value="${s.defaults.platformCount}" onchange="_csvImportState.defaults.platformCount=parseInt(this.value)||0"></div>`;
     }
     html += `<div class="flex gap-8" style="margin-top:16px">
-      <button class="btn" onclick="_csvRenderStep(3)">${t('btn.back')}</button>
-      <button class="btn btn-primary" onclick="_csvBuildNodePreview()">${t('csv.btn_preview')}</button>
+      <button class="btn" onclick="_csvRenderStep(3)">${t('common.btn.back')}</button>
+      <button class="btn btn-primary" onclick="_csvBuildNodePreview()">${t('import_export.csv.btn_preview')}</button>
     </div></div>`;
-    el.innerHTML = _csvStepHeader(4, totalSteps, t('csv.step_defaults')) + html;
+    el.innerHTML = _csvStepHeader(4, totalSteps, t('import_export.csv.step_defaults')) + html;
     return;
   }
 
@@ -2464,44 +2464,44 @@ function _csvRenderNodeStep(n, totalSteps) {
     const nodes = s.preview;
     const dupes = nodes.map((nd, i) => ({ nd, i })).filter(({ nd }) => nd._dupType);
     if (!dupes.length) {
-      el.innerHTML = _csvStepHeader(5, totalSteps, t('csv.step_dedup')) + `
+      el.innerHTML = _csvStepHeader(5, totalSteps, t('import_export.csv.step_dedup')) + `
         <div style="margin-top:20px">
-          <p class="text-dim">${t('csv.no_dupes')}</p>
+          <p class="text-dim">${t('import_export.csv.no_dupes')}</p>
           <div class="flex gap-8" style="margin-top:16px">
-            <button class="btn" onclick="_csvRenderStep(4)">${t('btn.back')}</button>
-            <button class="btn btn-primary" onclick="_csvRenderStep(6)">${t('btn.next')}</button>
+            <button class="btn" onclick="_csvRenderStep(4)">${t('common.btn.back')}</button>
+            <button class="btn btn-primary" onclick="_csvRenderStep(6)">${t('common.btn.next')}</button>
           </div>
         </div>`;
       return;
     }
     let html = `<div style="margin-top:20px">
-      <p class="text-dim" style="margin-bottom:12px">${t('csv.dedup_node_desc', { n: dupes.length })}</p>
+      <p class="text-dim" style="margin-bottom:12px">${t('import_export.csv.dedup_node_desc', { n: dupes.length })}</p>
       <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
       <table class="data-table csv-preview-table"><thead><tr>
-        <th>${t('csv.importing')}</th><th>${t('csv.existing')}</th><th>${t('csv.conflict')}</th><th>${t('csv.action')}</th>
+        <th>${t('import_export.csv.importing')}</th><th>${t('import_export.csv.existing')}</th><th>${t('import_export.csv.conflict')}</th><th>${t('import_export.csv.action')}</th>
       </tr></thead><tbody>`;
     for (const { nd, i } of dupes) {
       const existName = nd._dupExistingName || '';
       html += `<tr>
         <td>${esc(nd.name || '')} <span class="mono text-dim" style="font-size:11px">${esc(nd.ogfNode || '')}</span></td>
         <td>${esc(existName)}</td>
-        <td class="text-dim" style="font-size:11px">${nd._dupType === 'ogf' ? t('csv.dup_same_ogf') : t('csv.dup_same_batch')}</td>
+        <td class="text-dim" style="font-size:11px">${nd._dupType === 'ogf' ? t('import_export.csv.dup_same_ogf') : t('import_export.csv.dup_same_batch')}</td>
         <td style="white-space:nowrap">
           <select onchange="_csvNodeDedupAction(${i},this.value)" class="csv-match-select">
-            <option value="skip" ${nd._include === false ? 'selected' : ''}>${t('csv.action_skip')}</option>
-            <option value="disambig" ${nd._include !== false ? 'selected' : ''}>${t('csv.action_disambig')}</option>
+            <option value="skip" ${nd._include === false ? 'selected' : ''}>${t('import_export.csv.action_skip')}</option>
+            <option value="disambig" ${nd._include !== false ? 'selected' : ''}>${t('import_export.csv.action_disambig')}</option>
           </select>
-          ${nd._include !== false ? `<input type="text" value="${esc(nd._disambig || '')}" placeholder="${t('csv.disambig_placeholder')}"
+          ${nd._include !== false ? `<input type="text" value="${esc(nd._disambig || '')}" placeholder="${t('import_export.csv.disambig_placeholder')}"
             onchange="_csvNodeSetDisambig(${i},this.value)" style="width:120px;margin-left:6px;font-size:12px">` : ''}
         </td>
       </tr>`;
     }
     html += `</tbody></table></div>
       <div class="flex gap-8" style="margin-top:16px">
-        <button class="btn" onclick="_csvRenderStep(4)">${t('btn.back')}</button>
-        <button class="btn btn-primary" onclick="_csvApplyNodeDedup();_csvRenderStep(6)">${t('btn.next')}</button>
+        <button class="btn" onclick="_csvRenderStep(4)">${t('common.btn.back')}</button>
+        <button class="btn btn-primary" onclick="_csvApplyNodeDedup();_csvRenderStep(6)">${t('common.btn.next')}</button>
       </div></div>`;
-    el.innerHTML = _csvStepHeader(5, totalSteps, t('csv.step_dedup')) + html;
+    el.innerHTML = _csvStepHeader(5, totalSteps, t('import_export.csv.step_dedup')) + html;
     return;
   }
 
@@ -2509,8 +2509,8 @@ function _csvRenderNodeStep(n, totalSteps) {
     // Final review
     const nodes = s.preview;
     let table = `<table class="data-table csv-preview-table"><thead><tr>
-      <th></th><th>${t('field.name')}</th><th>${t('field.type')}</th><th>${t('field.ogf_node')}</th>
-      <th>${t('field.platforms')}</th><th></th></tr></thead><tbody>`;
+      <th></th><th>${t('common.field.name')}</th><th>${t('common.field.type')}</th><th>${t('nodes.field.ogf_node')}</th>
+      <th>${t('nodes.field.platforms')}</th><th></th></tr></thead><tbody>`;
     for (let i = 0; i < nodes.length; i++) {
       const nd = nodes[i];
       const warn = nd._warn ? ` style="background:var(--warn-dim)"` : '';
@@ -2523,13 +2523,13 @@ function _csvRenderNodeStep(n, totalSteps) {
     }
     table += `</tbody></table>`;
     const count = nodes.filter(nd => nd._include !== false).length;
-    el.innerHTML = _csvStepHeader(6, totalSteps, t('csv.step_review')) + `
+    el.innerHTML = _csvStepHeader(6, totalSteps, t('import_export.csv.step_review')) + `
       <div style="margin-top:20px">
-        <div class="text-dim" style="margin-bottom:8px">${t('csv.review_count', { n: count })}</div>
+        <div class="text-dim" style="margin-bottom:8px">${t('import_export.csv.review_count', { n: count })}</div>
         <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
         <div class="flex gap-8" style="margin-top:16px">
-          <button class="btn" onclick="_csvRenderStep(5)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_csvConfirmNodeImport()">${t('csv.btn_import', { n: count })}</button>
+          <button class="btn" onclick="_csvRenderStep(5)">${t('common.btn.back')}</button>
+          <button class="btn btn-primary" onclick="_csvConfirmNodeImport()">${t('import_export.csv.btn_import', { n: count })}</button>
         </div>
       </div>`;
     return;
@@ -2560,8 +2560,8 @@ function _csvBuildNodePreview() {
     }
 
     let warn = '', include = true, dupType = null, dupExistingName = '';
-    if (!name && !ogfNode) { warn = t('csv.warn_no_name_or_ogf'); include = false; }
-    else if (!name) warn = t('csv.warn_no_name');
+    if (!name && !ogfNode) { warn = t('import_export.csv.warn_no_name_or_ogf'); include = false; }
+    else if (!name) warn = t('import_export.csv.warn_no_name');
     // Dedup: tag conflicts for the dedup review step (don't auto-exclude)
     if (ogfNode) {
       const existingNode = data.nodes.find(n => String(n.ogfNode) === ogfNode);
@@ -2608,7 +2608,7 @@ async function _csvConfirmNodeImport() {
   _csvImporting = true;
   const s = _csvImportState;
   const toImport = s.preview.filter(n => n._include !== false);
-  if (!toImport.length) { toast(t('csv.nothing_to_import'), 'error'); _csvImporting = false; return; }
+  if (!toImport.length) { toast(t('import_export.csv.nothing_to_import'), 'error'); _csvImporting = false; return; }
 
   // Clean temp properties and push
   for (const n of toImport) { delete n._include; delete n._warn; }
@@ -2617,7 +2617,7 @@ async function _csvConfirmNodeImport() {
   // Fetch OGF data for nodes with OGF IDs
   const withOgf = toImport.filter(n => n.ogfNode);
   if (withOgf.length) {
-    toast(t('csv.fetching_ogf', { n: withOgf.length }), 'info');
+    toast(t('import_export.csv.fetching_ogf', { n: withOgf.length }), 'info');
     await fetchOgfCoords(withOgf, { updateTags: true });
   }
 
@@ -2626,7 +2626,7 @@ async function _csvConfirmNodeImport() {
   window._csvImportState = null;
   _csvImporting = false;
   refreshAll();
-  toast(t('csv.import_success', { n: toImport.length }), 'success');
+  toast(t('import_export.csv.import_success', { n: toImport.length }), 'success');
   renderImportExport();
 }
 
@@ -2643,11 +2643,11 @@ function _csvRenderSegStep(n, totalSteps) {
     const fieldCol = _csvFieldCol();
 
     let html = `<div style="margin-top:20px">
-      <p class="text-dim" style="margin-bottom:12px">${t('csv.match_desc')}</p>
+      <p class="text-dim" style="margin-bottom:12px">${t('import_export.csv.match_desc')}</p>
       <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
       <table class="data-table csv-preview-table"><thead><tr>
-        <th>${t('csv.row')}</th><th>${t('csv.from_input')}</th><th>${t('csv.from_match')}</th>
-        <th>${t('csv.to_input')}</th><th>${t('csv.to_match')}</th></tr></thead><tbody>`;
+        <th>${t('import_export.csv.row')}</th><th>${t('import_export.csv.from_input')}</th><th>${t('import_export.csv.matched_node')}</th>
+        <th>${t('import_export.csv.to_input')}</th><th>${t('import_export.csv.matched_node')}</th></tr></thead><tbody>`;
 
     for (let i = 0; i < rows.length; i++) {
       const m = matches[i] || {};
@@ -2666,10 +2666,10 @@ function _csvRenderSegStep(n, totalSteps) {
     }
     html += `</tbody></table></div>
       <div class="flex gap-8" style="margin-top:16px">
-        <button class="btn" onclick="_csvRenderStep(3)">${t('btn.back')}</button>
-        <button class="btn btn-primary" onclick="_csvRenderStep(5)">${t('btn.next')}</button>
+        <button class="btn" onclick="_csvRenderStep(3)">${t('common.btn.back')}</button>
+        <button class="btn btn-primary" onclick="_csvRenderStep(5)">${t('common.btn.next')}</button>
       </div></div>`;
-    el.innerHTML = _csvStepHeader(4, totalSteps, t('csv.step_matching')) + html;
+    el.innerHTML = _csvStepHeader(4, totalSteps, t('import_export.csv.step_matching')) + html;
     return;
   }
 
@@ -2680,24 +2680,24 @@ function _csvRenderSegStep(n, totalSteps) {
     const hasTracks = Object.values(s.columnMap).includes('trackCount');
     const hasElec = Object.values(s.columnMap).includes('electrification');
     if (!hasSpeed) {
-      html += `<div class="form-group"><label>${t('csv.default_speed')}</label>
+      html += `<div class="form-group"><label>${t('import_export.csv.default_speed')}</label>
         <input type="number" min="1" max="500" value="${s.defaults.maxSpeed}" onchange="_csvImportState.defaults.maxSpeed=parseInt(this.value)||120"></div>`;
     }
     if (!hasTracks) {
-      html += `<div class="form-group"><label>${t('csv.default_tracks')}</label>
+      html += `<div class="form-group"><label>${t('import_export.csv.default_tracks')}</label>
         <input type="number" min="1" max="20" value="${s.defaults.trackCount}" onchange="_csvImportState.defaults.trackCount=parseInt(this.value)||2"></div>`;
     }
     if (!hasElec) {
-      html += `<div class="form-group"><label>${t('csv.default_elec')}</label>
+      html += `<div class="form-group"><label>${t('import_export.csv.default_elec')}</label>
         <select onchange="_csvImportState.defaults.electrification=this.value==='true'">
-          <option value="true" ${s.defaults.electrification ? 'selected' : ''}>${t('seg_detail.electrified')}</option>
-          <option value="false" ${!s.defaults.electrification ? 'selected' : ''}>${t('seg_detail.not_electrified')}</option>
+          <option value="true" ${s.defaults.electrification ? 'selected' : ''}>${t('segments.detail.electrified')}</option>
+          <option value="false" ${!s.defaults.electrification ? 'selected' : ''}>${t('segments.detail.not_electrified')}</option>
         </select></div>`;
     }
     // Allowed modes — always shown (no CSV column for this)
     if (data.categories.length) {
-      html += `<div class="form-group"><label>${t('field.allowed_modes')}</label>
-        <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('field.allowed_modes_help')}</p>`;
+      html += `<div class="form-group"><label>${t('segments.field.allowed_modes')}</label>
+        <p class="text-dim" style="font-size:12px;margin-bottom:6px">${t('segments.field.allowed_modes_help')}</p>`;
       for (const cat of data.categories) {
         const checked = s.defaults.allowedModes.includes(cat.id) ? 'checked' : '';
         html += `<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:4px">
@@ -2706,10 +2706,10 @@ function _csvRenderSegStep(n, totalSteps) {
       html += `</div>`;
     }
     html += `<div class="flex gap-8" style="margin-top:16px">
-      <button class="btn" onclick="_csvRenderStep(4)">${t('btn.back')}</button>
-      <button class="btn btn-primary" onclick="_csvBuildSegPreview()">${t('csv.btn_preview')}</button>
+      <button class="btn" onclick="_csvRenderStep(4)">${t('common.btn.back')}</button>
+      <button class="btn btn-primary" onclick="_csvBuildSegPreview()">${t('import_export.csv.btn_preview')}</button>
     </div></div>`;
-    el.innerHTML = _csvStepHeader(5, totalSteps, t('csv.step_defaults')) + html;
+    el.innerHTML = _csvStepHeader(5, totalSteps, t('import_export.csv.step_defaults')) + html;
     return;
   }
 
@@ -2718,45 +2718,45 @@ function _csvRenderSegStep(n, totalSteps) {
     const segs = s.preview;
     const dupes = segs.map((seg, i) => ({ seg, i })).filter(({ seg }) => seg._dupType);
     if (!dupes.length) {
-      el.innerHTML = _csvStepHeader(6, totalSteps, t('csv.step_dedup')) + `
+      el.innerHTML = _csvStepHeader(6, totalSteps, t('import_export.csv.step_dedup')) + `
         <div style="margin-top:20px">
-          <p class="text-dim">${t('csv.no_dupes')}</p>
+          <p class="text-dim">${t('import_export.csv.no_dupes')}</p>
           <div class="flex gap-8" style="margin-top:16px">
-            <button class="btn" onclick="_csvRenderStep(5)">${t('btn.back')}</button>
-            <button class="btn btn-primary" onclick="_csvRenderStep(7)">${t('btn.next')}</button>
+            <button class="btn" onclick="_csvRenderStep(5)">${t('common.btn.back')}</button>
+            <button class="btn btn-primary" onclick="_csvRenderStep(7)">${t('common.btn.next')}</button>
           </div>
         </div>`;
       return;
     }
     let html = `<div style="margin-top:20px">
-      <p class="text-dim" style="margin-bottom:12px">${t('csv.dedup_seg_desc', { n: dupes.length })}</p>
+      <p class="text-dim" style="margin-bottom:12px">${t('import_export.csv.dedup_seg_desc', { n: dupes.length })}</p>
       <div style="overflow-x:auto;max-height:450px;overflow-y:auto">
       <table class="data-table csv-preview-table"><thead><tr>
-        <th>${t('csv.importing')}</th><th>${t('csv.conflict')}</th><th>${t('csv.action')}</th>
+        <th>${t('import_export.csv.importing')}</th><th>${t('import_export.csv.conflict')}</th><th>${t('import_export.csv.action')}</th>
       </tr></thead><tbody>`;
     for (const { seg, i } of dupes) {
       const fromName = getNode(seg.nodeA) ? nodeDisplayName(seg.nodeA) : '?';
       const toName = getNode(seg.nodeB) ? nodeDisplayName(seg.nodeB) : '?';
-      const typeLabel = seg._dupType === 'pair' ? t('csv.dup_same_endpoints')
-        : seg._dupType === 'ways' ? t('csv.dup_same_ways')
-        : t('csv.dup_same_batch');
+      const typeLabel = seg._dupType === 'pair' ? t('import_export.csv.dup_same_endpoints')
+        : seg._dupType === 'ways' ? t('import_export.csv.dup_same_ways')
+        : t('import_export.csv.dup_same_batch');
       html += `<tr>
         <td>${esc(fromName)} \u2192 ${esc(toName)}</td>
         <td class="text-dim" style="font-size:11px">${typeLabel}</td>
         <td>
           <select onchange="_csvImportState.preview[${i}]._include=this.value==='keep'" class="csv-match-select">
-            <option value="skip" ${seg._include === false ? 'selected' : ''}>${t('csv.action_skip')}</option>
-            <option value="keep" ${seg._include !== false ? 'selected' : ''}>${t('csv.action_keep')}</option>
+            <option value="skip" ${seg._include === false ? 'selected' : ''}>${t('import_export.csv.action_skip')}</option>
+            <option value="keep" ${seg._include !== false ? 'selected' : ''}>${t('import_export.csv.action_keep')}</option>
           </select>
         </td>
       </tr>`;
     }
     html += `</tbody></table></div>
       <div class="flex gap-8" style="margin-top:16px">
-        <button class="btn" onclick="_csvRenderStep(5)">${t('btn.back')}</button>
-        <button class="btn btn-primary" onclick="_csvRenderStep(7)">${t('btn.next')}</button>
+        <button class="btn" onclick="_csvRenderStep(5)">${t('common.btn.back')}</button>
+        <button class="btn btn-primary" onclick="_csvRenderStep(7)">${t('common.btn.next')}</button>
       </div></div>`;
-    el.innerHTML = _csvStepHeader(6, totalSteps, t('csv.step_dedup')) + html;
+    el.innerHTML = _csvStepHeader(6, totalSteps, t('import_export.csv.step_dedup')) + html;
     return;
   }
 
@@ -2764,8 +2764,8 @@ function _csvRenderSegStep(n, totalSteps) {
     // Final review
     const segs = s.preview;
     let table = `<table class="data-table csv-preview-table"><thead><tr>
-      <th></th><th>${t('field.from_node')}</th><th>${t('field.to_node')}</th>
-      <th>${t('field.distance')}</th><th>${t('field.max_speed')}</th><th>${t('field.tracks')}</th><th></th>
+      <th></th><th>${t('segments.field.from_node')}</th><th>${t('segments.field.to_node')}</th>
+      <th>${t('segments.field.distance')}</th><th>${t('segments.field.max_speed')}</th><th>${t('segments.field.tracks')}</th><th></th>
     </tr></thead><tbody>`;
     for (let i = 0; i < segs.length; i++) {
       const seg = segs[i];
@@ -2782,13 +2782,13 @@ function _csvRenderSegStep(n, totalSteps) {
     }
     table += `</tbody></table>`;
     const count = segs.filter(s => s._include !== false).length;
-    el.innerHTML = _csvStepHeader(7, totalSteps, t('csv.step_review')) + `
+    el.innerHTML = _csvStepHeader(7, totalSteps, t('import_export.csv.step_review')) + `
       <div style="margin-top:20px">
-        <div class="text-dim" style="margin-bottom:8px">${t('csv.review_count', { n: count })}</div>
+        <div class="text-dim" style="margin-bottom:8px">${t('import_export.csv.review_count', { n: count })}</div>
         <div style="overflow-x:auto;max-height:400px;overflow-y:auto">${table}</div>
         <div class="flex gap-8" style="margin-top:16px">
-          <button class="btn" onclick="_csvRenderStep(6)">${t('btn.back')}</button>
-          <button class="btn btn-primary" onclick="_csvConfirmSegImport()">${t('csv.btn_import', { n: count })}</button>
+          <button class="btn" onclick="_csvRenderStep(6)">${t('common.btn.back')}</button>
+          <button class="btn btn-primary" onclick="_csvConfirmSegImport()">${t('import_export.csv.btn_import', { n: count })}</button>
         </div>
       </div>`;
     return;
@@ -2826,8 +2826,8 @@ function _csvBuildSegNodeMatches() {
       const fromRes = _csvResolveEndpoint(row, fieldCol, 'from');
       const toRes = _csvResolveEndpoint(row, fieldCol, 'to');
 
-      const fromWarn = fromRes.mode === 'ogf' && fromRes.matches.length > 1 ? t('csv.warn_dup_ogf_match') : '';
-      const toWarn = toRes.mode === 'ogf' && toRes.matches.length > 1 ? t('csv.warn_dup_ogf_match') : '';
+      const fromWarn = fromRes.mode === 'ogf' && fromRes.matches.length > 1 ? t('import_export.csv.warn_dup_ogf_match') : '';
+      const toWarn = toRes.mode === 'ogf' && toRes.matches.length > 1 ? t('import_export.csv.warn_dup_ogf_match') : '';
 
       s.nodeMatches[i] = {
         from: fromRes.matches, to: toRes.matches,
@@ -2851,9 +2851,9 @@ function _csvMatchSelect(rowIdx, direction, matches) {
   const s = _csvImportState;
   const entry = s.nodeMatches[rowIdx];
   const selected = direction === 'from' ? entry?.fromSelected : entry?.toSelected;
-  if (!matches.length) return `<span class="csv-match-none">${t('csv.no_match')}</span>`;
+  if (!matches.length) return `<span class="csv-match-none">${t('import_export.csv.no_match')}</span>`;
   let html = `<select onchange="_csvImportState.nodeMatches[${rowIdx}].${direction}Selected=this.value||null" class="csv-match-select">`;
-  html += `<option value="">${t('csv.select_node')}</option>`;
+  html += `<option value="">${t('import_export.csv.select_node')}</option>`;
   for (const m of matches) {
     const label = `${nodeDisplayName(m.node.id)} (${m.method})`;
     html += `<option value="${m.node.id}" ${selected === m.node.id ? 'selected' : ''}>${esc(label)}</option>`;
@@ -2906,10 +2906,10 @@ function _csvBuildSegPreview() {
     for (let tk = 1; tk <= trackCount; tk++) tracks.push({ id: uid(), name: `Track ${tk}` });
 
     let warn = '', include = true, dupType = null;
-    if (!fromId && !toId) { warn = t('csv.warn_no_nodes'); include = false; }
-    else if (!fromId) { warn = t('csv.warn_no_from'); include = false; }
-    else if (!toId) { warn = t('csv.warn_no_to'); include = false; }
-    else if (fromId === toId) { warn = t('csv.warn_same_node'); include = false; }
+    if (!fromId && !toId) { warn = t('import_export.csv.warn_no_nodes'); include = false; }
+    else if (!fromId) { warn = t('import_export.csv.warn_no_from'); include = false; }
+    else if (!toId) { warn = t('import_export.csv.warn_no_to'); include = false; }
+    else if (fromId === toId) { warn = t('import_export.csv.warn_same_node'); include = false; }
 
     // Duplicate tagging for the dedup review step
     if (fromId && toId && fromId !== toId) {
@@ -2949,7 +2949,7 @@ async function _csvConfirmSegImport() {
   _csvImporting = true;
   const s = _csvImportState;
   const toImport = s.preview.filter(seg => seg._include !== false);
-  if (!toImport.length) { toast(t('csv.nothing_to_import'), 'error'); _csvImporting = false; return; }
+  if (!toImport.length) { toast(t('import_export.csv.nothing_to_import'), 'error'); _csvImporting = false; return; }
 
   for (const seg of toImport) { delete seg._include; delete seg._warn; }
   data.segments.push(...toImport);
@@ -2957,7 +2957,7 @@ async function _csvConfirmSegImport() {
   // Fetch way geometry for segments with OGF Way IDs — single batch API call
   const withWays = toImport.filter(seg => seg.ogfWayIds?.length);
   if (withWays.length) {
-    toast(t('csv.fetching_ways', { n: withWays.length }), 'info');
+    toast(t('import_export.csv.fetching_ways', { n: withWays.length }), 'info');
     try {
       const allWayIds = withWays.flatMap(seg => seg.ogfWayIds);
       const wayCache = await fetchWayGeometryBatch(allWayIds);
@@ -2972,8 +2972,8 @@ async function _csvConfirmSegImport() {
         if (nA?.lat != null && nB?.lat != null) {
           const snapA = _snapToPolyline([nA.lat, nA.lon], coords);
           const snapB = _snapToPolyline([nB.lat, nB.lon], coords);
-          if (snapA.dist > 0.05) toast(t('toast.snap_warn', { name: nA.name, m: Math.round(snapA.dist * 1000) }), 'error');
-          if (snapB.dist > 0.05) toast(t('toast.snap_warn', { name: nB.name, m: Math.round(snapB.dist * 1000) }), 'error');
+          if (snapA.dist > 0.05) toast(t('segments.toast.snap_warn', { name: nA.name, m: Math.round(snapA.dist * 1000) }), 'error');
+          if (snapB.dist > 0.05) toast(t('segments.toast.snap_warn', { name: nB.name, m: Math.round(snapB.dist * 1000) }), 'error');
           coords = _slicePolyline(coords, snapA, snapB);
 
           // _slicePolyline orders by polyline direction, not by A/B.
@@ -3001,7 +3001,7 @@ async function _csvConfirmSegImport() {
       }
     } catch (err) {
       console.error('Batch way fetch failed:', err);
-      toast(t('toast.way_fetch_error', { msg: err.message }), 'error');
+      toast(t('segments.toast.way_fetch_error', { msg: err.message }), 'error');
     }
   }
 
@@ -3010,7 +3010,7 @@ async function _csvConfirmSegImport() {
   window._csvImportState = null;
   _csvImporting = false;
   refreshAll();
-  toast(t('csv.import_success', { n: toImport.length }), 'success');
+  toast(t('import_export.csv.import_success', { n: toImport.length }), 'success');
   renderImportExport();
 }
 
@@ -3020,11 +3020,11 @@ async function _csvConfirmSegImport() {
 function renderDashboard() {
   const totalKm = data.segments.reduce((s, seg) => s + (seg.distance || 0), 0);
   document.getElementById('dashboard-stats').innerHTML = [
-    [t('btn.stat_nodes'), data.nodes.length], [t('btn.stat_stations'), data.nodes.filter(n => n.type === 'station').length],
-    [t('btn.stat_bus_stops'), data.nodes.filter(n => n.type === 'bus_stop').length],
-    [t('btn.stat_segments'), data.segments.length], [t('btn.stat_track_km'), totalKm.toFixed(1)],
-    [t('btn.stat_stock'), data.rollingStock.length], [t('btn.stat_services'), data.services.length],
-    [t('btn.stat_departures'), data.departures.length],
+    [t('dashboard.stat.nodes'), data.nodes.length], [t('dashboard.stat.stations'), data.nodes.filter(n => n.type === 'station').length],
+    [t('dashboard.stat.bus_stops'), data.nodes.filter(n => n.type === 'bus_stop').length],
+    [t('dashboard.stat.segments'), data.segments.length], [t('dashboard.stat.track_km'), totalKm.toFixed(1)],
+    [t('dashboard.stat.stock'), data.rollingStock.length], [t('dashboard.stat.services'), data.services.length],
+    [t('dashboard.stat.departures'), data.departures.length],
   ].map(([l, v]) => `<div class="stat-card"><div class="stat-value">${v}</div><div class="stat-label">${l}</div></div>`).join('');
 
   let content = '';

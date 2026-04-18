@@ -16,7 +16,7 @@
     <div class="logo"><div class="icon">⬡</div>BRIXYmanager <span id="system-name-header" style="font-weight:400;opacity:0.6;margin-left:4px"></span></div>
     <div class="actions">
       <div class="saves-dropdown" id="saves-dropdown">
-        <button class="btn btn-sm" onclick="toggleSavesDropdown(event)">💾 <span id="saves-dropdown-label" data-t="btn.saves">Saves</span> <span style="font-size:10px;opacity:0.5">▾</span></button>
+        <button class="btn btn-sm" onclick="toggleSavesDropdown(event)">💾 <span id="saves-dropdown-label" data-t="common.btn.saves">Saves</span> <span style="font-size:10px;opacity:0.5">▾</span></button>
         <div class="saves-dropdown-menu" id="saves-dropdown-menu"></div>
       </div>
     </div>
@@ -48,19 +48,19 @@
     <div class="content">
       <!-- DASHBOARD -->
       <div class="tab-panel active" id="panel-dashboard">
-        <div class="page-header"><div><h1 data-t="page.dashboard">Dashboard</h1><div class="subtitle" data-t="subtitle.dashboard">Network overview at a glance</div></div></div>
+        <div class="page-header"><div><h1 data-t="dashboard.title">Dashboard</h1><div class="subtitle" data-t="dashboard.subtitle">Network overview at a glance</div></div></div>
         <div class="stats-row" id="dashboard-stats"></div>
         <div id="dashboard-content"></div>
       </div>
       <!-- NODES -->
       <div class="tab-panel" id="panel-nodes">
         <div id="nodes-header">
-          <div class="page-header"><div><h1 data-t="page.nodes">Nodes</h1><div class="subtitle" data-t="subtitle.nodes">Stations, junctions, waypoints, depots and freight yards</div></div>
+          <div class="page-header"><div><h1 data-t="nodes.title">Nodes</h1><div class="subtitle" data-t="nodes.subtitle">Stations, junctions, waypoints, depots and freight yards</div></div>
           <div class="flex gap-8">
-            <button class="btn" onclick="fetchAllOgfCoords()" data-t-title="tooltip.fetch_ogf" title="Fetch coordinates from OGF for all nodes with OGF IDs">🌐 <span data-t="btn.update_coords">Update Coords</span></button>
-            <button class="btn btn-primary" onclick="openNodeModal()" data-t="btn.add_node">+ Add Node</button>
+            <button class="btn" onclick="fetchAllOgfCoords()" data-t-title="nodes.tooltip.fetch_ogf" title="Fetch coordinates from OGF for all nodes with OGF IDs">🌐 <span data-t="nodes.btn.update_coords">Update Coords</span></button>
+            <button class="btn btn-primary" onclick="openNodeModal()" data-t="nodes.btn.add">+ Add Node</button>
           </div></div>
-          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="node-search" placeholder="Search nodes..." data-t-placeholder="placeholder.search_nodes" oninput="renderNodes()"></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="node-search" placeholder="Search nodes..." data-t-placeholder="nodes.placeholder.search" oninput="renderNodes()"></div>
         </div>
         <div id="nodes-list"></div>
         <div id="node-detail"></div>
@@ -68,9 +68,9 @@
       <!-- SEGMENTS -->
       <div class="tab-panel" id="panel-segments">
         <div id="segments-header">
-          <div class="page-header"><div><h1 data-t="page.segments">Segments</h1><div class="subtitle" data-t="subtitle.segments">Track connections between nodes</div></div>
-          <button class="btn btn-primary" onclick="openSegmentModal()" data-t="btn.add_segment">+ Add Segment</button></div>
-          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="segment-search" placeholder="Search segments..." data-t-placeholder="placeholder.search_segments" oninput="renderSegments()"></div>
+          <div class="page-header"><div><h1 data-t="segments.title">Segments</h1><div class="subtitle" data-t="segments.subtitle">Track connections between nodes</div></div>
+          <button class="btn btn-primary" onclick="openSegmentModal()" data-t="segments.btn.add">+ Add Segment</button></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="segment-search" placeholder="Search segments..." data-t-placeholder="segments.placeholder.search" oninput="renderSegments()"></div>
         </div>
         <div id="segments-list"></div>
         <div id="segment-detail"></div>
@@ -78,50 +78,50 @@
       <!-- LINES -->
       <div class="tab-panel" id="panel-lines">
         <div id="lines-header">
-          <div class="page-header"><div><h1 data-t="page.lines">Lines</h1><div class="subtitle" data-t="subtitle.lines">Service lines with color coding and route coverage</div></div>
-          <button class="btn btn-primary" onclick="openLineModal()" data-t="btn.add_line">+ Add Line</button></div>
-          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="line-search" placeholder="Search lines..." data-t-placeholder="placeholder.search_lines" oninput="renderLines()"></div>
+          <div class="page-header"><div><h1 data-t="lines.title">Lines</h1><div class="subtitle" data-t="lines.subtitle">Service lines with color coding and route coverage</div></div>
+          <button class="btn btn-primary" onclick="openLineModal()" data-t="lines.btn.add">+ Add Line</button></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="line-search" placeholder="Search lines..." data-t-placeholder="lines.placeholder.search" oninput="renderLines()"></div>
         </div>
         <div id="lines-list"></div>
         <div id="line-detail"></div>
       </div>
       <!-- CATEGORIES -->
       <div class="tab-panel" id="panel-modes">
-        <div class="page-header"><div><h1 data-t="page.modes">Service Modes</h1><div class="subtitle" data-t="subtitle.modes">Define types of rail services</div></div>
-        <button class="btn btn-primary" onclick="openCategoryModal()" data-t="btn.add_mode">+ Add Mode</button></div>
+        <div class="page-header"><div><h1 data-t="modes.title">Service Modes</h1><div class="subtitle" data-t="modes.subtitle">Define types of rail services</div></div>
+        <button class="btn btn-primary" onclick="openCategoryModal()" data-t="modes.btn.add">+ Add Mode</button></div>
         <div id="modes-list"></div>
       </div>
       <!-- ROLLING STOCK -->
       <div class="tab-panel" id="panel-stock">
-        <div class="page-header"><div><h1 data-t="page.stock">Rolling Stock</h1><div class="subtitle" data-t="subtitle.stock">Train types and their properties</div></div>
-        <button class="btn btn-primary" onclick="openStockModal()" data-t="btn.add_stock">+ Add Stock Type</button></div>
+        <div class="page-header"><div><h1 data-t="stock.title">Rolling Stock</h1><div class="subtitle" data-t="stock.subtitle">Train types and their properties</div></div>
+        <button class="btn btn-primary" onclick="openStockModal()" data-t="stock.btn.add">+ Add Stock Type</button></div>
         <div id="stock-list"></div>
         <div id="stock-matrix"></div>
       </div>
       <!-- SERVICES -->
       <div class="tab-panel" id="panel-services">
         <div id="services-header">
-          <div class="page-header"><div><h1 data-t="page.services">Services</h1><div class="subtitle" data-t="subtitle.services">Route templates defining train paths</div></div>
-          <button class="btn btn-primary" onclick="openServiceModal()" data-t="btn.add_service">+ Add Service</button></div>
-          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="service-search" placeholder="Search services..." data-t-placeholder="placeholder.search_services" oninput="renderServices()"></div>
+          <div class="page-header"><div><h1 data-t="services.title">Services</h1><div class="subtitle" data-t="services.subtitle">Route templates defining train paths</div></div>
+          <button class="btn btn-primary" onclick="openServiceModal()" data-t="services.btn.add">+ Add Service</button></div>
+          <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="service-search" placeholder="Search services..." data-t-placeholder="services.placeholder.search" oninput="renderServices()"></div>
         </div>
         <div id="services-list"></div>
         <div id="service-detail"></div>
       </div>
       <!-- SCHEDULE -->
       <div class="tab-panel" id="panel-schedule">
-        <div class="page-header"><div><h1 data-t="page.schedule">Schedule</h1><div class="subtitle" data-t="subtitle.schedule">Generate and manage departures</div></div>
-        <button class="btn" onclick="recalcAllAndRefresh()">↻ <span data-t="btn.recalc_all">Recalculate All</span></button></div>
+        <div class="page-header"><div><h1 data-t="schedule.title">Schedule</h1><div class="subtitle" data-t="schedule.subtitle">Generate and manage departures</div></div>
+        <button class="btn" onclick="recalcAllAndRefresh()">↻ <span data-t="schedule.btn.recalc_all">Recalculate All</span></button></div>
         <div id="schedule-content"></div>
       </div>
       <!-- MAP -->
       <div class="tab-panel" id="panel-map">
-        <div class="page-header"><div><h1 data-t="page.geomap">Geomap</h1><div class="subtitle" data-t="subtitle.geomap">Geographic view of the network</div></div>
+        <div class="page-header"><div><h1 data-t="geomap.title">Geomap</h1><div class="subtitle" data-t="geomap.subtitle">Geographic view of the network</div></div>
         <div class="flex gap-8">
           <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);cursor:pointer;user-select:none">
-            <input type="checkbox" id="map-tiles-toggle" checked onchange="toggleMapTiles()"> <span data-t="btn.show_map_tiles">Show map tiles</span>
+            <input type="checkbox" id="map-tiles-toggle" checked onchange="toggleMapTiles()"> <span data-t="geomap.btn.show_map_tiles">Show map tiles</span>
           </label>
-          <button class="btn btn-sm" onclick="mapFitBounds()" data-t-title="tooltip.fit_map" title="Fit map to all nodes">⊞ <span data-t="btn.fit">Fit</span></button>
+          <button class="btn btn-sm" onclick="mapFitBounds()" data-t-title="geomap.tooltip.fit_map" title="Fit map to all nodes">⊞ <span data-t="common.btn.fit">Fit</span></button>
         </div></div>
         <div id="map-warnings"></div>
         <div id="network-map" style="height:calc(100vh - 180px);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);background:var(--bg)"></div>
@@ -133,10 +133,10 @@
           <div id="schem-sidebar" style="width:220px;background:var(--bg-raised);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden">
             <div style="padding:10px 12px;border-bottom:1px solid var(--border)">
               <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-                <strong style="font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em" data-t="label.unplaced">Unplaced</strong>
+                <strong style="font-size:11px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em" data-t="railmap.label.unplaced">Unplaced</strong>
                 <button class="btn btn-sm" onclick="document.getElementById('schem-sidebar').style.display='none';document.getElementById('schem-sidebar-show').style.display=''" style="font-size:10px;padding:2px 6px">◀</button>
               </div>
-              <input type="text" id="schem-sidebar-search" placeholder="Search..." data-t-placeholder="placeholder.search" oninput="renderSchemSidebar()" style="width:100%;font-size:12px;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
+              <input type="text" id="schem-sidebar-search" placeholder="Search..." data-t-placeholder="common.placeholder.search" oninput="renderSchemSidebar()" style="width:100%;font-size:12px;padding:4px 8px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text)">
               <details style="margin-top:4px"><summary style="font-size:10px;color:var(--text-muted);cursor:pointer;user-select:none">Line filter</summary><div id="schem-sidebar-filter" style="width:100%;font-size:11px;margin-top:2px"></div></details>
             </div>
             <div id="schem-sidebar-list" style="flex:1;overflow-y:auto;padding:4px 0"></div>
@@ -162,34 +162,34 @@
       </div>
       <!-- DEPARTURES -->
       <div class="tab-panel" id="panel-departures">
-        <div class="page-header"><div><h1 data-t="page.departures">Station Board</h1><div class="subtitle" data-t="subtitle.departures">View departures and arrivals at any station</div></div></div>
+        <div class="page-header"><div><h1 data-t="departures.title">Station Board</h1><div class="subtitle" data-t="departures.subtitle">View departures and arrivals at any station</div></div></div>
         <div class="flex gap-8 items-center mb-16" style="flex-wrap:wrap">
           <div class="form-group" style="max-width:300px;margin-bottom:0">
-            <label data-t="label.station">Station</label>
+            <label data-t="departures.label.station">Station</label>
             <div id="departure-station-picker"></div>
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label data-t="label.date">Date</label>
+            <label data-t="journey.label.date">Date</label>
             <input type="date" id="board-date" required onchange="renderDepartures()" style="width:150px">
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label data-t="label.time">Time</label>
+            <label data-t="journey.label.time">Time</label>
             <div class="flex gap-4 items-center">
               <input type="time" id="board-time" required onchange="renderDepartures()" style="width:110px">
-              <button class="btn btn-sm" onclick="boardSetNow()" data-t-title="tooltip.set_current_time" title="Set to current time" data-t="btn.now">Now</button>
+              <button class="btn btn-sm" onclick="boardSetNow()" data-t-title="common.tooltip.set_current_time" title="Set to current time" data-t="common.btn.now">Now</button>
             </div>
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label data-t="label.board">Board</label>
+            <label data-t="departures.label.board">Board</label>
             <div class="flex gap-4">
-              <button class="btn btn-sm" id="btn-dep-mode" onclick="setBoardMode('departures')" style="background:var(--accent);border-color:var(--accent);color:#fff" data-t="btn.departures">Departures</button>
-              <button class="btn btn-sm" id="btn-arr-mode" onclick="setBoardMode('arrivals')" data-t="btn.arrivals">Arrivals</button>
+              <button class="btn btn-sm" id="btn-dep-mode" onclick="setBoardMode('departures')" style="background:var(--accent);border-color:var(--accent);color:#fff" data-t="departures.btn.departures">Departures</button>
+              <button class="btn btn-sm" id="btn-arr-mode" onclick="setBoardMode('arrivals')" data-t="departures.btn.arrivals">Arrivals</button>
             </div>
           </div>
           <div class="form-group" style="margin-bottom:0">
-            <label data-t="label.platform">Platform</label>
+            <label data-t="departures.label.platform">Platform</label>
             <select id="board-platform" onchange="renderDepartures()" style="width:130px">
-              <option value="" data-t="label.all_platforms">All platforms</option>
+              <option value="" data-t="departures.label.all_platforms">All platforms</option>
             </select>
           </div>
         </div>
@@ -198,36 +198,36 @@
       <!-- CONFLICTS -->
       <!-- JOURNEY PLANNER -->
       <div class="tab-panel" id="panel-journey">
-        <div class="page-header"><div><h1 data-t="page.journey">Journey Planner</h1><div class="subtitle" data-t="subtitle.journey">Find routes between stations</div></div></div>
+        <div class="page-header"><div><h1 data-t="journey.title">Journey Planner</h1><div class="subtitle" data-t="journey.subtitle">Find routes between stations</div></div></div>
         <div style="max-width:700px">
           <div style="display:flex;align-items:end;gap:8px;margin-bottom:12px">
-            <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="label.from">From</label><div id="jp-origin-picker"></div></div>
-            <button class="btn btn-sm" onclick="jpSwapStations()" data-t-title="tooltip.swap_stations" title="Swap" style="padding:6px 10px;margin-bottom:2px">⇄</button>
-            <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="label.to">To</label><div id="jp-dest-picker"></div></div>
+            <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="journey.label.from">From</label><div id="jp-origin-picker"></div></div>
+            <button class="btn btn-sm" onclick="jpSwapStations()" data-t-title="journey.tooltip.swap" title="Swap" style="padding:6px 10px;margin-bottom:2px">⇄</button>
+            <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="journey.label.to">To</label><div id="jp-dest-picker"></div></div>
           </div>
           <div style="display:flex;align-items:end;gap:12px">
-            <div class="form-group" style="margin-bottom:0"><label data-t="label.date">Date</label><input type="date" id="jp-date" required style="width:150px"></div>
-            <div class="form-group" style="margin-bottom:0"><label data-t="label.depart_after">Depart after</label><input type="time" id="jp-time" required></div>
-            <button class="btn btn-sm" onclick="jpSetNow()" data-t="btn.now">Now</button>
-            <button class="btn btn-primary" onclick="jpSearch()" data-t="btn.search">Search</button>
+            <div class="form-group" style="margin-bottom:0"><label data-t="journey.label.date">Date</label><input type="date" id="jp-date" required style="width:150px"></div>
+            <div class="form-group" style="margin-bottom:0"><label data-t="journey.label.depart_after">Depart after</label><input type="time" id="jp-time" required></div>
+            <button class="btn btn-sm" onclick="jpSetNow()" data-t="common.btn.now">Now</button>
+            <button class="btn btn-primary" onclick="jpSearch()" data-t="common.btn.search">Search</button>
           </div>
         </div>
         <div id="jp-results"></div>
       </div>
       <!-- ISSUES -->
       <div class="tab-panel" id="panel-issues">
-        <div class="page-header"><div><h1 data-t="page.issues">Issues</h1><div class="subtitle" data-t="subtitle.issues">Scheduling conflicts, warnings and data quality checks</div></div>
-        <button class="btn" onclick="runIssueDetection()">↻ <span data-t="btn.recheck">Re-check</span></button></div>
+        <div class="page-header"><div><h1 data-t="issues.title">Issues</h1><div class="subtitle" data-t="issues.subtitle">Scheduling conflicts, warnings and data quality checks</div></div>
+        <button class="btn" onclick="runIssueDetection()">↻ <span data-t="issues.btn.recheck">Re-check</span></button></div>
         <div id="issues-list"></div>
       </div>
       <!-- SETTINGS -->
       <div class="tab-panel" id="panel-settings">
-        <div class="page-header"><div><h1 data-t="page.settings">Settings</h1><div class="subtitle" data-t="subtitle.settings">System configuration and defaults</div></div></div>
+        <div class="page-header"><div><h1 data-t="settings.title">Settings</h1><div class="subtitle" data-t="settings.subtitle">System configuration and defaults</div></div></div>
         <div id="settings-content"></div>
       </div>
       <!-- IMPORT/EXPORT -->
       <div class="tab-panel" id="panel-import-export">
-        <div class="page-header"><div><h1 data-t="page.import_export">Import / Export</h1><div class="subtitle" data-t="subtitle.import_export">Import and export network data</div></div></div>
+        <div class="page-header"><div><h1 data-t="import_export.title">Import / Export</h1><div class="subtitle" data-t="import_export.subtitle">Import and export network data</div></div></div>
         <div id="import-export-content"></div>
       </div>
     </div>

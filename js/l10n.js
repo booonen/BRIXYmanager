@@ -77,7 +77,7 @@ function registerLanguage(code, name, strings) {
 }
 
 // Register old-key → new-key aliases. Call after all registerLanguage() calls.
-// During a migration, old call sites like t('btn.saves') still resolve after
+// During a migration, old call sites like t('common.btn.saves') still resolve after
 // the key has been moved to common.btn.saves, without editing every call site.
 function registerAliases(map) {
   Object.assign(_aliases, map || {});
@@ -122,7 +122,7 @@ function t(key, params) {
 
 // Set language, persist to settings, re-render UI
 function setLanguage(code) {
-  if (!_strings[code]) { toast(t('toast.lang_not_found', { code }), 'error'); return; }
+  if (!_strings[code]) { toast(t('l10n.toast.lang_not_found', { code }), 'error'); return; }
   _lang = code;
   data.settings = data.settings || {};
   data.settings.language = code;
@@ -187,7 +187,7 @@ function showLanguageReport() {
   const report = checkLanguageCompleteness();
   const codes = Object.keys(report);
   if (!codes.length) {
-    toast(t('toast.no_other_langs'), 'info');
+    toast(t('l10n.toast.no_other_langs'), 'info');
     return;
   }
   let html = '';
@@ -211,7 +211,7 @@ function showLanguageReport() {
     }
     html += `</div>`;
   }
-  openModal(t('l10n.report_title'), html, `<button class="btn" onclick="closeModal()">${t('btn.close')}</button>`);
+  openModal(t('l10n.report_title'), html, `<button class="btn" onclick="closeModal()">${t('common.btn.close')}</button>`);
 }
 
 // Hydrate all elements with data-t attributes

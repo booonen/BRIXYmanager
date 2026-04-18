@@ -39,23 +39,23 @@ async function fetchOgfCoords(nodes, opts) {
 
     if (updated > 0) {
       save();
-      toast(updated === 1 ? t('toast.ogf_fetched_one') : t('toast.ogf_fetched_other', { n: updated }), 'success');
+      toast(updated === 1 ? t('nodes.toast.ogf_fetched_one') : t('nodes.toast.ogf_fetched_other', { n: updated }), 'success');
       // Refresh current view if on nodes tab
       const activeTab = document.querySelector('.nav-item.active')?.dataset?.tab;
       if (activeTab === 'nodes') renderNodes();
     } else {
-      toast(t('toast.ogf_none_found'), 'error');
+      toast(t('nodes.toast.ogf_none_found'), 'error');
     }
   } catch (err) {
     console.error('OGF fetch error:', err);
-    toast(t('toast.ogf_error', { msg: err.message }), 'error');
+    toast(t('nodes.toast.ogf_error', { msg: err.message }), 'error');
   }
 }
 
 async function fetchAllOgfCoords() {
   const nodes = data.nodes.filter(n => n.ogfNode);
-  if (!nodes.length) { toast(t('toast.ogf_no_ids'), 'error'); return; }
-  toast(nodes.length === 1 ? t('toast.ogf_fetching_one') : t('toast.ogf_fetching_other', { n: nodes.length }), 'success');
+  if (!nodes.length) { toast(t('nodes.toast.ogf_no_ids'), 'error'); return; }
+  toast(nodes.length === 1 ? t('nodes.toast.ogf_fetching_one') : t('nodes.toast.ogf_fetching_other', { n: nodes.length }), 'success');
   await fetchOgfCoords(nodes);
 }
 
@@ -107,7 +107,7 @@ async function fetchWayGeometry(wayIds) {
     else missing.push(id);
   }
   if (missing.length) {
-    toast(t('toast.way_fetch_missing', { ids: missing.join(', ') }), 'error');
+    toast(t('segments.toast.way_fetch_missing', { ids: missing.join(', ') }), 'error');
   }
   if (!pool.length) return null;
   if (pool.length === 1) return { coords: pool[0], maxSpeed, speedsConflict };
@@ -147,7 +147,7 @@ async function fetchWayGeometry(wayIds) {
 
     // Warn if gap > 500m
     if (bestDist > 0.5) {
-      toast(t('toast.way_fetch_stitch_gap', { m: Math.round(bestDist * 1000) }), 'error');
+      toast(t('segments.toast.way_fetch_stitch_gap', { m: Math.round(bestDist * 1000) }), 'error');
     }
 
     const next = bestFlip ? [...pool[bestIdx]].reverse() : pool[bestIdx];
@@ -374,8 +374,8 @@ function appConfirm(message, onYes) {
   overlay.innerHTML = `<div style="background:var(--bg-raised);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);padding:24px;max-width:440px;width:90%">
     <div style="font-size:14px;color:var(--text);margin-bottom:20px;line-height:1.6;white-space:pre-line">${esc(message)}</div>
     <div style="display:flex;justify-content:flex-end;gap:8px">
-      <button class="btn" id="app-confirm-no">${t('btn.cancel')}</button>
-      <button class="btn btn-primary" id="app-confirm-yes">${t('btn.confirm')}</button>
+      <button class="btn" id="app-confirm-no">${t('common.btn.cancel')}</button>
+      <button class="btn btn-primary" id="app-confirm-yes">${t('common.btn.confirm')}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -394,8 +394,8 @@ function appPrompt(message, defaultValue, onSubmit) {
     <div style="font-size:14px;color:var(--text);margin-bottom:12px;line-height:1.6">${esc(message)}</div>
     <input type="text" id="app-prompt-input" value="${esc(defaultValue || '')}" style="width:100%;margin-bottom:20px">
     <div style="display:flex;justify-content:flex-end;gap:8px">
-      <button class="btn" id="app-prompt-cancel">${t('btn.cancel')}</button>
-      <button class="btn btn-primary" id="app-prompt-ok">${t('btn.confirm')}</button>
+      <button class="btn" id="app-prompt-cancel">${t('common.btn.cancel')}</button>
+      <button class="btn btn-primary" id="app-prompt-ok">${t('common.btn.confirm')}</button>
     </div>
   </div>`;
   document.body.appendChild(overlay);
@@ -480,7 +480,7 @@ function createNodePicker(opts) {
   if (!container) return;
   const id = opts.pickerId || ('np-' + uid());
   const filterFn = opts.filterFn || (() => true);
-  const placeholder = opts.placeholder || t('node_picker.search');
+  const placeholder = opts.placeholder || t('common.node_picker.search');
 
   container.innerHTML = `<div class="node-picker" id="${id}">
     <div id="${id}-selected" style="display:none" class="np-selected" tabindex="0"
@@ -588,7 +588,7 @@ function nodePickerFilter(id) {
     .sort((a, b) => (dnFn ? dnFn(a.id) : a.name).localeCompare(dnFn ? dnFn(b.id) : b.name));
 
   if (!nodes.length) {
-    dd.innerHTML = `<div class="np-empty">${t('node_picker.no_match')}</div>`;
+    dd.innerHTML = `<div class="np-empty">${t('common.node_picker.no_match')}</div>`;
   } else {
     dd.innerHTML = nodes.map(n => {
       const displayName = dnFn ? dnFn(n.id) : n.name;
