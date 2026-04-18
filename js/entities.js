@@ -167,7 +167,7 @@ function showNodeDetail(id) {
   // Schedule
   html += `<div><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nav.schedule')} (${deps.length})</strong>`;
   if (deps.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>${t("schedule.th.arrive")}</th><th>${t("schedule.th.depart")}</th><th>${t("schedule.th.service")}</th><th>${t("services.th.origin_dest")}</th><th>${t("th.platform")}</th></tr></thead><tbody>` +
+    html += `<table class="schedule-table mt-8"><thead><tr><th>${t("schedule.th.arrive")}</th><th>${t("schedule.th.depart")}</th><th>${t("schedule.th.service")}</th><th>${t("services.th.origin_dest")}</th><th>${t("departures.label.platform")}</th></tr></thead><tbody>` +
       deps.map(d => `<tr>
         <td>${toTime(d.arrive)}</td>
         <td style="color:var(--warn)">${toTime(d.depart)}</td>
@@ -2005,7 +2005,7 @@ function svcTableRow(s) {
     <td class="pattern-cell">${esc(describePattern(s.schedulePattern))}</td>
     <td class="actions-cell">
       <button class="btn btn-sm" onclick="openServiceModal('${s.id}')">${t('common.btn.edit')}</button>
-      <button class="btn btn-sm" onclick="duplicateService('${s.id}')" title="${t('services.tooltip.duplicate')}">${t("btn.dup_short")}</button>
+      <button class="btn btn-sm" onclick="duplicateService('${s.id}')" title="${t('services.tooltip.duplicate')}">${t("common.btn.duplicate")}</button>
       <button class="btn btn-sm" onclick="reverseService('${s.id}')" title="${t('services.tooltip.reverse')}">${t("common.btn.reverse")}</button>
       <button class="btn btn-sm" onclick="openScheduleModal('${s.id}')">${t("schedule.btn.gen")}</button>
       <button class="btn btn-sm btn-danger" onclick="deleteSvc('${s.id}')">✕</button></td>

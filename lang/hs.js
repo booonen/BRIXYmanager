@@ -28,9 +28,6 @@ registerLanguage('hs', 'Hemsteiner', {
   "dashboard": {
     "title": "Höjbord",
     "subtitle": "Euverzich vengès Nètwèrkes mèt einem blikke",
-    "btn": {
-      "get_started": "Dao goon weer"
-    },
     "welcome_desc": "Begins door get knöjp bie tö veuge, verbings z'r mèt segmente, diffenieërs deenste, en ginnèrers tiedsjemaas.",
     "stat": {
       "nodes": "Knöjp",
@@ -53,20 +50,14 @@ registerLanguage('hs', 'Hemsteiner', {
       "add": "+ Knówp Bieveuge",
       "add_platform": "+ Perrón Bieveuge"
     },
-    "label": {
-      "ref_code_optional": "Riffèrensiekód (käözèg)"
-    },
     "placeholder": {
       "search": "Zeuk knöjp...",
-      "eg_name": "p.e. Centraol Sjtasie",
       "eg_ref": "p.e. CS",
       "eg_ogf_id": "p.e. 12345678",
       "eg_description": "p.e. Hoof reinpuntj, in 1923 gaopèng"
     },
     "tooltip": {
-      "fetch_ogf": "Haol ge cooërdinaote op vaan OGF veur alde knöjp mit OGF IDs gediffenieërdj",
-      "schematic_defined": "Sjema gediffenieërdj",
-      "ogf_linked": "OGF knówp gekoppeldj"
+      "fetch_ogf": "Haol ge cooërdinaote op vaan OGF veur alde knöjp mit OGF IDs gediffenieërdj"
     },
     "toast": {
       "ogf_fetched_one": "Cooërdinaote veur 1 knówpe opgehooldj",
@@ -102,18 +93,13 @@ registerLanguage('hs', 'Hemsteiner', {
     },
     "empty": {
       "none": "Meh geine knöjp",
-      "none_desc": "Veug sjtasies, kruutsènge, tössèpuntje, dèpoos en vrachserfe bei óm diense nètwèrk op tö boewe",
-      "no_further_connections": "Geine wieërer aonsjleitènge oet dees'r knówp."
+      "none_desc": "Veug sjtasies, kruutsènge, tössèpuntje, dèpoos en vrachserfe bei óm diense nètwèrk op tö boewe"
     },
     "msg": {
       "select_station": "Sjuft 'n sjtasie."
     },
     "detail": {
-      "view_departure_board": "Bekiek ge Sjtasiebord",
-      "connected_segments": "Verbónker Segmènte",
-      "services_through": "Deenste Door Dees'r Knówp",
-      "schedule_at": "Tiedsjema bie {name}",
-      "departures_at": "Vertrèkke ven {name}"
+      "view_departure_board": "Bekiek ge Sjtasiebord"
     }
   },
   "segments": {
@@ -122,18 +108,10 @@ registerLanguage('hs', 'Hemsteiner', {
     "btn": {
       "add": "+ Segmènt Bieveuge"
     },
-    "label": {
-      "from_node": "Oet {name}",
-      "to_node": "Nao {name}",
-      "split_segment": "Splitsj {name} ({dist} km), door 'ne tössèpuntj in tö veuge."
-    },
     "placeholder": {
       "search": "Zeuk segmènte...",
       "eg_ref": "p.e. SEG-01",
       "eg_walk_dist": "p.e. 0.3",
-      "eg_desc_interchange": "p.e. Óngergróndser doorgaank tösse sjtasiesk",
-      "eg_desc_track": "p.e. Döbbelsjporège hooflien door 'n reveerdaale",
-      "eg_waypoint": "p.e. Tössèpuntj {a}/{b}",
       "eg_wp_ref": "p.e. WP-01"
     },
     "toast": {
@@ -178,34 +156,22 @@ registerLanguage('hs', 'Hemsteiner', {
       "interchange_type": "Transfersaort",
       "walk_distance": "Loupaafsjtand (km)",
       "waypoint_name": "Tössèpuntj naam",
-      "waypoint_ref": "Riffèrensiekód",
-      "waypoint_dist": "Aafsjtand ven {a} (km)",
       "electrified": "Illètrizeerd"
     },
     "type": {
-      "track": "Sjpoorsegmènt",
-      "walking": "Loupendje Transfer",
       "osi": "BST (Boete gès Sjtasies)",
       "isi": "ISI (Ingès Sjtasies)",
-      "none": "Gei (normaal sjpoor)",
-      "track_short": "Sjpoor",
-      "osi_short": "OSI",
-      "isi_short": "ISI"
+      "track_short": "Sjpoor"
     },
     "empty": {
       "none": "Meh geine segmènte",
-      "none_desc": "Verbingk knöjp mèt sjpoorsegmènte.",
-      "no_services": "Geine deenste gebroeke dit segmènt."
+      "none_desc": "Verbingk knöjp mèt sjpoorsegmènte."
     },
     "detail": {
-      "lines_on_segment": "Liene",
       "services_using": "Deenste Tot Dit Segmènt Gebroeke",
-      "trains_on_segment": "Treine op dit Segmèntse",
       "walk_time": "{n} mèn. loupe",
       "electrified": "Illètrizeerd",
-      "not_electrified": "Neet illètrizeerd",
-      "track_info": "{n} sjposj",
-      "speed_info": "{n} km/oe"
+      "not_electrified": "Neet illètrizeerd"
     }
   },
   "lines": {
@@ -214,9 +180,6 @@ registerLanguage('hs', 'Hemsteiner', {
     "btn": {
       "add": "+ Lien Bieveuge",
       "new_short": "+ Nuuj"
-    },
-    "label": {
-      "services_count": "{n} deenste"
     },
     "placeholder": {
       "search": "Zeuk liene...",
@@ -249,10 +212,7 @@ registerLanguage('hs', 'Hemsteiner', {
       "color": "Kleur"
     },
     "empty": {
-      "none": "Meh geine liene",
-      "no_match": "Geine liene akkorderre mit \"{q}\".",
-      "no_services": "D'r zeen meh geine deenste aon dese liene naogèwees.",
-      "no_segments": "Meh geine segmènte gedèk — Veugems deenste mit trajjekke bie dese liene."
+      "none": "Meh geine liene"
     }
   },
   "modes": {
@@ -285,16 +245,13 @@ registerLanguage('hs', 'Hemsteiner', {
       "priority": "Veurrangswaerde"
     },
     "field": {
-      "name": "Naam",
       "abbreviation": "Aofkortèng",
       "default_dwell": "Standaardwachtied (sèkónde)",
       "plt_clearance": "Perrónsklarèng (mènute)",
-      "priority": "Veurrangswaerde (Mèt wie huuëger = mèt wie wiechtèger)",
-      "clearance_explainer": "Minnèmaol'r tied tösse vertrèkkesk deeses modusses opgèszelfde perrónse."
+      "priority": "Veurrangswaerde (Mèt wie huuëger = mèt wie wiechtèger)"
     },
     "empty": {
-      "none": "Meh geine moduste",
-      "none_desc": "Diffenieërtj deensmoduste wie Intèrurbaan, Pengel, Liechril, enzw."
+      "none": "Meh geine moduste"
     }
   },
   "stock": {
@@ -328,13 +285,9 @@ registerLanguage('hs', 'Hemsteiner', {
       "traction": "Motorsaort"
     },
     "field": {
-      "name": "Naam",
-      "code": "Kód",
       "acceleration": "Aksellèrasie (m/s²)",
-      "max_speed": "Topvitesse (km/oe)",
       "default_dwell": "Standaardwachtied (s)",
-      "traction": "Motorsaort",
-      "description": "Umsjrievèng (käözèg)"
+      "traction": "Motorsaort"
     },
     "empty": {
       "none": "Meh geine treinsaorte"
@@ -352,13 +305,11 @@ registerLanguage('hs', 'Hemsteiner', {
     "title": "Deenste",
     "subtitle": "Trajjeksjeblone tot treinpajer diffenieëre",
     "btn": {
-      "add": "+ Deens Bieveuge",
-      "clear_route": "Trajjek Rume"
+      "add": "+ Deens Bieveuge"
     },
     "placeholder": {
       "search": "Zeuk deenste...",
-      "eg_name": "p.e. IU 201",
-      "eg_desc": "p.e. Sjleit Westsjtasie euver, geit direk door nao Centraolsjtasie"
+      "eg_name": "p.e. IU 201"
     },
     "tooltip": {
       "reverse": "Sjaop 'n angersumme kopie",
@@ -371,8 +322,7 @@ registerLanguage('hs', 'Hemsteiner', {
       "deleted": "Deens eweggehaoldj",
       "reversed_created": "Angersumm'r deens biegeveug: {name}",
       "duplicated": "Gekopierdj: {name}",
-      "svc_needs_stops": "Deens broek opp't mins 2 haltes",
-      "variant_created": "Variantdeens gesjeep: {name}"
+      "svc_needs_stops": "Deens broek opp't mins 2 haltes"
     },
     "modal": {
       "edit_title": "Deens Aanpasse",
@@ -387,32 +337,21 @@ registerLanguage('hs', 'Hemsteiner', {
       "mode": "Modus",
       "stock": "Treinsaort",
       "stops": "Haltes",
-      "origin_dest": "Oorsjprónk → Ingpuntj",
-      "frequency": "Frekw."
+      "origin_dest": "Oorsjprónk → Ingpuntj"
     },
     "field": {
       "name": "Deens naam",
       "mode": "Modus",
       "rolling_stock": "Treinsaort",
       "line": "Lien",
-      "description": "Umsjrievèng (käözèg)",
       "route": "Trajjek",
-      "starting_node": "Startknówp",
-      "dwell_s": "Wach (s)",
-      "pass": "Passer"
+      "starting_node": "Startknówp"
     },
     "route": {
-      "prepend_before": "— Veug veur {name}… —",
       "extend_to": "— Verleng trajjek nao… —"
     },
     "empty": {
-      "none": "Meh geine deenste",
-      "no_stops": "Meh geine haltes. Kezems einen startknówp hieónger."
-    },
-    "detail": {
-      "route_header": "Trajjek",
-      "departures_header": "Vetrèkke ({n})",
-      "lines_header": "Liene"
+      "none": "Meh geine deenste"
     }
   },
   "schedule": {
@@ -429,12 +368,7 @@ registerLanguage('hs', 'Hemsteiner', {
     },
     "label": {
       "all_services": "Alle deenste",
-      "orphaned_deps": "Vertrèkke aone Deens",
-      "clear_existing": "Rump eers besjtaondjer vertrèkke veur dees'm deense.",
-      "availability_timeline": "Besjikbaarheidstiedlien (24oe)"
-    },
-    "placeholder": {
-      "eg_times": "06:00, 06:30, 07:00, 07:30..."
+      "orphaned_deps": "Vertrèkke aone Deens"
     },
     "toast": {
       "enter_times": "Völlems opp't mins eine tied in",
@@ -443,8 +377,7 @@ registerLanguage('hs', 'Hemsteiner', {
       "orphans_removed": "{n} vertrèk(ke) aone deens eweggehaoldj",
       "recalc_done": "{n} vertrèk(ke) herbèrekèng — handjmaotèger euversjrievènge beheeldj",
       "deps_added": "{n} vertrèk(ke) biegeveug",
-      "deps_replaced": "{n} vertrèk(ke) vervónk",
-      "invalid_time": "Netèg'r tied: \"{time}\""
+      "deps_replaced": "{n} vertrèk(ke) vervónk"
     },
     "modal": {
       "title": "Tiedsjema — {name}",
@@ -461,38 +394,26 @@ registerLanguage('hs', 'Hemsteiner', {
       "service": "Deens",
       "dep_time": "Vertrèktied",
       "arrival": "Aonkóms",
-      "best_start": "Bèst'r start",
-      "conflicts": "Kónflikte",
       "service_id": "Deens-ID",
       "filter_service": "Fèltre nao Deens"
     },
     "field": {
       "stock_override": "Treinsaort euversjrievèng",
       "window_start": "Vinster Start",
-      "window_end": "Vinster Ing",
-      "explicit_times": "Vertrèktieje (deur 'nem kómma gesjeej, bev. 06:00, 07:30, 09:15)"
+      "window_end": "Vinster Ing"
     },
     "frequency": "Frekwensie",
     "explicit": "Besjtömper Tieje",
     "free": "Vrie",
     "partial": "Deils vrie",
     "blocked": "Bezat",
-    "clear": "Vrie",
-    "free_slots": "Vrieër Sjlitste ({n} ven 1440 mènute)",
-    "conflicts_n_one": "1 kónflik",
-    "conflicts_n_other": "{n} kónflikte",
     "stop_origin": "oorsjprónk",
     "stop_terminus": "ingpuntj",
     "stop_pass": "passaasj",
-    "platform_override_note": "Euversjreef veur dit'm vertrèk — beheeldj nao herbèrekènèng",
-    "platform_default_note": "Gebroek deensstandaard",
-    "dwell_override_note": "Handjmaotèg euversjreef — beheeldj nao herbèrekènèng",
-    "dwell_default_note": "Standaardwachtied",
     "empty": {
       "no_services": "Geine gediffenieërdje deenste",
       "no_services_desc": "Sjaopems eers deenste, ginnèrerems daonao tiedsjemaas.",
       "no_departures": "Geine vertrèkke tö toene",
-      "no_departures_gen": "Meh geine vertrèkke geginnèreerdj.",
       "no_scheduled": "Geine treine besjeemp."
     }
   },
@@ -507,8 +428,7 @@ registerLanguage('hs', 'Hemsteiner', {
     },
     "missing_coords": "{n} knöjp vermisse nog cooërdinaote",
     "view_node": "Bekiek Knówp",
-    "departure_board": "Sjtasiebord",
-    "view_departures": "Bekiek Vertrèkke"
+    "departure_board": "Sjtasiebord"
   },
   "departures": {
     "title": "Sjtasiebord",
@@ -529,8 +449,6 @@ registerLanguage('hs', 'Hemsteiner', {
       "no_services_at_time": "Gein {mode} vaanaaf {time}"
     },
     "board": {
-      "header_departures": "VERTRÈKKE — {name}",
-      "header_arrivals": "AONKÓMSTE — {name}",
       "col_time": "Tied",
       "col_mode": "Modus",
       "col_destination": "Ingpuntj",
@@ -583,17 +501,11 @@ registerLanguage('hs', 'Hemsteiner', {
     "transfers_other": "{n} transfesj",
     "no_intermediate": "Geine tössèligkendjer haltes",
     "intermediate_one": "1 tössèligkendje halte",
-    "intermediate_other": "{n} tössèligkendjer haltes",
     "transfer_within": "Transfers binne gès sjtasies",
     "walk_to_station": "Loups nao ge sjtasie",
-    "transfer_time": "{label} · {min} mènute transfer",
-    "plt": "Per. {name}",
     "earlier": "← Ierdèrer vertrèkke",
     "later": "Laeter vertrèkke →",
-    "showing_results": "Toendj {start}–{end}",
-    "terminus": "Ingpuntj",
     "detail": {
-      "total_time": "Totaol ~{n} mènute",
       "transfer": "Transfer",
       "towards": "{line} tege {terminus}",
       "leg_service": "Deens",
@@ -737,9 +649,6 @@ registerLanguage('hs', 'Hemsteiner', {
     "label": {
       "individual_issue_types": "Aafzónjerlèker Bibberentsaorte"
     },
-    "placeholder": {
-      "eg_system_name": "p.e. Centraol Sjpoornètwèrk"
-    },
     "toast": {
       "theme_coming": "Liech en siesteem óntwerp kummentj mit 'n toekómstège beiwèrkènge"
     },
@@ -772,8 +681,7 @@ registerLanguage('hs', 'Hemsteiner', {
     "light": "Liech",
     "system_pref": "Siesteem",
     "check_translations": "Geit chet vertalènge nao",
-    "show_low_severity": "Toen laogveurrangèger bibberente",
-    "strip_brackets_example": "p.e. \"Centraole Sjtasie [Roeje Lien]\" waertj wie \"Centraole Sjtasie \" getoeng opgès sjtasiebordse engeis reisplanerresk."
+    "show_low_severity": "Toen laogveurrangèger bibberente"
   },
   "common": {
     "btn": {
@@ -781,23 +689,19 @@ registerLanguage('hs', 'Hemsteiner', {
       "search": "Zeuke",
       "now": "Noe",
       "fit": "Passe",
-      "swap": "Ómtoesje",
       "close": "Sjleite",
       "save": "Opsjlaon",
       "cancel": "Kundège",
       "confirm": "Bevestège",
       "edit": "Aanpasse",
-      "delete": "Eweghaole",
       "load": "Laje",
       "rename": "Hernöme",
       "duplicate": "Kopiere",
       "reverse": "Angersum",
-      "apply": "Gelje",
-      "remove": "Eweghaole"
+      "apply": "Gelje"
     },
     "language": "Taal",
     "label": {
-      "code": "Kód",
       "per_day": "/daag"
     },
     "select": "— Sjuft —",
@@ -815,9 +719,7 @@ registerLanguage('hs', 'Hemsteiner', {
       "name": "Naam",
       "ref": "Kód",
       "type": "Saort",
-      "description": "Umsjrievèng",
-      "cat": "Cat.",
-      "deps": "Vetr."
+      "description": "Umsjrievèng"
     },
     "field": {
       "name": "Naam",
@@ -829,31 +731,20 @@ registerLanguage('hs', 'Hemsteiner', {
       "search": "Zeuk knöjp...",
       "no_match": "Geine gakkordeerdjer knöjp "
     },
-    "none": "Gei",
-    "none_line": "(gei)",
     "typical": "Tipies",
     "atypical": "Óntipies",
-    "disallowed": "Neet Touwgesjtónk",
-    "not_set": "—",
-    "duration_min": "{n} mèn",
-    "duration_hm": "{h}oe {m}m"
+    "disallowed": "Neet Touwgesjtónk"
   },
   "railmap": {
     "btn": {
       "add_track": "+ Sjpoor Bieveuge",
-      "create_schematic": "+ e Sjema Sjaope",
-      "edit_schematic": "Sjema Aanpasse"
+      "create_schematic": "+ e Sjema Sjaope"
     },
     "label": {
       "unplaced": "Óngeplaatsj",
       "station_schematic": "Sjtasiesjema",
       "junction_schematic": "Kruutsèngsjema",
       "pick_start_node": "— Kees einen beginknówp —"
-    },
-    "tooltip": {
-      "zoom_in": "Inrófe",
-      "zoom_out": "Oetrófe",
-      "fit_all": "Pas alde knöjp"
     },
     "toast": {
       "saved": "Sjema opgesjloog"
@@ -863,9 +754,7 @@ registerLanguage('hs', 'Hemsteiner', {
     },
     "th": {
       "direction": "Richtèng",
-      "seg_towards": "Segmènt nao",
-      "enter": "Binnègónk",
-      "exit": "Oetgónk"
+      "seg_towards": "Segmènt nao"
     },
     "northbound": "Nao g'm Naorde",
     "southbound": "Nao g'm Zuuje",
@@ -874,17 +763,9 @@ registerLanguage('hs', 'Hemsteiner', {
     "assign_directions": "Wieës edere aongesjlootje segmènt 'n richtèng (maks 2 richtènge de sjtasie).",
     "track_connections": "Eder sjpoor sjleintj aon segmènte aon ein of mieër ziejesk (of waertj bèeindèg)",
     "no_tracks": "Geine sjposj gediffenieërdj.",
-    "no_segs_side": "Geine segmènte aon dees's zies",
-    "tracks_defined_one": "1 sjpoor gediffenieërdj",
-    "tracks_defined_other": "{n} sjposj gediffenieërdj",
     "segment_directions": "Segmèntrichtènge",
     "tracks_title": "Sjposj",
-    "save_schematic": "Sjlei Sjema Op",
-    "platforms": "Perrónne",
-    "empty": {
-      "all_placed": "Alle sjtasies geplaatsj!",
-      "no_stations": "Geine sjtasies gediffenieërdj."
-    }
+    "save_schematic": "Sjlei Sjema Op"
   },
   "import_export": {
     "btn": {
@@ -921,11 +802,7 @@ registerLanguage('hs', 'Hemsteiner', {
       "lang_not_found": "Taalbesjtand neet gevónk: {code}",
       "no_other_langs": "Geine angerrer tale gelootj — allein Hemsteiner is besjikbaar"
     },
-    "report_title": "Vertalèngsversjlaag",
-    "missing_keys": "{n} óntbraekdnj(e)r sjleutel(s)",
-    "stale_keys": "{n} muff(e)r sjleutel(s) (Ingelsj verangerdj)",
-    "fully_up_to_date": "Gans d'rbie!",
-    "complete": "cómpleet"
+    "report_title": "Vertalèngsversjlaag"
   },
   "type": {
     "station": "sjtasie",
@@ -973,39 +850,28 @@ registerLanguage('hs', 'Hemsteiner', {
     "common.btn.cancel": "1bin7kb",
     "common.btn.close": "3lk8qj",
     "common.btn.confirm": "eh2ftf",
-    "common.btn.delete": "1c8q7h4",
     "common.btn.duplicate": "376eum",
     "common.btn.edit": "yjrxfv",
     "common.btn.fit": "376g88",
     "common.btn.load": "yjxkkl",
     "common.btn.now": "376n3t",
-    "common.btn.remove": "1layij7",
     "common.btn.rename": "1layy9p",
     "common.btn.reverse": "376q7m",
     "common.btn.save": "yk2ng4",
     "common.btn.saves": "3wmm93",
     "common.btn.search": "1ly04vv",
-    "common.btn.swap": "yk35eo",
     "common.disallowed": "qk5031",
-    "common.duration_hm": "v2cavz",
-    "common.duration_min": "2mq0pb",
     "common.field.description": "fn5ygw",
     "common.field.name": "yjyskm",
     "common.field.ref_code": "14bznuz",
     "common.field.type": "yk3z6v",
-    "common.label.code": "yjqn34",
     "common.label.per_day": "yjaz76",
     "common.language": "1mbj2cp",
     "common.node_picker.no_match": "e5tt52",
     "common.node_picker.search": "s2ji66",
-    "common.none": "yjz4d1",
     "common.none_default": "11y56wt",
-    "common.none_line": "uaqvly",
-    "common.not_set": "3zcp",
     "common.placeholder.search": "b7h12d",
     "common.select": "rmg4jx",
-    "common.th.cat": "yjqbor",
-    "common.th.deps": "3m4ahr",
     "common.th.description": "1rufazt",
     "common.th.name": "yjyskm",
     "common.th.ref": "376q76",
@@ -1013,7 +879,6 @@ registerLanguage('hs', 'Hemsteiner', {
     "common.toast.name_required": "1e5pz6r",
     "common.tooltip.set_current_time": "39p1d2",
     "common.typical": "sxe4gr",
-    "dashboard.btn.get_started": "1oywkjg",
     "dashboard.get_started": "1h02apa",
     "dashboard.no_lines": "zrcfkc",
     "dashboard.stat.departures": "1ntd8mc",
@@ -1033,8 +898,6 @@ registerLanguage('hs', 'Hemsteiner', {
     "departures.board.col_origin": "1jm5971",
     "departures.board.col_plt": "yk0ler",
     "departures.board.col_time": "yk3lo4",
-    "departures.board.header_arrivals": "1q4sx86",
-    "departures.board.header_departures": "rvvb9t",
     "departures.board.search_station": "17gjhdb",
     "departures.board.showing": "fw6e70",
     "departures.board.via": "377kjp",
@@ -1065,7 +928,6 @@ registerLanguage('hs', 'Hemsteiner', {
     "geomap.subtitle": "1oo3jmh",
     "geomap.title": "1e6p43i",
     "geomap.tooltip.fit_map": "jf1517",
-    "geomap.view_departures": "8rl2in",
     "geomap.view_node": "vjdh7q",
     "hint.address": "c0x2s0",
     "hint.connections": "w36nv6",
@@ -1239,13 +1101,11 @@ registerLanguage('hs', 'Hemsteiner', {
     "journey.detail.leg_service": "1tpadti",
     "journey.detail.leg_stock": "3x1361",
     "journey.detail.leg_terminus": "vll49o",
-    "journey.detail.total_time": "txt99n",
     "journey.detail.towards": "khhhw8",
     "journey.detail.transfer": "e5qfca",
     "journey.direct": "1cbohog",
     "journey.earlier": "1yvrwns",
     "journey.intermediate_one": "a1e0k7",
-    "journey.intermediate_other": "1otepvj",
     "journey.label.depart_after": "jptn1z",
     "journey.label.from": "yjt12x",
     "journey.label.time": "yk3lo4",
@@ -1255,36 +1115,24 @@ registerLanguage('hs', 'Hemsteiner', {
     "journey.no_journeys": "1qr3ocd",
     "journey.no_journeys_desc": "1qnhyp0",
     "journey.origin": "je5fzt",
-    "journey.plt": "lzk53w",
-    "journey.showing_results": "1x6c030",
     "journey.subtitle": "zeuuf",
-    "journey.terminus": "vll49o",
     "journey.title": "88wxy9",
     "journey.toast.origin_dest_differ": "19pu5l5",
     "journey.toast.select_origin_dest": "he2bqn",
     "journey.tooltip.swap": "yk35eo",
-    "journey.transfer_time": "xgh47t",
     "journey.transfer_within": "1b4u3uf",
     "journey.transfers_one": "1k9vl6j",
     "journey.transfers_other": "t7i1hf",
     "journey.walk_to_station": "1cwfc6x",
-    "l10n.complete": "hs0m1q",
-    "l10n.fully_up_to_date": "1gumpdk",
-    "l10n.missing_keys": "ltms2a",
     "l10n.report_title": "1my7834",
-    "l10n.stale_keys": "1jkhjcm",
     "l10n.toast.lang_not_found": "1btxwqr",
     "l10n.toast.no_other_langs": "vdn2bz",
     "lines.btn.add": "uagxvl",
     "lines.btn.new_short": "32yvqy",
     "lines.confirm.delete": "ocljr",
-    "lines.empty.no_match": "1bio5oj",
-    "lines.empty.no_segments": "1vlw3s0",
-    "lines.empty.no_services": "1c0drlj",
     "lines.empty.none": "1b7eaq7",
     "lines.field.color": "3lmhb8",
     "lines.field.name": "uyvipa",
-    "lines.label.services_count": "joaj9r",
     "lines.modal.add_title": "wpa74m",
     "lines.modal.edit_title": "j5gg0j",
     "lines.modal.new_title": "1u6bxdj",
@@ -1305,11 +1153,8 @@ registerLanguage('hs', 'Hemsteiner', {
     "modes.btn.add": "uahue6",
     "modes.confirm.delete": "dfjt2s",
     "modes.empty.none": "1a5zb0s",
-    "modes.empty.none_desc": "7geptf",
     "modes.field.abbreviation": "1tooduj",
-    "modes.field.clearance_explainer": "lfelgh",
     "modes.field.default_dwell": "1qs1gv6",
-    "modes.field.name": "yjyskm",
     "modes.field.plt_clearance": "1dozbdq",
     "modes.field.priority": "jg16fx",
     "modes.modal.add_title": "wpb3n7",
@@ -1348,23 +1193,16 @@ registerLanguage('hs', 'Hemsteiner', {
     "nodes.btn.add_platform": "1lbjzfi",
     "nodes.btn.update_coords": "5m8d1u",
     "nodes.confirm.delete": "qhyltb",
-    "nodes.detail.connected_segments": "1e1beqm",
-    "nodes.detail.departures_at": "1ylv6sy",
-    "nodes.detail.schedule_at": "1r0mh7k",
-    "nodes.detail.services_through": "5hr7mw",
     "nodes.detail.view_departure_board": "1opzlmc",
-    "nodes.empty.no_further_connections": "1csda3p",
     "nodes.empty.none": "7gey6l",
     "nodes.empty.none_desc": "10zvpyy",
     "nodes.field.address": "zh9arv",
     "nodes.field.ogf_node": "56fnv8",
     "nodes.field.platforms": "jbj2zh",
-    "nodes.label.ref_code_optional": "qf2w82",
     "nodes.modal.add_title": "wpbvdg",
     "nodes.modal.edit_title": "j5i49d",
     "nodes.msg.select_station": "1f3fel2",
     "nodes.placeholder.eg_description": "2qoh4v",
-    "nodes.placeholder.eg_name": "1e9wk6w",
     "nodes.placeholder.eg_ogf_id": "fbbff5",
     "nodes.placeholder.eg_ref": "xwvjzg",
     "nodes.placeholder.search": "s2ji66",
@@ -1387,38 +1225,24 @@ registerLanguage('hs', 'Hemsteiner', {
     "nodes.toast.ogf_none_found": "xmzmi5",
     "nodes.toast.updated": "rabscy",
     "nodes.tooltip.fetch_ogf": "2cjo3v",
-    "nodes.tooltip.ogf_linked": "19ux09q",
-    "nodes.tooltip.schematic_defined": "11zwpdx",
     "railmap.assign_directions": "3utghm",
     "railmap.btn.add_track": "5bs9gu",
     "railmap.btn.create_schematic": "1fu5tf9",
-    "railmap.btn.edit_schematic": "rqhg70",
     "railmap.eastbound": "11e5rii",
-    "railmap.empty.all_placed": "1wlw14t",
-    "railmap.empty.no_stations": "15mdc8k",
     "railmap.label.junction_schematic": "ymwusg",
     "railmap.label.pick_start_node": "c1dcva",
     "railmap.label.station_schematic": "j2ukwo",
     "railmap.label.unplaced": "3xpuj5",
     "railmap.modal.title": "z9jiv7",
-    "railmap.no_segs_side": "bcj0f6",
     "railmap.no_tracks": "fq9ypz",
     "railmap.northbound": "x90g8",
-    "railmap.platforms": "jbj2zh",
     "railmap.save_schematic": "qfsalh",
     "railmap.segment_directions": "18mzh7w",
     "railmap.southbound": "1p4kxqo",
     "railmap.th.direction": "18h3hi",
-    "railmap.th.enter": "3n0q6b",
-    "railmap.th.exit": "yjse8v",
     "railmap.th.seg_towards": "k0x7q4",
     "railmap.toast.saved": "71mnc9",
-    "railmap.tooltip.fit_all": "1h2kpa2",
-    "railmap.tooltip.zoom_in": "8ixw0x",
-    "railmap.tooltip.zoom_out": "1w9qc82",
     "railmap.track_connections": "1673788",
-    "railmap.tracks_defined_one": "p48z96",
-    "railmap.tracks_defined_other": "87slnm",
     "railmap.tracks_title": "1muh1d9",
     "railmap.westbound": "t0a9eo",
     "schedule.blocked": "1q80krd",
@@ -1429,45 +1253,30 @@ registerLanguage('hs', 'Hemsteiner', {
     "schedule.btn.recalc_all": "zqfqar",
     "schedule.btn.recalculate": "esy5m2",
     "schedule.btn.replace_schedule": "18qzytq",
-    "schedule.clear": "3ljzvw",
     "schedule.confirm.apply": "1b70dw5",
     "schedule.confirm.delete_orphans": "1sexe4e",
     "schedule.confirm.recalc_all": "5j671k",
-    "schedule.conflicts_n_one": "mjndfs",
-    "schedule.conflicts_n_other": "1gnrtkg",
-    "schedule.dwell_default_note": "77quwh",
-    "schedule.dwell_override_note": "q6fi2o",
     "schedule.empty.no_departures": "cmrrlf",
-    "schedule.empty.no_departures_gen": "1pnywj4",
     "schedule.empty.no_scheduled": "prnjwy",
     "schedule.empty.no_services": "1brprp1",
     "schedule.empty.no_services_desc": "1q84qm1",
     "schedule.explicit": "1e2zzpl",
-    "schedule.field.explicit_times": "129mok0",
     "schedule.field.stock_override": "17m6vpl",
     "schedule.field.window_end": "1yep2wk",
     "schedule.field.window_start": "wi6563",
     "schedule.free": "yjt0tj",
-    "schedule.free_slots": "1t3vaza",
     "schedule.frequency": "v5dhh3",
     "schedule.label.all_services": "og6c02",
-    "schedule.label.availability_timeline": "1qfcuja",
-    "schedule.label.clear_existing": "1c6q3e6",
     "schedule.label.orphaned_deps": "4dlv59",
     "schedule.modal.edit_dep_title": "yy9ofs",
     "schedule.modal.title": "1i2vjxb",
     "schedule.partial": "1y2fquq",
-    "schedule.placeholder.eg_times": "1cnypn",
-    "schedule.platform_default_note": "1o6sorl",
-    "schedule.platform_override_note": "bp08mg",
     "schedule.stop_origin": "5an17x",
     "schedule.stop_pass": "ykozj0",
     "schedule.stop_terminus": "1xec83g",
     "schedule.subtitle": "rt1up7",
     "schedule.th.arrival": "18t5ws6",
     "schedule.th.arrive": "yjp6go",
-    "schedule.th.best_start": "122qb8h",
-    "schedule.th.conflicts": "1sitikq",
     "schedule.th.dep_time": "ej3f2z",
     "schedule.th.depart": "yjr6oc",
     "schedule.th.filter_service": "dfv02f",
@@ -1479,20 +1288,14 @@ registerLanguage('hs', 'Hemsteiner', {
     "schedule.toast.deps_added": "1bqa4st",
     "schedule.toast.deps_replaced": "1ykb2vv",
     "schedule.toast.enter_times": "sru7ky",
-    "schedule.toast.invalid_time": "15qng0w",
     "schedule.toast.orphans_removed": "vn3ox9",
     "schedule.toast.recalc_done": "1e3h93t",
     "segments.btn.add": "icgyuk",
     "segments.confirm.delete": "dpgigy",
     "segments.detail.electrified": "1nradtx",
-    "segments.detail.lines_on_segment": "3runxc",
     "segments.detail.not_electrified": "1eptcnq",
     "segments.detail.services_using": "9mmdga",
-    "segments.detail.speed_info": "fsp3lm",
-    "segments.detail.track_info": "jkbgnn",
-    "segments.detail.trains_on_segment": "13tjnku",
     "segments.detail.walk_time": "1qof0ri",
-    "segments.empty.no_services": "nbyaks",
     "segments.empty.none": "bo5a0q",
     "segments.empty.none_desc": "165kvt9",
     "segments.field.distance": "1c6g3ll",
@@ -1504,20 +1307,12 @@ registerLanguage('hs', 'Hemsteiner', {
     "segments.field.to_node": "kvc2b2",
     "segments.field.tracks": "1muh1d9",
     "segments.field.walk_distance": "g0yfhi",
-    "segments.field.waypoint_dist": "5dfx9i",
     "segments.field.waypoint_name": "lhio8x",
-    "segments.field.waypoint_ref": "14bznuz",
-    "segments.label.from_node": "4c8pde",
-    "segments.label.split_segment": "1yueuev",
-    "segments.label.to_node": "r3n3a9",
     "segments.modal.add_title": "letly9",
     "segments.modal.edit_title": "10iytha",
     "segments.modal.insert_waypoint_title": "1vzp9w5",
-    "segments.placeholder.eg_desc_interchange": "gkkdod",
-    "segments.placeholder.eg_desc_track": "l2ojyl",
     "segments.placeholder.eg_ref": "1xk8ysa",
     "segments.placeholder.eg_walk_dist": "xwuyu6",
-    "segments.placeholder.eg_waypoint": "1voncbu",
     "segments.placeholder.eg_wp_ref": "1urkrsy",
     "segments.placeholder.search": "y7ga23",
     "segments.subtitle": "12kd01s",
@@ -1543,39 +1338,23 @@ registerLanguage('hs', 'Hemsteiner', {
     "segments.toast.walk_dist_positive": "fqjmv4",
     "segments.toast.waypoint_inserted": "ejvjgi",
     "segments.type.isi": "ircnwh",
-    "segments.type.isi_short": "376i5m",
-    "segments.type.none": "1t8yclp",
     "segments.type.osi": "621e34",
-    "segments.type.osi_short": "376n74",
-    "segments.type.track": "7wxd8t",
     "segments.type.track_short": "3xon0a",
-    "segments.type.walking": "1db7jve",
     "services.btn.add": "ikfl62",
-    "services.btn.clear_route": "16j7zln",
     "services.confirm.delete": "17ngxhc",
-    "services.detail.departures_header": "vca1vf",
-    "services.detail.lines_header": "3runxc",
-    "services.detail.route_header": "3w7yxg",
-    "services.empty.no_stops": "19fx7h8",
     "services.empty.none": "1cbt6ig",
-    "services.field.description": "fn5ygw",
-    "services.field.dwell_s": "6ozj29",
     "services.field.line": "yjxfv1",
     "services.field.mode": "yjycdm",
     "services.field.name": "1tr708n",
-    "services.field.pass": "yk0c70",
     "services.field.rolling_stock": "1873vmo",
     "services.field.route": "3w7yxg",
     "services.field.starting_node": "r21nmf",
     "services.modal.add_title": "lms89r",
     "services.modal.edit_title": "10qxfss",
-    "services.placeholder.eg_desc": "14bo4eg",
     "services.placeholder.eg_name": "1r104ss",
     "services.placeholder.search": "1rasf3d",
     "services.route.extend_to": "j8zf71",
-    "services.route.prepend_before": "1wqy8x9",
     "services.subtitle": "p808it",
-    "services.th.frequency": "3nsvsx",
     "services.th.line": "yjxfv1",
     "services.th.mode": "yjycdm",
     "services.th.origin_dest": "8ur8cd",
@@ -1590,7 +1369,6 @@ registerLanguage('hs', 'Hemsteiner', {
     "services.toast.reversed_created": "v9l2yp",
     "services.toast.svc_needs_stops": "8qksm6",
     "services.toast.updated": "1l0ikhp",
-    "services.toast.variant_created": "m8eora",
     "services.tooltip.duplicate": "p30qfl",
     "services.tooltip.reverse": "1jno2no",
     "settings.check_translations": "12hqgrp",
@@ -1614,11 +1392,9 @@ registerLanguage('hs', 'Hemsteiner', {
     "settings.language_desc": "g9xmn6",
     "settings.light": "3rui4d",
     "settings.new_system_desc": "khre7b",
-    "settings.placeholder.eg_system_name": "aoz4ih",
     "settings.show_low_severity": "1bx6plo",
     "settings.strip_brackets": "fwnjsm",
     "settings.strip_brackets_desc": "x7doj6",
-    "settings.strip_brackets_example": "x7doj6",
     "settings.subtitle": "ukdca5",
     "settings.system_name_desc": "1d2jmh9",
     "settings.system_pref": "ojtj55",
@@ -1631,11 +1407,7 @@ registerLanguage('hs', 'Hemsteiner', {
     "stock.confirm.delete": "65rket",
     "stock.empty.none": "lhxnvz",
     "stock.field.acceleration": "4ntvj5",
-    "stock.field.code": "yjqn34",
     "stock.field.default_dwell": "1l8uzza",
-    "stock.field.description": "fn5ygw",
-    "stock.field.max_speed": "3igkgs",
-    "stock.field.name": "yjyskm",
     "stock.field.traction": "dxzo5l",
     "stock.matrix.atypical_desc": "1fx6bet",
     "stock.matrix.desc": "vwgsoq",

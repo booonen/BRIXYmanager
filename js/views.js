@@ -145,7 +145,7 @@ function renderSettings() {
             return `<label style="display:flex;align-items:center;gap:6px;font-size:12px;padding:4px 0;cursor:pointer;${greyed ? "opacity:0.4" : ""}">
               <input type="checkbox" ${!hidden ? 'checked' : ''} ${greyed ? 'disabled' : ''} onchange="toggleIssueType('${it.key}', !this.checked)">
               <span style="width:6px;height:6px;border-radius:50%;background:${sevColor};flex-shrink:0"></span>
-              ${t("issue.type." + it.key)}</label>`;
+              ${t("issues.type." + it.key)}</label>`;
           }).join('\n          ')}
         </div>
       </div>
@@ -1946,17 +1946,17 @@ function renderImportExport() {
         </div>
       </div>
       <div class="ie-card">
-        <h3>${t('import_export.ogf_title')}</h3>
+        <h3>${t('import_export.rel.title')}</h3>
         <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.ogf_desc')}</p>
         <button class="btn" onclick="startRelationImport()">${t('import_export.ogf_btn')}</button>
       </div>
       <div class="ie-card">
-        <h3>${t('import_export.csv_node_title')}</h3>
+        <h3>${t('import_export.csv.mode_nodes')}</h3>
         <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.csv_node_desc')}</p>
         <button class="btn" onclick="startCSVNodeImport()">${t('import_export.csv_btn')}</button>
       </div>
       <div class="ie-card">
-        <h3>${t('import_export.csv_seg_title')}</h3>
+        <h3>${t('import_export.csv.mode_segments')}</h3>
         <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('import_export.csv_seg_desc')}</p>
         <button class="btn" onclick="startCSVSegmentImport()">${t('import_export.csv_btn')}</button>
       </div>

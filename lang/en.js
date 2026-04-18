@@ -40,9 +40,6 @@ registerLanguage('en', 'English', {
       "services": "Services",
       "departures": "Departures"
     },
-    "btn": {
-      "get_started": "Get Started"
-    },
     "welcome": "Welcome to BRIXYmanager",
     "no_lines": "No lines defined yet.",
     "get_started": "Get Started →"
@@ -55,20 +52,14 @@ registerLanguage('en', 'English', {
       "add": "+ Add Node",
       "add_platform": "+ Add Platform"
     },
-    "label": {
-      "ref_code_optional": "Ref. Code (optional)"
-    },
     "placeholder": {
       "search": "Search nodes...",
-      "eg_name": "e.g. Central Station",
       "eg_ref": "e.g. HTC",
       "eg_ogf_id": "e.g. 12345678",
       "eg_description": "e.g. Main terminus, opened 1923"
     },
     "tooltip": {
-      "fetch_ogf": "Fetch coordinates from OGF for all nodes with OGF IDs",
-      "schematic_defined": "Schematic defined",
-      "ogf_linked": "OGF node linked"
+      "fetch_ogf": "Fetch coordinates from OGF for all nodes with OGF IDs"
     },
     "toast": {
       "ogf_fetched_one": "Fetched coordinates for 1 node",
@@ -104,18 +95,13 @@ registerLanguage('en', 'English', {
     },
     "empty": {
       "none": "No nodes yet",
-      "none_desc": "Add stations, junctions, waypoints, depots and freight yards to build your network.",
-      "no_further_connections": "No further connections from this node."
+      "none_desc": "Add stations, junctions, waypoints, depots and freight yards to build your network."
     },
     "msg": {
       "select_station": "Select a station."
     },
     "detail": {
-      "view_departure_board": "View Departure Board",
-      "connected_segments": "Connected Segments",
-      "services_through": "Services Through This Node",
-      "schedule_at": "Schedule at {name}",
-      "departures_at": "Departures at {name}"
+      "view_departure_board": "View Departure Board"
     }
   },
   "segments": {
@@ -124,19 +110,11 @@ registerLanguage('en', 'English', {
     "btn": {
       "add": "+ Add Segment"
     },
-    "label": {
-      "split_segment": "Split {name} ({dist} km) by inserting a waypoint.",
-      "to_node": "To {name}",
-      "from_node": "From {name}"
-    },
     "placeholder": {
       "search": "Search segments...",
       "eg_ref": "e.g. SEG-01",
       "eg_ogf_ways": "e.g. 12345, 67890",
       "eg_walk_dist": "e.g. 0.3",
-      "eg_desc_interchange": "e.g. Underground passage between stations",
-      "eg_desc_track": "e.g. Double-track mainline through river valley",
-      "eg_waypoint": "e.g. Waypoint {a}/{b}",
       "eg_wp_ref": "e.g. WP-01"
     },
     "toast": {
@@ -194,34 +172,22 @@ registerLanguage('en', 'English', {
       "interchange_type": "Interchange Type",
       "walk_distance": "Walking Distance (km)",
       "waypoint_name": "Waypoint Name",
-      "waypoint_ref": "Ref. Code",
-      "waypoint_dist": "Distance from {a} (km)",
       "electrified": "Electrified"
     },
     "type": {
-      "track": "Track segment",
-      "walking": "Walking interchange",
       "osi": "OSI (Out of Station)",
       "isi": "ISI (In-Station)",
-      "none": "None (regular track)",
-      "track_short": "Track",
-      "osi_short": "OSI",
-      "isi_short": "ISI"
+      "track_short": "Track"
     },
     "empty": {
       "none": "No segments yet",
-      "none_desc": "Connect nodes with track segments.",
-      "no_services": "No services use this segment."
+      "none_desc": "Connect nodes with track segments."
     },
     "detail": {
-      "lines_on_segment": "Lines",
       "services_using": "Services Using This Segment",
-      "trains_on_segment": "Trains on This Segment",
       "walk_time": "{n} min walk",
       "electrified": "Electrified",
       "not_electrified": "Not electrified",
-      "track_info": "{n} tracks",
-      "speed_info": "{n} km/h",
       "ogf_ways": "OGF: {n} ways, {pts} points"
     },
     "tooltip": {
@@ -234,9 +200,6 @@ registerLanguage('en', 'English', {
     "btn": {
       "add": "+ Add Line",
       "new_short": "+ New"
-    },
-    "label": {
-      "services_count": "{n} services"
     },
     "placeholder": {
       "search": "Search lines...",
@@ -269,10 +232,7 @@ registerLanguage('en', 'English', {
       "color": "Color"
     },
     "empty": {
-      "none": "No lines yet",
-      "no_match": "No lines matching \"{q}\".",
-      "no_services": "No services assigned to this line yet.",
-      "no_segments": "No segments covered — add services with routes to this line."
+      "none": "No lines yet"
     }
   },
   "modes": {
@@ -305,17 +265,14 @@ registerLanguage('en', 'English', {
       "priority": "Priority"
     },
     "field": {
-      "name": "Name",
       "abbreviation": "Abbreviation",
       "default_dwell": "Default Dwell (seconds)",
       "plt_clearance": "Platform Clearance (minutes)",
       "priority": "Priority (higher = more important)",
-      "infrastructure_type": "Infrastructure Type",
-      "clearance_explainer": "Min. time between departures of this mode using the same platform."
+      "infrastructure_type": "Infrastructure Type"
     },
     "empty": {
-      "none": "No modes yet",
-      "none_desc": "Define service modes like Intercity, Commuter, Light Rail, etc."
+      "none": "No modes yet"
     }
   },
   "stock": {
@@ -349,13 +306,9 @@ registerLanguage('en', 'English', {
       "traction": "Traction"
     },
     "field": {
-      "name": "Name",
-      "code": "Code",
       "acceleration": "Acceleration (m/s²)",
-      "max_speed": "Max Speed (km/h)",
       "default_dwell": "Default Dwell (s)",
-      "traction": "Traction",
-      "description": "Description (optional)"
+      "traction": "Traction"
     },
     "empty": {
       "none": "No rolling stock yet"
@@ -373,13 +326,11 @@ registerLanguage('en', 'English', {
     "title": "Services",
     "subtitle": "Route templates defining train paths",
     "btn": {
-      "add": "+ Add Service",
-      "clear_route": "Clear Route"
+      "add": "+ Add Service"
     },
     "placeholder": {
       "search": "Search services...",
-      "eg_name": "e.g. IC 201",
-      "eg_desc": "e.g. Skips West station, runs express to Central Station"
+      "eg_name": "e.g. IC 201"
     },
     "tooltip": {
       "reverse": "Create reversed copy",
@@ -390,7 +341,6 @@ registerLanguage('en', 'English', {
       "mark_pass_through": "Mark as pass-through"
     },
     "toast": {
-      "variant_created": "Created variant service: {name}",
       "min_two_stops": "At least 2 stops required",
       "updated": "Service updated",
       "added": "Service added",
@@ -413,32 +363,21 @@ registerLanguage('en', 'English', {
       "mode": "Mode",
       "stock": "Stock",
       "stops": "Stops",
-      "origin_dest": "Origin → Dest.",
-      "frequency": "Freq."
+      "origin_dest": "Origin → Dest."
     },
     "field": {
       "name": "Service Name",
       "mode": "Mode",
       "rolling_stock": "Rolling Stock",
       "line": "Line",
-      "description": "Description (optional)",
       "route": "Route",
-      "starting_node": "Starting Node",
-      "dwell_s": "Dwell (s)",
-      "pass": "Pass"
+      "starting_node": "Starting Node"
     },
     "route": {
-      "prepend_before": "— Prepend before {name}… —",
       "extend_to": "— Extend route to… —"
     },
     "empty": {
-      "none": "No services yet",
-      "no_stops": "No stops yet. Pick a starting node below."
-    },
-    "detail": {
-      "route_header": "Route",
-      "departures_header": "Departures ({n})",
-      "lines_header": "Lines"
+      "none": "No services yet"
     }
   },
   "schedule": {
@@ -455,15 +394,9 @@ registerLanguage('en', 'English', {
     },
     "label": {
       "all_services": "All Services",
-      "orphaned_deps": "⚠ Orphaned ({n})",
-      "availability_timeline": "Availability Timeline (24h)",
-      "clear_existing": "Clear existing departures for this service first"
-    },
-    "placeholder": {
-      "eg_times": "06:00, 06:30, 07:00, 07:30..."
+      "orphaned_deps": "⚠ Orphaned ({n})"
     },
     "toast": {
-      "invalid_time": "Invalid time: \"{time}\"",
       "deps_replaced": "Replaced {n} departure(s)",
       "deps_added": "Added {n} departure(s)",
       "recalc_done": "Recalculated {n} departure(s) — manual overrides preserved",
@@ -487,38 +420,26 @@ registerLanguage('en', 'English', {
       "service": "Service",
       "dep_time": "Dep. Time",
       "arrival": "Arrival",
-      "best_start": "Best Start",
-      "conflicts": "Conflicts",
       "service_id": "Service ID",
       "filter_service": "Filter by Service"
     },
     "field": {
       "stock_override": "Stock Override",
       "window_start": "Window Start",
-      "window_end": "Window End",
-      "explicit_times": "Departure times (comma-separated, e.g. 06:00, 07:30, 09:15)"
+      "window_end": "Window End"
     },
     "frequency": "Frequency",
     "explicit": "Explicit Times",
     "free": "Free",
     "partial": "Partial",
     "blocked": "Blocked",
-    "clear": "Clear",
-    "free_slots": "Free Slots ({n} of 1440 minutes)",
-    "conflicts_n_one": "1 conflict",
-    "conflicts_n_other": "{n} conflicts",
     "stop_origin": "origin",
     "stop_terminus": "terminus",
     "stop_pass": "pass",
-    "platform_override_note": "Overridden for this departure — preserved on recalculate",
-    "platform_default_note": "Using service default",
-    "dwell_override_note": "Manually overridden — preserved on recalculate",
-    "dwell_default_note": "Default dwell time",
     "empty": {
       "no_services": "No services defined",
       "no_services_desc": "Create services first, then generate schedules.",
       "no_departures": "No departures to show.",
-      "no_departures_gen": "No departures generated yet.",
       "no_scheduled": "No trains scheduled."
     }
   },
@@ -533,8 +454,7 @@ registerLanguage('en', 'English', {
     },
     "missing_coords": "{n} nodes missing coordinates:",
     "view_node": "View Node",
-    "departure_board": "Departure Board",
-    "view_departures": "View Departures"
+    "departure_board": "Departure Board"
   },
   "departures": {
     "title": "Station Board",
@@ -555,8 +475,6 @@ registerLanguage('en', 'English', {
       "no_services_at_time": "No {mode} from {time}"
     },
     "board": {
-      "header_departures": "DEPARTURES — {name}",
-      "header_arrivals": "ARRIVALS — {name}",
       "col_time": "Time",
       "col_mode": "Mode",
       "col_destination": "Destination",
@@ -610,17 +528,11 @@ registerLanguage('en', 'English', {
     "transfers_other": "{n} transfers",
     "no_intermediate": "No intermediate stops",
     "intermediate_one": "1 intermediate stop",
-    "intermediate_other": "{n} intermediate stops",
     "transfer_within": "Transfer within station complex",
     "walk_to_station": "Walk to station",
-    "transfer_time": "{label} · {min} min transfer",
-    "plt": "Plt. {name}",
     "earlier": "← Earlier departures",
     "later": "Later departures →",
-    "showing_results": "Showing {start}–{end}",
-    "terminus": "Terminus",
     "detail": {
-      "total_time": "Total: ~{n} min",
       "transfer": "Transfer",
       "towards": "{line} towards {terminus}",
       "leg_service": "Service",
@@ -724,9 +636,7 @@ registerLanguage('en', 'English', {
       "duplicate_segment": "{n} {type} segments connect {from} and {to}",
       "cross_cutoff_journey": "\"{name}\" @ {time} runs across the service day boundary ({cutoff})",
       "suspicious_segment": "{from} — {to}: near-identical path to another segment ({dist}m avg deviation)",
-      "suspicious_chain": "{from} — {to}: path matches a chain of segments ({dist}m avg deviation): {chain}",
-      "overlap_branching": "{segA} and {segB} share {dist}m of track after a common station",
-      "overlap_mid": "{segA} and {segB} share {dist}m of track"
+      "suspicious_chain": "{from} — {to}: path matches a chain of segments ({dist}m avg deviation): {chain}"
     },
     "detail": {
       "single_track_conflict": "{a_time} vs {b_time}",
@@ -799,9 +709,6 @@ registerLanguage('en', 'English', {
     "label": {
       "individual_issue_types": "Individual Issue Types"
     },
-    "placeholder": {
-      "eg_system_name": "e.g. Central Railway Network"
-    },
     "toast": {
       "theme_coming": "Light and system themes coming in a future update"
     },
@@ -822,7 +729,6 @@ registerLanguage('en', 'English', {
     "language_desc": "Interface language. Language files live in the lang/ folder.",
     "system_name_desc": "Shown in the header and browser tab. Included in JSON exports.",
     "strip_brackets": "Strip bracketed text from end of station names on public-facing views",
-    "strip_brackets_example": "e.g. \"Central Station [Red Line]\" displays as \"Central Station\" on the departure board and journey planner.",
     "strip_brackets_desc": "e.g. \"Central Station [Red Line]\" displays as \"Central Station\" on the departure board and journey planner.",
     "jp_map_tiles": "Show map tiles on journey planner maps",
     "jp_map_tiles_desc": "When disabled, journey maps show a plain dark background without OGF tiles.",
@@ -842,18 +748,14 @@ registerLanguage('en', 'English', {
     "subtitle": "Import and export network data",
     "json_title": "JSON Save File",
     "json_desc": "Export the entire current system as a JSON file, or import a previously exported save file as a new system.",
-    "ogf_title": "OGF Relation Import",
     "ogf_desc": "Import stations and segments from an OGF route relation.",
     "ogf_btn": "Import Relation",
-    "csv_node_title": "CSV Node Import",
     "csv_node_desc": "Import stations and other nodes from a CSV or TSV file.",
-    "csv_seg_title": "CSV Segment Import",
     "csv_seg_desc": "Import segments from a CSV or TSV file.",
     "csv_btn": "Import CSV",
     "saves_title": "Manage Saves",
     "saves_desc": "Rename, duplicate, or delete saved systems.",
     "manage_saves": "Open Save Manager",
-    "coming_soon": "Coming in a future session",
     "csv": {
       "mode_nodes": "CSV Node Import",
       "mode_segments": "CSV Segment Import",
@@ -879,7 +781,6 @@ registerLanguage('en', 'English', {
       "default_speed": "Default Max Speed (km/h)",
       "default_tracks": "Default Track Count",
       "default_elec": "Default Electrification",
-      "no_defaults_needed": "All fields are mapped from columns — no defaults needed.",
       "btn_preview": "Build Preview",
       "btn_import": "Import {n} items",
       "review_count": "{n} items ready to import",
@@ -891,7 +792,6 @@ registerLanguage('en', 'English', {
       "warn_same_node": "Same from/to node",
       "warn_dup_ogf_match": "Multiple nodes share this OGF ID",
       "warn_dup_existing": "Duplicate of existing segment",
-      "warn_dup_batch": "Duplicate within import batch",
       "warn_no_name_or_ogf": "No name or OGF ID — cannot identify",
       "warn_dup_ogf_existing": "OGF ID already exists: {name}",
       "nothing_to_import": "Nothing selected to import.",
@@ -905,7 +805,6 @@ registerLanguage('en', 'English', {
       "to_input": "To (CSV)",
       "no_match": "No match found",
       "select_node": "— Select —",
-      "disambig_suffix": "Disambiguation Suffix",
       "disambig_desc": "Appended in [brackets] to every imported node name. Useful when importing stations for a specific line.",
       "disambig_placeholder": "e.g. Metro, Piccadilly",
       "step_dedup": "Duplicates",
@@ -989,9 +888,7 @@ registerLanguage('en', 'English', {
       "saves": "Saves",
       "search": "Search",
       "now": "Now",
-      "today": "Today",
       "fit": "Fit",
-      "swap": "Swap",
       "close": "Close",
       "save": "Save",
       "cancel": "Cancel",
@@ -999,17 +896,14 @@ registerLanguage('en', 'English', {
       "next": "Next →",
       "confirm": "Confirm",
       "edit": "Edit",
-      "delete": "Delete",
       "load": "Load",
       "rename": "Rename",
       "duplicate": "Dup",
       "reverse": "Rev",
-      "apply": "Apply",
-      "remove": "Remove"
+      "apply": "Apply"
     },
     "label": {
-      "per_day": "/day",
-      "code": "Code"
+      "per_day": "/day"
     },
     "select": "— Select —",
     "none_default": "— None —",
@@ -1027,9 +921,7 @@ registerLanguage('en', 'English', {
       "name": "Name",
       "ref": "Ref",
       "type": "Type",
-      "description": "Description",
-      "cat": "Cat.",
-      "deps": "Deps."
+      "description": "Description"
     },
     "field": {
       "name": "Name",
@@ -1043,18 +935,12 @@ registerLanguage('en', 'English', {
     },
     "typical": "Typical",
     "atypical": "Atypical",
-    "disallowed": "Disallowed",
-    "none": "None",
-    "none_line": "(none)",
-    "not_set": "—",
-    "duration_min": "{n} min",
-    "duration_hm": "{h}h {m}m"
+    "disallowed": "Disallowed"
   },
   "railmap": {
     "btn": {
       "add_track": "+ Add Track",
-      "create_schematic": "+ Create Schematic",
-      "edit_schematic": "Edit Schematic"
+      "create_schematic": "+ Create Schematic"
     },
     "label": {
       "pick_start_node": "— Pick starting node —",
@@ -1062,11 +948,6 @@ registerLanguage('en', 'English', {
       "junction_schematic": "Junction Schematic",
       "station_schematic": "Station Schematic",
       "waypoint_schematic": "Waypoint Schematic"
-    },
-    "tooltip": {
-      "zoom_in": "Zoom in",
-      "zoom_out": "Zoom out",
-      "fit_all": "Fit all nodes"
     },
     "toast": {
       "saved": "Schematic saved"
@@ -1076,9 +957,7 @@ registerLanguage('en', 'English', {
     },
     "th": {
       "direction": "Direction",
-      "seg_towards": "Segment towards",
-      "enter": "Enter",
-      "exit": "Exit"
+      "seg_towards": "Segment towards"
     },
     "northbound": "Northbound",
     "southbound": "Southbound",
@@ -1087,28 +966,16 @@ registerLanguage('en', 'English', {
     "assign_directions": "Assign each connected segment to a direction (max 2 directions per station).",
     "track_connections": "Each track connects to segments on one or more sides (or terminates).",
     "no_tracks": "No tracks defined.",
-    "no_segs_side": "No segments on this side",
-    "tracks_defined_one": "1 track defined",
-    "tracks_defined_other": "{n} tracks defined",
     "segment_directions": "Segment Directions",
     "tracks_title": "Tracks",
-    "save_schematic": "Save Schematic",
-    "platforms": "Platforms",
-    "empty": {
-      "all_placed": "All stations placed!",
-      "no_stations": "No stations defined."
-    }
+    "save_schematic": "Save Schematic"
   },
   "l10n": {
     "toast": {
       "lang_not_found": "Language file not found: {code}",
       "no_other_langs": "No other languages loaded — only English is available."
     },
-    "report_title": "Translation Report",
-    "missing_keys": "{n} missing key(s)",
-    "stale_keys": "{n} stale key(s) (English changed)",
-    "fully_up_to_date": "Fully up to date!",
-    "complete": "complete"
+    "report_title": "Translation Report"
   },
   "pattern": {
     "daily": "Daily",
