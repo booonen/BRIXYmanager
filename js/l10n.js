@@ -24,6 +24,11 @@ let _strings = {};
 // Shape: { [code]: { name, hashes: {key: hash} | null, staleKeys: [key, ...] } }
 let _meta = {};
 let _availableLanguages = [{ code: 'en', name: 'English' }];
+// Old-key → new-key aliases. Used during key-restructure migrations so that
+// call sites referencing old key paths keep resolving while the codebase
+// transitions. Registered via registerAliases(). Empty when no migration
+// is in-flight.
+let _aliases = {};
 
 // djb2 → unsigned 32-bit → base36. ~6-7 char hashes, plenty for staleness detection.
 function _hashString(s) {
@@ -71,6 +76,13 @@ function registerLanguage(code, name, strings) {
   }
 }
 
+// Register old-key → new-key aliases. Call after all registerLanguage() calls.
+// During a migration, old call sites like t('btn.saves') still resolve after
+// the key has been moved to common.btn.saves, without editing every call site.
+function registerAliases(map) {
+  Object.assign(_aliases, map || {});
+}
+
 // Resolve a dot-notation key in an object: resolve(obj, 'nav.nodes') → obj.nav.nodes
 function _resolveKey(obj, key) {
   if (!obj) return undefined;
@@ -90,6 +102,12 @@ const _missingKeys = new Set();
 function t(key, params) {
   let val = _resolveKey(_strings[_lang], key);
   if (val === undefined) val = _resolveKey(_strings.en, key); // fallback to English
+  if (val === undefined && _aliases[key]) {
+    // Transitional: try the aliased new key if direct lookup failed.
+    const aliased = _aliases[key];
+    val = _resolveKey(_strings[_lang], aliased);
+    if (val === undefined) val = _resolveKey(_strings.en, aliased);
+  }
   if (val === undefined) {
     if (!_missingKeys.has(key)) { _missingKeys.add(key); console.warn(`[l10n] Missing key: "${key}"`); }
     return key; // fallback to raw key
