@@ -1275,7 +1275,7 @@ function renderSchemSidebar() {
   const allSelected = lineFilterSet.size === 0;
   let filterHtml = `<label style="display:flex;align-items:center;gap:4px;cursor:pointer;margin-bottom:2px">`;
   filterHtml += `<input type="checkbox" ${allSelected ? 'checked' : ''} onchange="if(this.checked){_schemState._lineFilter=new Set();}else{_schemState._lineFilter=new Set(['__none__']);}renderSchemSidebar()"/>`;
-  filterHtml += `<span style="font-weight:600">${t('label.all_lines')}</span></label>`;
+  filterHtml += `<span style="font-weight:600">${t('common.all_lines')}</span></label>`;
   for (const g of data.serviceGroups) {
     const checked = allSelected ? true : lineFilterSet.has(g.id);
     const fg = contrastText(g.color || '#888');

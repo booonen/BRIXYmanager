@@ -44,12 +44,12 @@ function renderNodes() {
 
   if (!list.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">◉</div>
-      <h3>${t('empty.no_nodes')}</h3><p>${t('empty.no_nodes_desc')}</p>
+      <h3>${t('nodes.empty.title')}</h3><p>${t('nodes.empty.desc')}</p>
       <button class="btn btn-primary" onclick="openNodeModal()">+ Add Node</button></div>`;
     return;
   }
   el.innerHTML = `<table class="data-table"><thead><tr>
-    ${sortableHeader('nodes','name',t('th.name'))}${sortableHeader('nodes','ref',t('th.ref'))}${sortableHeader('nodes','type',t('th.type'))}${sortableHeader('nodes','platforms',t('th.platforms'))}${sortableHeader('nodes','connections',t('th.connections'))}<th>${t("th.ogf")}</th><th>${t("th.coords")}</th><th>${t("th.schematic")}</th><th></th></tr></thead><tbody>` +
+    ${sortableHeader('nodes','name',t('common.th.name'))}${sortableHeader('nodes','ref',t('common.th.ref'))}${sortableHeader('nodes','type',t('common.th.type'))}${sortableHeader('nodes','platforms',t('nodes.th.platforms'))}${sortableHeader('nodes','connections',t('nodes.th.connections'))}<th>${t("nodes.th.ogf")}</th><th>${t("nodes.th.coords")}</th><th>${t("nodes.th.schematic")}</th><th></th></tr></thead><tbody>` +
     list.map(n => {
       const conns = connectedNodes(n.id).length;
       const hasOgf = !!n.ogfNode;
@@ -64,7 +64,7 @@ function renderNodes() {
       <td style="text-align:center">${n.lat != null ? '<span title="' + n.lat.toFixed(5) + ', ' + n.lon.toFixed(5) + '" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>'}</td>
       <td style="text-align:center">${(n.type==='station' || n.type==='junction') ? (hasSch ? '<span title="Schematic defined" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>') : ''}</td>
       <td class="actions-cell">
-        <button class="btn btn-sm" onclick="openNodeModal('${n.id}')">${t('btn.edit')}</button>
+        <button class="btn btn-sm" onclick="openNodeModal('${n.id}')">${t('common.edit')}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteNode('${n.id}')">✕</button></td>
     </tr>`;
     }).join('') + '</tbody></table>';
@@ -122,7 +122,7 @@ function showNodeDetail(id) {
   if (isPassengerStop(node)) {
     const _canSplit = nodeCanSplit(id);
     const _mergeCands = nodeMergeCandidates(id);
-    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">\u25A4 ${t('node_detail.view_departure_board')}</button> <button class="btn btn-sm" ${_canSplit ? '' : 'disabled title="' + esc(t('split.btn_disabled_tooltip')) + '"'} onclick="openSplitModal('${id}')">\u2702 ${t('split.btn')}</button>${_mergeCands.length ? ` <button class="btn btn-sm" onclick="openMergeChooser('${id}')">\u21C4 ${t('merge.btn')}</button>` : ''}</div>`;
+    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">\u25A4 ${t('nodes.detail.view_departure_board')}</button> <button class="btn btn-sm" ${_canSplit ? '' : 'disabled title="' + esc(t('nodes.split.btn_disabled_tooltip')) + '"'} onclick="openSplitModal('${id}')">\u2702 ${t('nodes.split.btn')}</button>${_mergeCands.length ? ` <button class="btn btn-sm" onclick="openMergeChooser('${id}')">\u21C4 ${t('nodes.merge.btn')}</button>` : ''}</div>`;
   }
 
   // Detail map
@@ -154,7 +154,7 @@ function showNodeDetail(id) {
       return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;background:${seg?.interchangeType==='osi'?'#2a1f3d':'#1f2a2a'};border-color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'};color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'}" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))} · ${label} · ${walkMins} min</span>`;
     }).join('');
     html += '</div>';
-  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_segments')}</div>`;
+  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('segments.empty.title')}</div>`;
   html += '</div>';
 
   html += '<div class="detail-map-clear"></div>';
@@ -162,12 +162,12 @@ function showNodeDetail(id) {
   // Schematic (stations, junctions, waypoints)
   if ((node.type === 'station' || node.type === 'junction' || node.type === 'waypoint') && conns.length > 0) {
     const sch = node.schematic;
-    html += `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('th.schematic')}</strong>`;
+    html += `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nodes.th.schematic')}</strong>`;
     if (sch && sch.tracks && sch.tracks.length > 0) {
       html += ` <span class="clickable" style="font-size:11px;color:var(--accent);cursor:pointer;margin-left:8px;text-transform:none;font-weight:400" onclick="openSchematicEditor('${id}')">Edit</span>`;
       html += schRenderSVG(node, sch, id);
     } else {
-      html += `<div class="mt-8" style="font-size:13px"><span class="clickable" style="color:var(--accent);cursor:pointer" onclick="openSchematicEditor('${id}')">${t('btn.create_schematic')}</span></div>`;
+      html += `<div class="mt-8" style="font-size:13px"><span class="clickable" style="color:var(--accent);cursor:pointer" onclick="openSchematicEditor('${id}')">${t('nodes.btn.create_schematic')}</span></div>`;
     }
     html += `</div>`;
   }
@@ -175,7 +175,7 @@ function showNodeDetail(id) {
   // Schedule
   html += `<div><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nav.schedule')} (${deps.length})</strong>`;
   if (deps.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>${t("th.arrive")}</th><th>${t("th.depart")}</th><th>${t("th.service")}</th><th>${t("th.origin_dest")}</th><th>${t("th.platform")}</th></tr></thead><tbody>` +
+    html += `<table class="schedule-table mt-8"><thead><tr><th>${t("departures.th.arrive")}</th><th>${t("departures.th.depart")}</th><th>${t("services.th.service")}</th><th>${t("departures.th.origin_dest")}</th><th>${t("nodes.th.platform")}</th></tr></thead><tbody>` +
       deps.map(d => `<tr>
         <td>${toTime(d.arrive)}</td>
         <td style="color:var(--warn)">${toTime(d.depart)}</td>
@@ -183,7 +183,7 @@ function showNodeDetail(id) {
         <td class="text-dim">${esc(d.origin)} → ${esc(d.destination)}</td>
         <td>${esc(d.platform)}</td>
       </tr>`).join('') + '</tbody></table>';
-  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_scheduled_trains')}</div>`;
+  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('segments.empty.no_scheduled_trains')}</div>`;
   html += '</div></div>';
 
   el.innerHTML = html;
@@ -290,39 +290,39 @@ function openNodeModal(id, hField) {
     `<div class="flex items-center gap-8 mb-8">
       <input type="text" value="${esc(p.name)}" class="plat-name" style="flex:1">
       <button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">✕</button></div>`).join('') : defaultPlats;
-  openModal(n ? t('modal.edit_node') : t('modal.add_node'), `
+  openModal(n ? t('nodes.modal.edit') : t('nodes.modal.add'), `
     <div class="form-row">
-      <div class="form-group" style="flex:2"><label>${t('field.name')}</label><input type="text" id="f-name" value="${esc(n?.name||'')}" placeholder="e.g. Hemstein Centraal"></div>
-      <div class="form-group" style="flex:1"><label>${t('field.ref_code')}</label><input type="text" id="f-ref" value="${esc(n?.refCode||'')}" placeholder="${t('placeholder.eg_ref')}"></div>
+      <div class="form-group" style="flex:2"><label>${t('common.field.name')}</label><input type="text" id="f-name" value="${esc(n?.name||'')}" placeholder="e.g. Hemstein Centraal"></div>
+      <div class="form-group" style="flex:1"><label>${t('common.field.ref_code')}</label><input type="text" id="f-ref" value="${esc(n?.refCode||'')}" placeholder="${t('nodes.placeholder.eg_ref')}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>${t('field.type')}</label>
+      <div class="form-group"><label>${t('common.field.type')}</label>
         <select id="f-type" onchange="document.getElementById('plat-sec').style.display=(this.value==='station')?'':'none'">
           ${['station','bus_stop','junction','waypoint','depot','freight_yard'].map(tp =>
             `<option value="${tp}" ${(n ? n.type : _lastNodeType)===tp?'selected':''}>${t('type.'+tp)}</option>`).join('')}
         </select></div>
-      <div class="form-group"><label>${t('field.ogf_node')}</label><input type="text" id="f-ogf" value="${esc(n?.ogfNode||'')}" placeholder="${t('placeholder.eg_ogf_id')}" oninput="this.value=this.value.replace(/^node\\s+/i,'')"></div>
+      <div class="form-group"><label>${t('nodes.field.ogf_node')}</label><input type="text" id="f-ogf" value="${esc(n?.ogfNode||'')}" placeholder="${t('nodes.placeholder.eg_ogf_id')}" oninput="this.value=this.value.replace(/^node\\s+/i,'')"></div>
     </div>
-    <div class="form-group"><label>${t('field.address')}</label><input type="text" id="f-addr" value="${esc(n?.address||'')}"></div>
-    <div class="form-group"><label>${t('field.description')}</label><input type="text" id="f-ndesc" value="${esc(n?.description||'')}" placeholder="${t('placeholder.eg_description')}"></div>
+    <div class="form-group"><label>${t('nodes.field.address')}</label><input type="text" id="f-addr" value="${esc(n?.address||'')}"></div>
+    <div class="form-group"><label>${t('common.field.description')}</label><input type="text" id="f-ndesc" value="${esc(n?.description||'')}" placeholder="${t('nodes.placeholder.eg_description')}"></div>
     <div id="plat-sec" style="${(n ? n.type === 'station' : _lastNodeType==='station')?'':'display:none'}">
-      <div class="form-group"><label>${t('field.platforms')}</label><div id="plat-list">${plats}</div>
-        <button class="btn btn-sm mt-8" onclick="addPlatRow()">${t('btn.add_platform')}</button></div>
-      ${n && n.type === 'station' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.station_schematic")}</label>
-        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
+      <div class="form-group"><label>${t('nodes.field.platforms')}</label><div id="plat-list">${plats}</div>
+        <button class="btn btn-sm mt-8" onclick="addPlatRow()">${t('nodes.btn.add_platform')}</button></div>
+      ${n && n.type === 'station' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("nodes.schematic.station_title")}</label>
+        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('nodes.btn.edit_schematic') : t('nodes.btn.create_schematic')}</button>
         ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
       </div>` : ''}
     </div>
-    ${n && n.type === 'junction' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.junction_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
+    ${n && n.type === 'junction' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("nodes.schematic.junction_title")}</label>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('nodes.btn.edit_schematic') : t('nodes.btn.create_schematic')}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}
-    ${n && n.type === 'waypoint' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.waypoint_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
+    ${n && n.type === 'waypoint' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("nodes.schematic.waypoint_title")}</label>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('nodes.btn.edit_schematic') : t('nodes.btn.create_schematic')}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="saveNode()">${n?t('btn.save'):t('btn.add_node')}</button>`);
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="saveNode()">${n?t('common.save'):t('nodes.btn.add')}</button>`);
   if (hField) highlightField(hField);
 }
 function addPlatRow() {
@@ -333,7 +333,7 @@ function addPlatRow() {
 }
 function saveNode() {
   const name = document.getElementById('f-name').value.trim();
-  if (!name) { toast(t('toast.name_required'), 'error'); return; }
+  if (!name) { toast(t('nodes.toast.name_required'), 'error'); return; }
   const type = document.getElementById('f-type').value;
   _lastNodeType = type;
   const ogfNode = document.getElementById('f-ogf').value.trim();
@@ -362,12 +362,12 @@ function saveNode() {
     if (ogfNode && (ogfChanged || node.lat == null || node.lon == null)) {
       fetchOgfCoords([node]);
     }
-    toast(t('toast.node_updated'), 'success');
+    toast(t('nodes.toast.updated'), 'success');
   } else {
     const newNode = { id: uid(), name, type, ogfNode, address, refCode, description, platforms };
     data.nodes.push(newNode);
     if (ogfNode) fetchOgfCoords([newNode]);
-    toast(t('toast.node_added'), 'success');
+    toast(t('nodes.toast.added'), 'success');
   }
   save(); closeModal(); renderNodes(); updateBadges();
 }
@@ -378,12 +378,12 @@ function deleteNode(id) {
   let impact = '';
   if (segCount) impact += `\n• ${segCount} segment${segCount!==1?'s':''} will be removed`;
   if (svcCount) impact += `\n• ${svcCount} service${svcCount!==1?'s':''} will be affected`;
-  appConfirm(t('confirm.delete_node', { name: n.name }) + (impact ? '\n' + impact : ''), () => {
+  appConfirm(t('nodes.confirm.delete', { name: n.name }) + (impact ? '\n' + impact : ''), () => {
     data.segments = data.segments.filter(s => s.nodeA !== id && s.nodeB !== id);
     data.services.forEach(s => { s.stops = s.stops.filter(st => st.nodeId !== id); });
     data.departures = data.departures.filter(d => { const svc = getSvc(d.serviceId); return svc && svc.stops.length >= 2; });
     data.nodes = data.nodes.filter(n => n.id !== id);
-    save(); renderNodes(); updateBadges(); toast(t('toast.node_deleted'), 'success');
+    save(); renderNodes(); updateBadges(); toast(t('nodes.toast.deleted'), 'success');
   });
 }
 
@@ -428,7 +428,7 @@ function schRenderModal(nodeId) {
   const segIds = connectedNodes(nodeId).map(c => c.segId);
   const platforms = node.platforms || [];
 
-  const SIDE_NAMES = { a: t('schematic.northbound'), b: t('schematic.southbound'), c: t('schematic.eastbound'), d: t('schematic.westbound') };
+  const SIDE_NAMES = { a: t('nodes.schematic.northbound'), b: t('nodes.schematic.southbound'), c: t('nodes.schematic.eastbound'), d: t('nodes.schematic.westbound') };
   const allSides = ['a', 'b', 'c', 'd'];
 
   // Determine which directions are in use (max 2)
@@ -437,9 +437,9 @@ function schRenderModal(nodeId) {
   const availableSides = usedSides.length < 2 ? allSides : usedSides;
 
   // Sides table
-  let sidesHtml = `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted)">${t('schematic.segment_directions')}</strong>
-    <p class="text-dim" style="font-size:12px;margin:4px 0 8px">${t('schematic.assign_directions')}</p>
-    <table class="schedule-table"><thead><tr><th>${t("th.seg_towards")}</th><th>${t("th.direction")}</th></tr></thead><tbody>`;
+  let sidesHtml = `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted)">${t('nodes.schematic.segment_directions')}</strong>
+    <p class="text-dim" style="font-size:12px;margin:4px 0 8px">${t('nodes.schematic.assign_directions')}</p>
+    <table class="schedule-table"><thead><tr><th>${t("services.th.seg_towards")}</th><th>${t("services.th.direction")}</th></tr></thead><tbody>`;
   for (const sid of segIds) {
     const currentSide = allSides.find(s => (sch.sides[s]||[]).includes(sid)) || usedSides[0] || 'a';
     sidesHtml += `<tr><td>${esc(schSegLabel(sid, nodeId))}</td>
@@ -451,8 +451,8 @@ function schRenderModal(nodeId) {
 
   // Tracks table — only show the active (used) sides
   const activeSides = usedSides;
-  let tracksHtml = `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted)">${t('schematic.tracks_title')}</strong>
-    <p class="text-dim" style="font-size:12px;margin:4px 0 8px">${t('schematic.track_connections')}</p>`;
+  let tracksHtml = `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted)">${t('nodes.schematic.tracks_title')}</strong>
+    <p class="text-dim" style="font-size:12px;margin:4px 0 8px">${t('nodes.schematic.track_connections')}</p>`;
 
   if (sch.tracks.length) {
     tracksHtml += `<div style="overflow-x:auto">`;
@@ -490,13 +490,13 @@ function schRenderModal(nodeId) {
     }
     tracksHtml += `</div>`;
   } else {
-    tracksHtml += `<div class="text-dim" style="font-size:13px">t('schematic.no_tracks')</div>`;
+    tracksHtml += `<div class="text-dim" style="font-size:13px">t('nodes.schematic.no_tracks')</div>`;
   }
-  tracksHtml += `<button class="btn btn-sm mt-8" onclick="schAddTrack('${nodeId}')">${t('btn.add_track')}</button></div>`;
+  tracksHtml += `<button class="btn btn-sm mt-8" onclick="schAddTrack('${nodeId}')">${t('nodes.btn.add_track')}</button></div>`;
 
-  openModal(t('modal.schematic', { name: node.name }), sidesHtml + tracksHtml,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="schSave('${nodeId}')">${t("schematic.save_schematic")}</button>`);
+  openModal(t('nodes.modal.schematic', { name: node.name }), sidesHtml + tracksHtml,
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="schSave('${nodeId}')">${t("nodes.schematic.save_schematic")}</button>`);
 }
 
 function schMultiSegSelect(sideSegs, selected, trackIdx, sideKey, nodeId) {
@@ -572,7 +572,7 @@ function schSave(nodeId) {
   delete sch._hasExtraSides;
   node.schematic = sch;
   save(); closeModal(); showNodeDetail(nodeId);
-  toast(t('toast.schematic_saved'), 'success');
+  toast(t('nodes.toast.schematic_saved'), 'success');
 }
 
 function schRenderSVG(node, sch, nodeId) {
@@ -597,7 +597,7 @@ function schRenderSVG(node, sch, nodeId) {
   const sideASegs = sch.sides?.[leftDir] || [];
   const sideBSegs = rightDir ? (sch.sides?.[rightDir] || []) : [];
 
-  const SIDE_NAMES = { a: t('schematic.northbound'), b: t('schematic.southbound'), c: t('schematic.eastbound'), d: t('schematic.westbound') };
+  const SIDE_NAMES = { a: t('nodes.schematic.northbound'), b: t('nodes.schematic.southbound'), c: t('nodes.schematic.eastbound'), d: t('nodes.schematic.westbound') };
   const leftLabel = SIDE_NAMES[leftDir] || '';
   const rightLabel = rightDir ? (SIDE_NAMES[rightDir] || '') : '';
 
@@ -834,12 +834,12 @@ function renderSegments() {
 
   if (!list.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">─</div>
-      <h3>${t('empty.no_segments')}</h3><p>${t('empty.no_segments_desc')}</p>
+      <h3>${t('segments.empty.title')}</h3><p>${t('segments.empty.desc')}</p>
       <button class="btn btn-primary" onclick="openSegmentModal()">+ Add Segment</button></div>`;
     return;
   }
   el.innerHTML = `<table class="data-table"><thead><tr>
-    ${sortableHeader('segments','from',t('th.from'))}${sortableHeader('segments','to',t('th.to'))}<th>${t('th.type')}</th>${sortableHeader('segments','tracks',t('th.tracks'))}${sortableHeader('segments','speed',t('th.speed'))}${sortableHeader('segments','distance',t('th.distance'))}<th>${t("th.electrification")}</th>${sortableHeader('segments','traffic',t('th.traffic'))}<th></th></tr></thead><tbody>` +
+    ${sortableHeader('segments','from',t('segments.th.from'))}${sortableHeader('segments','to',t('segments.th.to'))}<th>${t('common.th.type')}</th>${sortableHeader('segments','tracks',t('segments.th.tracks'))}${sortableHeader('segments','speed',t('segments.th.speed'))}${sortableHeader('segments','distance',t('segments.th.distance'))}<th>${t("segments.th.electrification")}</th>${sortableHeader('segments','traffic',t('segments.th.traffic'))}<th></th></tr></thead><tbody>` +
     list.map(s => {
       const ich = isInterchange(s);
       const road = isRoad(s);
@@ -859,18 +859,18 @@ function renderSegments() {
         ? `<span class="chip" style="font-size:10px;background:${s.interchangeType==='osi'?'#2a1f3d':'#1f2a2a'};color:${s.interchangeType==='osi'?'#b08ae0':'#7ec8c8'}">${s.interchangeType.toUpperCase()}</span>`
         : road
         ? `<span class="chip" style="font-size:10px;background:#3d2a1f;color:#e0a860">ROAD</span>`
-        : `<span class="chip" style="font-size:10px;background:var(--accent-glow);color:var(--accent)">${t('seg.type_track_display')}</span>`;
+        : `<span class="chip" style="font-size:10px;background:var(--accent-glow);color:var(--accent)">${t('segments.seg.type_track_display')}</span>`;
       return `<tr data-id="${s.id}">
       <td><strong class="clickable" onclick="showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))}</strong></td>
       <td><strong class="clickable" onclick="showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeB))}</strong></td>
       <td>${typeChip}</td>
       <td class="mono">${ich || road ? '—' : segTrackCount(s)}</td>
-      <td class="mono">${ich ? t('seg_detail.walk_time', { n: walkMins }) : s.maxSpeed + ' km/h'}</td>
+      <td class="mono">${ich ? t('segments.detail.walk_time', { n: walkMins }) : s.maxSpeed + ' km/h'}</td>
       <td class="mono">${s.distance} km</td>
-      <td>${ich || road ? '—' : (s.electrification?'⚡ '+t('seg_detail.electrified'):t('seg_detail.not_electrified'))}</td>
-      <td class="mono">${ich ? '—' : traffic+t('label.per_day')}</td>
+      <td>${ich || road ? '—' : (s.electrification?'⚡ '+t('segments.detail.electrified'):t('segments.detail.not_electrified'))}</td>
+      <td class="mono">${ich ? '—' : traffic+t('common.per_day')}</td>
       <td class="actions-cell">
-        <button class="btn btn-sm" onclick="openSegmentModal('${s.id}')">${t('btn.edit')}</button>
+        <button class="btn btn-sm" onclick="openSegmentModal('${s.id}')">${t('common.edit')}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteSegment('${s.id}')">✕</button></td>
     </tr>`;
     }).join('') + '</tbody></table>';
@@ -890,8 +890,8 @@ function showSegmentDetail(segId) {
       ${seg.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(seg.description)}</p>` : ''}
       <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
         <span class="chip">${seg.distance} km</span>
-        <span class="chip">${t('seg_detail.walk_time', { n: walkMins })}</span>
-        <span class="chip">${seg.interchangeType === 'osi' ? t('seg.osi') : t('seg.isi')}</span>
+        <span class="chip">${t('segments.detail.walk_time', { n: walkMins })}</span>
+        <span class="chip">${seg.interchangeType === 'osi' ? t('segments.seg.osi') : t('segments.seg.isi')}</span>
       </div></div>`;
     setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
     return;
@@ -953,12 +953,12 @@ function showSegmentDetail(segId) {
       <span class="chip">${seg.maxSpeed} km/h</span>
       <span class="chip">${seg.distance} km</span>
       <span class="chip">~${travelMins} min</span>
-      ${road ? '' : `<span class="chip">${seg.electrification?'⚡ '+t('seg_detail.electrified'):t('seg_detail.not_electrified')}</span>`}
-      ${seg.ogfWayIds?.length ? `<span class="chip" title="${esc(seg.ogfWayIds.join(', '))}">${t('seg_detail.ogf_ways', { n: seg.ogfWayIds.length, pts: seg.wayGeometry?.length || 0 })}</span>` : ''}
+      ${road ? '' : `<span class="chip">${seg.electrification?'⚡ '+t('segments.detail.electrified'):t('segments.detail.not_electrified')}</span>`}
+      ${seg.ogfWayIds?.length ? `<span class="chip" title="${esc(seg.ogfWayIds.join(', '))}">${t('segments.detail.ogf_ways', { n: seg.ogfWayIds.length, pts: seg.wayGeometry?.length || 0 })}</span>` : ''}
       ${seg.allowedModes?.length ? seg.allowedModes.map(mid => { const c = getCat(mid); return c ? `<span class="chip" style="font-size:10px">${esc(c.name)}</span>` : ''; }).join('') : ''}
     </div>
     ${detailMapContainerHTML('dm-seg', nA?.lat != null && nB?.lat != null, detailMapHasBeck(segLineIds))}
-    <button class="btn btn-sm mb-16" onclick="promptInsertWaypoint('${segId}')" title="${t('tooltip.insert_waypoint')}">✂ ${t('modal.insert_waypoint')}</button>`;
+    <button class="btn btn-sm mb-16" onclick="promptInsertWaypoint('${segId}')" title="${t('nodes.tooltip.insert_waypoint')}">✂ ${t('nodes.modal.insert_waypoint')}</button>`;
   if (segLineIds.size) {
     const segLines = [...segLineIds].map(gid => getGroup(gid)).filter(Boolean);
     html += `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nav.lines')}</strong>
@@ -968,7 +968,7 @@ function showSegmentDetail(segId) {
   }
 
   html += '<div class="detail-map-clear"></div>';
-  html += `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('seg_detail.services_using')}</strong>`;
+  html += `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('segments.detail.services_using')}</strong>`;
 
   // Collect unique services that traverse this segment
   const svcSet = new Map();
@@ -993,7 +993,7 @@ function showSegmentDetail(segId) {
 
   const hasMultiTrack = segTrackCount(seg) > 1;
   if (svcSet.size) {
-    html += `<table class="schedule-table mt-8 mb-16"><thead><tr><th>Service</th><th>Cat.</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("th.route")}</th><th>${t("th.direction")}</th><th>${t("th.depart")}</th></tr></thead><tbody>` +
+    html += `<table class="schedule-table mt-8 mb-16"><thead><tr><th>Service</th><th>Cat.</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("services.th.route")}</th><th>${t("services.th.direction")}</th><th>${t("departures.th.depart")}</th></tr></thead><tbody>` +
       Array.from(svcSet.values()).map(s => `<tr>
         <td><span class="clickable" onclick="showServiceDetail('${s.svc.id}')">${esc(s.svc.name)}</span></td>
         <td>${s.cat ? `<span class="chip" style="font-size:10px"><span class="dot" style="background:${svcLineColor(s.svc)}"></span>${esc(s.cat.abbreviation||s.cat.name)}</span>` : '—'}</td>
@@ -1007,7 +1007,7 @@ function showSegmentDetail(segId) {
   html += `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Trains on this segment (${trains.length})</strong>`;
 
   if (trains.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>Enter</th><th>Exit</th><th>Cat.</th><th>Service</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("th.direction")}</th><th>${t("th.route")}</th></tr></thead><tbody>` +
+    html += `<table class="schedule-table mt-8"><thead><tr><th>Enter</th><th>Exit</th><th>Cat.</th><th>Service</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("services.th.direction")}</th><th>${t("services.th.route")}</th></tr></thead><tbody>` +
       trains.map(t => `<tr>
         <td style="color:var(--warn)">${toTime(t.enter)}</td>
         <td>${toTime(t.exit)}</td>
@@ -1097,68 +1097,68 @@ function openSegmentModal(id, hField) {
   const defElec = s ? s.electrification : td.electrification;
   const defRef = s?.refCode ?? (segTypeVal === 'road' ? rd.refCode : td.refCode) ?? '';
   const defIchType = s?.interchangeType ?? id_.ichType ?? 'osi';
-  openModal(s ? t('modal.edit_segment') : t('modal.add_segment'), `
-    <div class="form-group"><label>${t('field.segment_type')}</label>
+  openModal(s ? t('segments.modal.edit') : t('segments.modal.add'), `
+    <div class="form-group"><label>${t('segments.field.segment_type')}</label>
       <select id="f-sType" onchange="segTypeChanged(this.value)">
-        <option value="" ${!isInterchange?'selected':''}>${t('seg.track_segment')}</option>
-        <option value="road" ${isInterchange==='road'?'selected':''}>${t('seg.road_segment')}</option>
-        <option value="osi" ${isInterchange==='osi'||isInterchange==='isi'?'selected':''}>${t('seg.walking_interchange')}</option>
+        <option value="" ${!isInterchange?'selected':''}>${t('segments.seg.track_segment')}</option>
+        <option value="road" ${isInterchange==='road'?'selected':''}>${t('segments.seg.road_segment')}</option>
+        <option value="osi" ${isInterchange==='osi'||isInterchange==='isi'?'selected':''}>${t('segments.seg.walking_interchange')}</option>
       </select></div>
     <div class="form-row">
-      <div class="form-group"><label>${t('field.from_node')}</label><div id="seg-node-a-picker"></div></div>
-      <div class="form-group"><label>${t('field.to_node')}</label><div id="seg-node-b-picker"></div></div>
+      <div class="form-group"><label>${t('segments.field.from_node')}</label><div id="seg-node-a-picker"></div></div>
+      <div class="form-group"><label>${t('segments.field.to_node')}</label><div id="seg-node-b-picker"></div></div>
     </div>
     <div id="seg-track-fields" style="${isInterchange==='osi'||isInterchange==='isi'?'display:none':''}">
       <div class="form-row">
-        <div class="form-group"><label>${t('field.max_speed')}</label><input type="number" id="f-sSp" value="${defSpeed}" min="1"></div>
-        <div class="form-group"><label>${t('field.distance')}</label><input type="number" id="f-sDi" value="${s?.distance||''}" min="0.1" step="0.1"></div>
+        <div class="form-group"><label>${t('segments.field.max_speed')}</label><input type="number" id="f-sSp" value="${defSpeed}" min="1"></div>
+        <div class="form-group"><label>${t('segments.field.distance')}</label><input type="number" id="f-sDi" value="${s?.distance||''}" min="0.1" step="0.1"></div>
       </div>
       <div class="form-row">
         <div class="form-group" id="seg-elec-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
           <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
-            <input type="checkbox" id="f-sEl" ${defElec?'checked':''}>${t('field.electrified_label')}</label>
+            <input type="checkbox" id="f-sEl" ${defElec?'checked':''}>${t('segments.field.electrified')}</label>
         </div>
-        <div class="form-group"><label>${t('field.ref_code')}</label><input type="text" id="f-sRef" value="${esc(s ? (s.refCode||'') : defRef)}" placeholder="${t('placeholder.eg_seg_ref')}"></div>
+        <div class="form-group"><label>${t('common.field.ref_code')}</label><input type="text" id="f-sRef" value="${esc(s ? (s.refCode||'') : defRef)}" placeholder="${t('segments.placeholder.eg_ref')}"></div>
       </div>
       <div class="form-group">
-        <label>${t('field.ogf_way_ids')}</label>
+        <label>${t('segments.field.ogf_way_ids')}</label>
         <div style="display:flex;gap:8px;align-items:center">
-          <input type="text" id="f-sOgfWays" value="${esc(s?.ogfWayIds?.length ? s.ogfWayIds.join(', ') : '')}" placeholder="${t('placeholder.eg_ogf_ways')}" style="flex:1" oninput="this.value=this.value.replace(/\\bway\\s*/gi,'')">
+          <input type="text" id="f-sOgfWays" value="${esc(s?.ogfWayIds?.length ? s.ogfWayIds.join(', ') : '')}" placeholder="${t('segments.placeholder.eg_ogf_ways')}" style="flex:1" oninput="this.value=this.value.replace(/\\bway\\s*/gi,'')">
           <button type="button" class="btn btn-sm" onclick="fetchSegWayGeometry()">Fetch</button>
         </div>
-        <p class="text-dim" style="font-size:11px;margin-top:4px" id="seg-way-status">${s?.wayGeometry?.length ? t('seg_detail.ogf_ways', { n: s.ogfWayIds?.length || '?', pts: s.wayGeometry.length }) : ''}</p>
+        <p class="text-dim" style="font-size:11px;margin-top:4px" id="seg-way-status">${s?.wayGeometry?.length ? t('segments.detail.ogf_ways', { n: s.ogfWayIds?.length || '?', pts: s.wayGeometry.length }) : ''}</p>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:6px;cursor:pointer;text-transform:none;font-weight:400">
-          <input type="checkbox" id="f-sAutoTrim" checked>${t('field.auto_trim')}</label>
+          <input type="checkbox" id="f-sAutoTrim" checked>${t('segments.field.auto_trim')}</label>
       </div>
       ${data.categories.length ? `<div class="form-group">
-        <label>${t('field.allowed_modes')}</label>
+        <label>${t('segments.field.allowed_modes')}</label>
         <div style="display:flex;flex-wrap:wrap;gap:8px">${data.categories.map(c => {
           const checked = s?.allowedModes?.length ? s.allowedModes.includes(c.id) : false;
           return `<label style="font-size:12px;display:flex;align-items:center;gap:3px;cursor:pointer">
             <input type="checkbox" class="seg-allowed-mode" value="${c.id}" ${checked?'checked':''}>${esc(c.name)}</label>`;
         }).join('')}</div>
-        <p class="text-dim" style="font-size:11px;margin-top:4px">${t('field.allowed_modes_help')}</p>
+        <p class="text-dim" style="font-size:11px;margin-top:4px">${t('segments.field.allowed_modes_help')}</p>
       </div>` : ''}
       <div class="form-group" id="seg-tracks-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
-        <label>${t('field.tracks')}</label>
+        <label>${t('segments.field.tracks')}</label>
         <div id="seg-track-list">${segTypeVal === 'road' ? '' : defTrackRows}</div>
-        <button type="button" class="btn btn-sm mt-4" onclick="addSegTrackRow()">+ ${t('btn.add_track')}</button>
+        <button type="button" class="btn btn-sm mt-4" onclick="addSegTrackRow()">+ ${t('nodes.btn.add_track')}</button>
       </div>
     </div>
     <div id="seg-interchange-fields" style="${isInterchange==='osi'||isInterchange==='isi'?'':'display:none'}">
-      <div class="form-group"><label>${t('field.interchange_type')}</label>
+      <div class="form-group"><label>${t('segments.field.interchange_type')}</label>
         <div class="flex gap-4">
-          <button class="btn btn-sm" id="btn-ich-osi" onclick="document.getElementById('f-sIchType').value='osi';document.getElementById('btn-ich-osi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-isi').style.cssText=''" style="${!isInterchange||isInterchange==='osi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('seg.osi')}</button>
-          <button class="btn btn-sm" id="btn-ich-isi" onclick="document.getElementById('f-sIchType').value='isi';document.getElementById('btn-ich-isi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-osi').style.cssText=''" style="${isInterchange==='isi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('seg.isi')}</button>
+          <button class="btn btn-sm" id="btn-ich-osi" onclick="document.getElementById('f-sIchType').value='osi';document.getElementById('btn-ich-osi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-isi').style.cssText=''" style="${!isInterchange||isInterchange==='osi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('segments.seg.osi')}</button>
+          <button class="btn btn-sm" id="btn-ich-isi" onclick="document.getElementById('f-sIchType').value='isi';document.getElementById('btn-ich-isi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-osi').style.cssText=''" style="${isInterchange==='isi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('segments.seg.isi')}</button>
         </div>
         <input type="hidden" id="f-sIchType" value="${s?.interchangeType || defIchType}">
       </div>
-      <div class="form-group"><label>${t('field.walk_distance')}</label><input type="number" id="f-sIDi" value="${isInterchange ? (s?.distance||'') : ''}" min="0.01" step="0.01" placeholder="${t('placeholder.eg_walk_dist')}"></div>
+      <div class="form-group"><label>${t('segments.field.walk_distance')}</label><input type="number" id="f-sIDi" value="${isInterchange ? (s?.distance||'') : ''}" min="0.01" step="0.01" placeholder="${t('segments.placeholder.eg_walk_dist')}"></div>
       <p class="text-dim" style="font-size:12px;margin-top:4px">Walking time: <strong id="walk-time-label">—</strong></p>
     </div>
-    <div class="form-group"><label>${t('field.description')}</label><input type="text" id="f-sDesc" value="${esc(s?.description||'')}" placeholder="${isInterchange ? 'e.g. Underground passage between stations' : 'e.g. Double-track mainline through river valley'}"></div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="saveSegment()">${s?t('btn.save'):t('btn.add_segment')}</button>`);
+    <div class="form-group"><label>${t('common.field.description')}</label><input type="text" id="f-sDesc" value="${esc(s?.description||'')}" placeholder="${isInterchange ? 'e.g. Underground passage between stations' : 'e.g. Double-track mainline through river valley'}"></div>`,
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="saveSegment()">${s?t('common.save'):t('segments.btn.add')}</button>`);
   if (hField) highlightField(hField);
   segTypeChanged(document.getElementById('f-sType').value);
 
@@ -1202,11 +1202,11 @@ function openSegmentModal(id, hField) {
 async function fetchSegWayGeometry() {
   const raw = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '');
   const ids = raw.split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
-  if (!ids.length) { toast(t('toast.way_fetch_none'), 'error'); return false; }
-  toast(t('toast.way_fetching'), 'success');
+  if (!ids.length) { toast(t('segments.toast.way_fetch_none'), 'error'); return false; }
+  toast(t('segments.toast.way_fetching'), 'success');
   try {
     const result = await fetchWayGeometry(ids);
-    if (!result || !result.coords?.length) { toast(t('toast.way_fetch_none'), 'error'); return false; }
+    if (!result || !result.coords?.length) { toast(t('segments.toast.way_fetch_none'), 'error'); return false; }
     let coords = result.coords;
 
     // Auto-trim: snap endpoints to polyline and slice
@@ -1218,8 +1218,8 @@ async function fetchSegWayGeometry() {
         const snapA = _snapToPolyline([nA.lat, nA.lon], coords);
         const snapB = _snapToPolyline([nB.lat, nB.lon], coords);
         // Warn if snap distance > 50m
-        if (snapA.dist > 0.05) toast(t('toast.snap_warn', { name: nA.name, m: Math.round(snapA.dist * 1000) }), 'error');
-        if (snapB.dist > 0.05) toast(t('toast.snap_warn', { name: nB.name, m: Math.round(snapB.dist * 1000) }), 'error');
+        if (snapA.dist > 0.05) toast(t('segments.toast.snap_warn', { name: nA.name, m: Math.round(snapA.dist * 1000) }), 'error');
+        if (snapB.dist > 0.05) toast(t('segments.toast.snap_warn', { name: nB.name, m: Math.round(snapB.dist * 1000) }), 'error');
         coords = _slicePolyline(coords, snapA, snapB);
       }
     }
@@ -1234,23 +1234,23 @@ async function fetchSegWayGeometry() {
       if (speedInput && !parseInt(speedInput.value)) speedInput.value = result.maxSpeed;
     }
     if (result.speedsConflict) {
-      toast(t('toast.way_speed_conflict'), 'error');
+      toast(t('segments.toast.way_speed_conflict'), 'error');
     }
     // Update status label
     const status = document.getElementById('seg-way-status');
-    if (status) status.textContent = t('toast.way_fetch_ok', { n: coords.length, km });
-    toast(t('toast.way_fetch_ok', { n: coords.length, km }), 'success');
+    if (status) status.textContent = t('segments.toast.way_fetch_ok', { n: coords.length, km });
+    toast(t('segments.toast.way_fetch_ok', { n: coords.length, km }), 'success');
     return true;
   } catch (err) {
     console.error('Way fetch error:', err);
-    toast(t('toast.way_fetch_error', { msg: err.message }), 'error');
+    toast(t('segments.toast.way_fetch_error', { msg: err.message }), 'error');
     return false;
   }
 }
 async function saveSegment() {
   const nodeA = nodePickerGetValue('np-segA'), nodeB = nodePickerGetValue('np-segB');
-  if (!nodeA || !nodeB) { toast(t('toast.select_both_nodes'), 'error'); return; }
-  if (nodeA === nodeB) { toast(t('toast.nodes_must_differ'), 'error'); return; }
+  if (!nodeA || !nodeB) { toast(t('nodes.toast.select_both_nodes'), 'error'); return; }
+  if (nodeA === nodeB) { toast(t('nodes.toast.nodes_must_differ'), 'error'); return; }
   const segType = document.getElementById('f-sType').value;
   _lastSegType = segType;
   const description = document.getElementById('f-sDesc').value.trim();
@@ -1271,27 +1271,27 @@ async function saveSegment() {
   if (segType === 'osi') {
     // Interchange segment
     const distance = parseFloat(document.getElementById('f-sIDi').value) || 0;
-    if (distance <= 0) { toast(t('toast.walk_dist_positive'), 'error'); return; }
+    if (distance <= 0) { toast(t('nodes.toast.walk_dist_positive'), 'error'); return; }
     const ichType = document.getElementById('f-sIchType')?.value || 'osi';
     _lastSegDefaults.interchange.ichType = ichType;
     const existing = editingId ? getSeg(editingId) : null;
     const obj = { nodeA, nodeB, distance, interchangeType: ichType, tracks: existing?.tracks || [], maxSpeed: existing?.maxSpeed || 0, electrification: existing?.electrification || false, refCode: existing?.refCode || '', description };
-    if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.interchange_updated'), 'success'); }
-    else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.interchange_added'), 'success'); }
+    if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('nodes.toast.interchange_updated'), 'success'); }
+    else { data.segments.push({ id: uid(), ...obj }); toast(t('nodes.toast.interchange_added'), 'success'); }
   } else if (segType === 'road') {
     // Road segment
     const maxSpeed = parseInt(document.getElementById('f-sSp').value) || 50;
     const distance = parseFloat(document.getElementById('f-sDi').value) || 0;
-    if (distance <= 0) { toast(t('toast.dist_positive'), 'error'); return; }
-    if (maxSpeed < 1) { toast(t('toast.speed_positive'), 'error'); return; }
+    if (distance <= 0) { toast(t('segments.toast.dist_positive'), 'error'); return; }
+    if (maxSpeed < 1) { toast(t('segments.toast.speed_positive'), 'error'); return; }
     const refCode = document.getElementById('f-sRef').value.trim();
     _lastSegDefaults.road.maxSpeed = maxSpeed;
     _lastSegDefaults.road.refCode = refCode;
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
     const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
     const obj = { nodeA, nodeB, tracks: [], maxSpeed, distance, electrification: false, refCode, description, interchangeType: 'road', ogfWayIds, wayGeometry, allowedModes };
-    if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
-    else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
+    if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('segments.toast.updated'), 'success'); }
+    else { data.segments.push({ id: uid(), ...obj }); toast(t('segments.toast.added'), 'success'); }
   } else {
     // Track segment — collect named tracks from list editor
     const existing = editingId ? getSeg(editingId) : null;
@@ -1301,19 +1301,19 @@ async function saveSegment() {
       const tid = inp.dataset.tid || (existing?.tracks?.[idx]?.id) || uid();
       tracks.push({ id: tid, name });
     });
-    if (tracks.length < 1) { toast(t('toast.tracks_min_one'), 'error'); return; }
+    if (tracks.length < 1) { toast(t('segments.toast.tracks_min_one'), 'error'); return; }
     const maxSpeed = parseInt(document.getElementById('f-sSp').value) || 120;
     const distance = parseFloat(document.getElementById('f-sDi').value) || 0;
-    if (distance <= 0) { toast(t('toast.dist_positive'), 'error'); return; }
-    if (maxSpeed < 1) { toast(t('toast.speed_positive'), 'error'); return; }
+    if (distance <= 0) { toast(t('segments.toast.dist_positive'), 'error'); return; }
+    if (maxSpeed < 1) { toast(t('segments.toast.speed_positive'), 'error'); return; }
     const electrification = document.getElementById('f-sEl').checked;
     const refCode = document.getElementById('f-sRef').value.trim();
     _lastSegDefaults.track = { trackCount: tracks.length, maxSpeed, electrification, refCode };
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
     const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
     const obj = { nodeA, nodeB, tracks, maxSpeed, distance, electrification, refCode, description, interchangeType: null, ogfWayIds, wayGeometry, allowedModes };
-    if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
-    else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
+    if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('segments.toast.updated'), 'success'); }
+    else { data.segments.push({ id: uid(), ...obj }); toast(t('segments.toast.added'), 'success'); }
   }
   save(); closeModal(); renderSegments(); updateBadges();
 }
@@ -1325,9 +1325,9 @@ function deleteSegment(id) {
   }).length;
   let impact = '';
   if (svcCount) impact += `\n• ${svcCount} service${svcCount!==1?'s':''} route through this segment`;
-  appConfirm(t('confirm.delete_segment', { name: segName }) + (impact ? '\n' + impact : ''), () => {
+  appConfirm(t('segments.confirm.delete', { name: segName }) + (impact ? '\n' + impact : ''), () => {
     data.segments = data.segments.filter(s => s.id !== id);
-    save(); renderSegments(); updateBadges(); toast(t('toast.segment_deleted'), 'success');
+    save(); renderSegments(); updateBadges(); toast(t('segments.toast.deleted'), 'success');
   });
 }
 
@@ -1335,12 +1335,12 @@ function promptInsertWaypoint(segId) {
   const seg = getSeg(segId); if (!seg) return;
   editingId = null;
   const nodeAName = nodeName(seg.nodeA), nodeBName = nodeName(seg.nodeB);
-  openModal(t('modal.insert_waypoint'), `
+  openModal(t('nodes.modal.insert_waypoint'), `
     <p style="font-size:13px;color:var(--text-dim);margin-bottom:16px;">
       Split <strong>${esc(nodeAName)} — ${esc(nodeBName)}</strong> (${seg.distance} km) by inserting a waypoint.</p>
     <div class="form-row">
-      <div class="form-group"><label>${t('field.waypoint_name')}</label><input type="text" id="f-wpName" value="" placeholder="e.g. Waypoint ${esc(nodeAName)}/${esc(nodeBName)}"></div>
-      <div class="form-group"><label>Ref. Code (optional)</label><input type="text" id="f-wpRef" value="" placeholder="${t('placeholder.eg_wp_ref')}"></div>
+      <div class="form-group"><label>${t('nodes.field.waypoint_name')}</label><input type="text" id="f-wpName" value="" placeholder="e.g. Waypoint ${esc(nodeAName)}/${esc(nodeBName)}"></div>
+      <div class="form-group"><label>Ref. Code (optional)</label><input type="text" id="f-wpRef" value="" placeholder="${t('nodes.placeholder.eg_wp_ref')}"></div>
     </div>
     <div class="form-group"><label>Distance from ${esc(nodeAName)} (km)</label>
       <input type="range" id="f-wpSlider" min="0.1" max="${(seg.distance - 0.1).toFixed(1)}" step="0.1" value="${(seg.distance / 2).toFixed(1)}"
@@ -1354,7 +1354,7 @@ function promptInsertWaypoint(segId) {
           <div style="padding:8px 0;font-family:var(--font-mono);font-size:14px"><span id="wp-remainder">${(seg.distance / 2).toFixed(1)}</span> km</div></div>
       </div>
     </div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
      <button class="btn btn-primary" onclick="insertWaypoint('${segId}')">✂ Insert</button>`);
 }
 
@@ -1365,7 +1365,7 @@ function insertWaypoint(segId) {
   const refCode = document.getElementById('f-wpRef').value.trim();
   const dist = parseFloat(document.getElementById('f-wpDist').value);
   if (!dist || dist <= 0 || dist >= seg.distance) {
-    toast(t('toast.dist_range', { max: seg.distance }), 'error'); return;
+    toast(t('segments.toast.dist_range', { max: seg.distance }), 'error'); return;
   }
 
   // 1. Create the waypoint node
@@ -1435,7 +1435,7 @@ function insertWaypoint(segId) {
   }
 
   save(); closeModal(); renderSegments(); renderNodes(); updateBadges();
-  toast(t('toast.waypoint_inserted', { name }), 'success');
+  toast(t('nodes.toast.waypoint_inserted', { name }), 'success');
   showSegmentDetail(segId);
 }
 
@@ -1484,18 +1484,18 @@ function renderLines() {
   document.getElementById('line-detail').innerHTML = '';
 
   if (!list.length && !data.serviceGroups.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">≡</div><h3>${t('empty.no_lines')}</h3>
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">≡</div><h3>${t('lines.empty.title')}</h3>
       <p>Lines group services that share a route corridor, like the Northern Line or IC 200 Series.</p>
       <button class="btn btn-primary" onclick="openLineModal()">+ Add Line</button></div>`;
     return;
   }
 
   if (!list.length) {
-    el.innerHTML = `<div class="text-dim mt-16">${t('empty.no_lines_match', { q })}</div>`;
+    el.innerHTML = `<div class="text-dim mt-16">${t('lines.empty.no_match', { q })}</div>`;
     return;
   }
 
-  el.innerHTML = `<table class="data-table"><thead><tr>${sortableHeader('lines','name',t('th.line'))}<th>${t("th.color")}</th>${sortableHeader('lines','services',t('th.services'))}${sortableHeader('lines','departures',t('th.departures'))}${sortableHeader('lines','stations',t('th.stations'))}${sortableHeader('lines','segments',t('th.segments'))}<th></th></tr></thead><tbody>` +
+  el.innerHTML = `<table class="data-table"><thead><tr>${sortableHeader('lines','name',t('lines.th.line'))}<th>${t("lines.th.color")}</th>${sortableHeader('lines','services',t('lines.th.services'))}${sortableHeader('lines','departures',t('departures.th.departures'))}${sortableHeader('lines','stations',t('lines.th.stations'))}${sortableHeader('lines','segments',t('lines.th.segments'))}<th></th></tr></thead><tbody>` +
     list.map(g => {
       const lineSvcs = data.services.filter(s => s.groupId === g.id);
       const svcCount = lineSvcs.length;
@@ -1511,7 +1511,7 @@ function renderLines() {
         <td class="mono">${stationSet.size}</td>
         <td class="mono">${segCount}</td>
         <td class="actions-cell">
-          <button class="btn btn-sm" onclick="openLineModal('${g.id}')">${t('btn.edit')}</button>
+          <button class="btn btn-sm" onclick="openLineModal('${g.id}')">${t('common.edit')}</button>
           <button class="btn btn-sm btn-danger" onclick="deleteLine('${g.id}')">✕</button></td>
       </tr>`;
     }).join('') + '</tbody></table>';
@@ -1550,7 +1550,7 @@ function showLineDetail(id) {
       }).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_services')}</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">${t('lines.empty.no_services')}</div>`;
   }
   html += `</div>`;
 
@@ -1562,7 +1562,7 @@ function showLineDetail(id) {
       ${segs.map(s => `<span class="chip clickable" onclick="switchTab('segments');showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))} — ${esc(nodeName(s.nodeB))} <span class="text-muted" style="font-size:11px">${s.distance}km</span></span>`).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_segments')}</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">${t('lines.empty.no_segments')}</div>`;
   }
   html += `<div class="detail-map-clear"></div></div></div>`;
 
@@ -1601,29 +1601,29 @@ function openLineModal(id) {
   editingId = id || null;
   const g = id ? getGroup(id) : null;
   const lineColor = g?.color || '#8899aa';
-  openModal(g ? t('modal.edit_line') : t('modal.add_line'), `
+  openModal(g ? t('lines.modal.edit') : t('lines.modal.add'), `
     <div class="form-row">
-      <div class="form-group"><label>${t('field.name')}</label><input type="text" id="f-lN" value="${esc(g?.name||'')}" placeholder="${t('placeholder.eg_line')}"></div>
-      <div class="form-group"><label>${t('field.color')}</label><input type="text" id="f-lC" value="${esc(lineColor)}" oninput="document.querySelectorAll('#f-lC-palette .color-swatch').forEach(s=>s.classList.toggle('active',s.title.startsWith(this.value)))">
+      <div class="form-group"><label>${t('common.field.name')}</label><input type="text" id="f-lN" value="${esc(g?.name||'')}" placeholder="${t('lines.placeholder.eg_line')}"></div>
+      <div class="form-group"><label>${t('common.field.color')}</label><input type="text" id="f-lC" value="${esc(lineColor)}" oninput="document.querySelectorAll('#f-lC-palette .color-swatch').forEach(s=>s.classList.toggle('active',s.title.startsWith(this.value)))">
         <div id="f-lC-palette">${colorPaletteHtml('f-lC', lineColor)}</div></div>
     </div>
-    <div class="form-group"><label>${t('field.description')}</label>
+    <div class="form-group"><label>${t('common.field.description')}</label>
       <input type="text" id="f-lD" value="${esc(g?.description||'')}" placeholder="e.g. Intercity service between Hemstein and Zaalkirk"></div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
      <button class="btn btn-primary" onclick="saveLine()">${g?'Save':'Add Line'}</button>`);
 }
 
 function saveLine() {
   const name = document.getElementById('f-lN').value.trim();
-  if (!name) { toast(t('toast.name_required'), 'error'); return; }
+  if (!name) { toast(t('nodes.toast.name_required'), 'error'); return; }
   const color = document.getElementById('f-lC').value.trim() || '#5b8af5';
   const description = document.getElementById('f-lD')?.value?.trim() || '';
   if (editingId) {
     Object.assign(getGroup(editingId), { name, color, description });
-    toast(t('toast.line_updated'), 'success');
+    toast(t('lines.toast.updated'), 'success');
   } else {
     data.serviceGroups.push({ id: uid(), name, color, description });
-    toast(t('toast.line_added'), 'success');
+    toast(t('lines.toast.added'), 'success');
   }
   save(); closeModal(); renderLines(); renderServices(); updateBadges();
 }
@@ -1633,10 +1633,10 @@ function deleteLine(id) {
   const svcCount = data.services.filter(s => s.groupId === id).length;
   let impact = '';
   if (svcCount) impact += `\n• ${svcCount} service${svcCount!==1?'s':''} will be unassigned from this line`;
-  appConfirm(t('confirm.delete_line', { name: g?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
+  appConfirm(t('lines.confirm.delete', { name: g?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
     data.services.forEach(s => { if (s.groupId === id) s.groupId = null; });
     data.serviceGroups = data.serviceGroups.filter(g => g.id !== id);
-    save(); renderLines(); renderServices(); updateBadges(); toast(t('toast.line_deleted'), 'success');
+    save(); renderLines(); renderServices(); updateBadges(); toast(t('lines.toast.deleted'), 'success');
   });
 }
 
@@ -1646,13 +1646,13 @@ function deleteLine(id) {
 function renderCategories() {
   const el = document.getElementById('modes-list');
   if (!data.categories.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">◆</div><h3>${t('empty.no_modes')}</h3>
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">◆</div><h3>${t('modes.empty.title')}</h3>
       <p>Define service modes like Intercity, Commuter, Light Rail, etc.</p>
       <button class="btn btn-primary" onclick="openCategoryModal()">+ Add Mode</button></div>`;
     return;
   }
   const modeList = applySortable(data.categories, 'modes', { name: c => c.name, dwell: c => c.defaultDwellTime || 0, clearance: c => c.platformClearance ?? PLATFORM_CLEARANCE_MIN_(), priority: c => c.priority || 0 }) || data.categories;
-  el.innerHTML = `<table class="data-table"><thead><tr>${sortableHeader('modes','name',t('th.name'))}<th>${t('th.abbreviation')}</th>${sortableHeader('modes','dwell',t('th.default_dwell'))}${sortableHeader('modes','clearance',t('th.plt_clearance'))}${sortableHeader('modes','priority',t('th.priority'))}<th></th></tr></thead><tbody>` +
+  el.innerHTML = `<table class="data-table"><thead><tr>${sortableHeader('modes','name',t('common.th.name'))}<th>${t('modes.th.abbreviation')}</th>${sortableHeader('modes','dwell',t('modes.th.default_dwell'))}${sortableHeader('modes','clearance',t('modes.th.plt_clearance'))}${sortableHeader('modes','priority',t('modes.th.priority'))}<th></th></tr></thead><tbody>` +
     modeList.map(c => `<tr>
       <td><strong>${esc(c.name)}</strong></td>
       <td class="mono">${esc(c.abbreviation||'')}</td>
@@ -1660,38 +1660,38 @@ function renderCategories() {
       <td class="mono">${c.platformClearance ?? PLATFORM_CLEARANCE_MIN_()} min</td>
       <td class="mono">${c.priority||0}</td>
       <td class="actions-cell">
-        <button class="btn btn-sm" onclick="openCategoryModal('${c.id}')">${t('btn.edit')}</button>
+        <button class="btn btn-sm" onclick="openCategoryModal('${c.id}')">${t('common.edit')}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteCat('${c.id}')">✕</button></td>
     </tr>`).join('') + '</tbody></table>';
 }
 function openCategoryModal(id) {
   editingId = id || null; const c = id ? getCat(id) : null;
-  openModal(c ? t('modal.edit_mode') : t('modal.add_mode'), `
+  openModal(c ? t('modes.modal.edit') : t('modes.modal.add'), `
     <div class="form-row">
-      <div class="form-group"><label>${t('field.name')}</label><input type="text" id="f-cN" value="${esc(c?.name||'')}" placeholder="${t('placeholder.eg_mode')}"></div>
-      <div class="form-group"><label>${t('field.abbreviation')}</label><input type="text" id="f-cA" value="${esc(c?.abbreviation||'')}" placeholder="${t('placeholder.eg_mode_abbr')}"></div>
+      <div class="form-group"><label>${t('common.field.name')}</label><input type="text" id="f-cN" value="${esc(c?.name||'')}" placeholder="${t('modes.placeholder.eg_mode')}"></div>
+      <div class="form-group"><label>${t('modes.field.abbreviation')}</label><input type="text" id="f-cA" value="${esc(c?.abbreviation||'')}" placeholder="${t('modes.placeholder.eg_abbr')}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>${t('field.default_dwell')}</label><input type="number" id="f-cD" value="${c?.defaultDwellTime||60}" min="0"></div>
-      <div class="form-group"><label>${t('field.plt_clearance')}</label><input type="number" id="f-cPC" value="${c?.platformClearance ?? 3}" min="0" max="30">
+      <div class="form-group"><label>${t('modes.field.default_dwell')}</label><input type="number" id="f-cD" value="${c?.defaultDwellTime||60}" min="0"></div>
+      <div class="form-group"><label>${t('modes.field.plt_clearance')}</label><input type="number" id="f-cPC" value="${c?.platformClearance ?? 3}" min="0" max="30">
         <p class="text-dim" style="font-size:11px;margin-top:2px">Min. time between this mode departing and next train arriving at same platform.</p></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>${t('field.priority')}</label><input type="number" id="f-cP" value="${c?.priority||0}" min="0"></div>
+      <div class="form-group"><label>${t('modes.field.priority')}</label><input type="number" id="f-cP" value="${c?.priority||0}" min="0"></div>
       <div class="form-group"><label>Map Style</label><select id="f-cMS">
         ${['full','dashed','punched','double','hidden'].map(s => `<option value="${s}"${(c?.defaultMapStyle||'full')===s?' selected':''}>${s}</option>`).join('')}
       </select></div>
     </div>
-    <div class="form-group"><label>${t('field.infrastructure_type')}</label><select id="f-cIT">
+    <div class="form-group"><label>${t('segments.field.infrastructure_type')}</label><select id="f-cIT">
       <option value="rail"${(c?.infrastructureType||'rail')==='rail'?' selected':''}>Rail</option>
       <option value="road"${c?.infrastructureType==='road'?' selected':''}>Road</option>
     </select></div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="saveCat()">${c?t('btn.save'):t('btn.add_mode')}</button>`);
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="saveCat()">${c?t('common.save'):t('modes.btn.add')}</button>`);
 }
 function saveCat() {
   const name = document.getElementById('f-cN').value.trim();
-  if (!name) { toast(t('toast.name_required'), 'error'); return; }
+  if (!name) { toast(t('nodes.toast.name_required'), 'error'); return; }
   const abbreviation = document.getElementById('f-cA').value.trim();
   const color = editingId ? (getCat(editingId)?.color || '#5b8af5') : '#5b8af5';
   const defaultDwellTime = parseInt(document.getElementById('f-cD').value) || 60;
@@ -1699,8 +1699,8 @@ function saveCat() {
   const priority = parseInt(document.getElementById('f-cP').value) || 0;
   const defaultMapStyle = document.getElementById('f-cMS').value || 'full';
   const infrastructureType = document.getElementById('f-cIT').value || 'rail';
-  if (editingId) { Object.assign(getCat(editingId), { name, abbreviation, defaultDwellTime, platformClearance, priority, defaultMapStyle, infrastructureType }); toast(t('toast.mode_updated'), 'success'); }
-  else { data.categories.push({ id: uid(), name, abbreviation, color, defaultDwellTime, platformClearance, priority, defaultMapStyle, infrastructureType }); toast(t('toast.mode_added'), 'success'); }
+  if (editingId) { Object.assign(getCat(editingId), { name, abbreviation, defaultDwellTime, platformClearance, priority, defaultMapStyle, infrastructureType }); toast(t('modes.toast.updated'), 'success'); }
+  else { data.categories.push({ id: uid(), name, abbreviation, color, defaultDwellTime, platformClearance, priority, defaultMapStyle, infrastructureType }); toast(t('modes.toast.added'), 'success'); }
   save(); closeModal(); renderCategories(); updateBadges();
 }
 function deleteCat(id) {
@@ -1708,8 +1708,8 @@ function deleteCat(id) {
   const svcCount = data.services.filter(s => s.categoryId === id).length;
   let impact = '';
   if (svcCount) impact += `\n• ${svcCount} service${svcCount!==1?'s':''} use this mode`;
-  appConfirm(t('confirm.delete_mode', { name: cat?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
-    data.categories = data.categories.filter(c => c.id !== id); save(); renderCategories(); updateBadges(); toast(t('toast.mode_deleted'), 'success');
+  appConfirm(t('modes.confirm.delete', { name: cat?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
+    data.categories = data.categories.filter(c => c.id !== id); save(); renderCategories(); updateBadges(); toast(t('modes.toast.deleted'), 'success');
   });
 }
 
@@ -1719,7 +1719,7 @@ function deleteCat(id) {
 function renderStock() {
   const el = document.getElementById('stock-list');
   if (!data.rollingStock.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🚃</div><h3>${t('empty.no_stock')}</h3>
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">🚃</div><h3>${t('stock.empty.title')}</h3>
       <p>Define train types with their performance characteristics.</p>
       <button class="btn btn-primary" onclick="openStockModal()">+ Add Stock Type</button></div>`;
     document.getElementById('stock-matrix').innerHTML = '';
@@ -1727,7 +1727,7 @@ function renderStock() {
   }
   const stockList = applySortable(data.rollingStock, 'stock', { name: s => s.name, speed: s => s.maxSpeed, accel: s => s.acceleration }) || data.rollingStock;
   el.innerHTML = `<table class="data-table"><thead><tr>
-    ${sortableHeader('stock','name',t('th.name'))}${sortableHeader('stock','accel',t('th.acceleration'))}${sortableHeader('stock','speed',t('th.max_speed'))}<th>${t("th.dwell")}</th><th>${t("th.traction")}</th><th>${t("th.description")}</th><th></th></tr></thead><tbody>` +
+    ${sortableHeader('stock','name',t('common.th.name'))}${sortableHeader('stock','accel',t('stock.th.acceleration'))}${sortableHeader('stock','speed',t('stock.th.max_speed'))}<th>${t("stock.th.dwell")}</th><th>${t("stock.th.traction")}</th><th>${t("common.th.description")}</th><th></th></tr></thead><tbody>` +
     stockList.map(s => `<tr>
       <td><strong>${esc(s.name)}</strong>${s.code ? ` <span class="mono text-muted" style="font-size:11px">[${esc(s.code)}]</span>` : ''}</td>
       <td class="mono">${s.acceleration} m/s²</td>
@@ -1736,7 +1736,7 @@ function renderStock() {
       <td>${s.traction === 'electric' ? '⚡ ' + t('type.electric')||'Electric' : s.traction === 'diesel' ? '⛽ ' + t('type.diesel')||'Diesel' : '⚡⛽ ' + t('type.dual')||'Dual'}</td>
       <td class="text-dim" style="font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.description||'—')}</td>
       <td class="actions-cell">
-        <button class="btn btn-sm" onclick="openStockModal('${s.id}')">${t('btn.edit')}</button>
+        <button class="btn btn-sm" onclick="openStockModal('${s.id}')">${t('common.edit')}</button>
         <button class="btn btn-sm btn-danger" onclick="deleteStock('${s.id}')">✕</button></td>
     </tr>`).join('') + '</tbody></table>';
 
@@ -1747,51 +1747,51 @@ function renderStock() {
 function openStockModal(id) {
   editingId = id || null;
   const s = id ? getStock(id) : null;
-  openModal(s ? t('modal.edit_stock') : t('modal.add_stock'), `
+  openModal(s ? t('stock.modal.edit') : t('stock.modal.add'), `
     <div class="form-row">
-      <div class="form-group" style="flex:2"><label>${t('field.name')}</label>
-        <input type="text" id="f-stN" value="${esc(s?.name||'')}" placeholder="${t('placeholder.eg_stock_name')}"></div>
+      <div class="form-group" style="flex:2"><label>${t('common.field.name')}</label>
+        <input type="text" id="f-stN" value="${esc(s?.name||'')}" placeholder="${t('stock.placeholder.eg_name')}"></div>
       <div class="form-group" style="flex:1"><label>Code</label>
-        <input type="text" id="f-stCode" value="${esc(s?.code||'')}" placeholder="${t('placeholder.eg_stock_code')}"></div>
+        <input type="text" id="f-stCode" value="${esc(s?.code||'')}" placeholder="${t('stock.placeholder.eg_code')}"></div>
     </div>
     <div class="form-row-3">
-      <div class="form-group"><label>${t('field.acceleration')}</label>
+      <div class="form-group"><label>${t('stock.field.acceleration')}</label>
         <input type="number" id="f-stAcc" value="${s?.acceleration??1.0}" min="0.1" max="5" step="0.1"></div>
-      <div class="form-group"><label>${t('field.max_speed')}</label>
+      <div class="form-group"><label>${t('segments.field.max_speed')}</label>
         <input type="number" id="f-stSpd" value="${s?.maxSpeed??160}" min="10" max="400"></div>
-      <div class="form-group"><label>${t('field.stock_dwell')}</label>
+      <div class="form-group"><label>${t('stock.field.dwell')}</label>
         <input type="number" id="f-stDwell" value="${s?.defaultDwell??60}" min="0"></div>
     </div>
-    <div class="form-group"><label>${t('field.stock_traction')}</label>
+    <div class="form-group"><label>${t('stock.field.traction')}</label>
       <select id="f-stTrac">
         <option value="electric" ${s?.traction==='electric'||!s?'selected':''}>⚡ Electric</option>
         <option value="diesel" ${s?.traction==='diesel'?'selected':''}>⛽ Diesel</option>
         <option value="dual" ${s?.traction==='dual'?'selected':''}>⚡⛽ Dual (electric + diesel)</option>
       </select></div>
-    <div class="form-group"><label>${t('field.description')}</label>
-      <input type="text" id="f-stDesc" value="${esc(s?.description||'')}" placeholder="${t('placeholder.eg_stock_desc')}"></div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="saveStock()">${s?t('btn.save'):t('btn.add_stock')}</button>`);
+    <div class="form-group"><label>${t('common.field.description')}</label>
+      <input type="text" id="f-stDesc" value="${esc(s?.description||'')}" placeholder="${t('stock.placeholder.eg_desc')}"></div>`,
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="saveStock()">${s?t('common.save'):t('stock.btn.add')}</button>`);
 }
 
 function saveStock() {
   const name = document.getElementById('f-stN').value.trim();
-  if (!name) { toast(t('toast.name_required'), 'error'); return; }
+  if (!name) { toast(t('nodes.toast.name_required'), 'error'); return; }
   const code = document.getElementById('f-stCode').value.trim();
   const acceleration = parseFloat(document.getElementById('f-stAcc').value) || 1.0;
   const maxSpeed = parseInt(document.getElementById('f-stSpd').value) || 160;
   const defaultDwell = parseInt(document.getElementById('f-stDwell').value) || 60;
   const traction = document.getElementById('f-stTrac').value;
   const description = document.getElementById('f-stDesc').value.trim();
-  if (acceleration <= 0) { toast(t('toast.accel_positive'), 'error'); return; }
-  if (maxSpeed <= 0) { toast(t('toast.maxspeed_positive'), 'error'); return; }
+  if (acceleration <= 0) { toast(t('stock.toast.accel_positive'), 'error'); return; }
+  if (maxSpeed <= 0) { toast(t('stock.toast.maxspeed_positive'), 'error'); return; }
 
   if (editingId) {
     Object.assign(getStock(editingId), { name, code, acceleration, maxSpeed, defaultDwell, traction, description });
-    toast(t('toast.stock_updated'), 'success');
+    toast(t('stock.toast.updated'), 'success');
   } else {
     data.rollingStock.push({ id: uid(), name, code, acceleration, maxSpeed, defaultDwell, traction, description });
-    toast(t('toast.stock_added'), 'success');
+    toast(t('stock.toast.added'), 'success');
   }
   save(); closeModal(); renderStock(); updateBadges();
 }
@@ -1801,12 +1801,12 @@ function deleteStock(id) {
   const svcCount = data.services.filter(sv => sv.stockId === id).length;
   let impact = '';
   if (svcCount) impact += `\n• ${svcCount} service${svcCount!==1?'s':''} use this stock type`;
-  appConfirm(t('confirm.delete_stock', { name: s.name }) + (impact ? '\n' + impact : ''), () => {
+  appConfirm(t('stock.confirm.delete', { name: s.name }) + (impact ? '\n' + impact : ''), () => {
     data.rollingStock = data.rollingStock.filter(s => s.id !== id);
     for (const key of Object.keys(data.stockModeMatrix)) {
       if (key.startsWith(id + '::') || key.endsWith('::' + id)) delete data.stockModeMatrix[key];
     }
-    save(); renderStock(); updateBadges(); toast(t('toast.stock_deleted'), 'success');
+    save(); renderStock(); updateBadges(); toast(t('stock.toast.deleted'), 'success');
   });
 }
 
@@ -1830,12 +1830,12 @@ function renderStockModeMatrix() {
 
   let html = `<div style="margin-top:32px">
     <div class="page-header" style="margin-bottom:16px"><div>
-      <h2 style="font-family:var(--font-display);font-size:18px;font-weight:600">${t('matrix.title')}</h2>
-      <div class="subtitle">${t('matrix.desc')}</div>
+      <h2 style="font-family:var(--font-display);font-size:18px;font-weight:600">${t('stock.matrix.title')}</h2>
+      <div class="subtitle">${t('stock.matrix.desc')}</div>
     </div></div>
     <div style="overflow-x:auto">
     <table class="data-table" style="min-width:auto">
-      <thead><tr><th style="min-width:120px">${t('matrix.header')}</th>`;
+      <thead><tr><th style="min-width:120px">${t('stock.matrix.header')}</th>`;
 
   for (const cat of data.categories) {
     html += `<th style="text-align:center;min-width:90px"><span class="chip" style="font-size:10px">${esc(cat.abbreviation || cat.name)}</span></th>`;
@@ -1854,9 +1854,9 @@ function renderStockModeMatrix() {
             color:${val==='typical'?'var(--success)':val==='atypical'?'var(--warn)':val==='disallowed'?'var(--danger)':'var(--text-dim)'};
             border-color:${val==='typical'?'var(--success)':val==='atypical'?'var(--warn)':val==='disallowed'?'var(--danger)':'var(--border)'}">
           <option value="" ${!val?'selected':''}>—</option>
-          <option value="typical" ${val==='typical'?'selected':''}>✓ ${t('matrix.typical')}</option>
-          <option value="atypical" ${val==='atypical'?'selected':''}>~ ${t('matrix.atypical')}</option>
-          <option value="disallowed" ${val==='disallowed'?'selected':''}>✕ ${t('matrix.disallowed')}</option>
+          <option value="typical" ${val==='typical'?'selected':''}>✓ ${t('stock.matrix.typical')}</option>
+          <option value="atypical" ${val==='atypical'?'selected':''}>~ ${t('stock.matrix.atypical')}</option>
+          <option value="disallowed" ${val==='disallowed'?'selected':''}>✕ ${t('stock.matrix.disallowed')}</option>
         </select></td>`;
     }
     html += '</tr>';
@@ -1866,9 +1866,9 @@ function renderStockModeMatrix() {
 
   // Legend
   html += `<div class="flex gap-8 mt-8" style="flex-wrap:wrap;font-size:12px;color:var(--text-dim)">
-    <span><strong style="color:var(--success)">✓ ${t('matrix.typical')}</strong> — ${t('matrix.typical_desc')}</span>
-    <span><strong style="color:var(--warn)">~ ${t('matrix.atypical')}</strong> — ${t('matrix.atypical_desc')}</span>
-    <span><strong style="color:var(--danger)">✕ ${t('matrix.disallowed')}</strong> — ${t('matrix.disallowed_desc')}</span>
+    <span><strong style="color:var(--success)">✓ ${t('stock.matrix.typical')}</strong> — ${t('stock.matrix.typical_desc')}</span>
+    <span><strong style="color:var(--warn)">~ ${t('stock.matrix.atypical')}</strong> — ${t('stock.matrix.atypical_desc')}</span>
+    <span><strong style="color:var(--danger)">✕ ${t('stock.matrix.disallowed')}</strong> — ${t('stock.matrix.disallowed_desc')}</span>
   </div></div>`;
 
   el.innerHTML = html;
@@ -1928,7 +1928,7 @@ function renderServices() {
   document.getElementById('service-detail').innerHTML = '';
 
   if (!list.length && !data.services.length) {
-    el.innerHTML = `<div class="empty-state"><div class="empty-icon">▷</div><h3>${t('empty.no_services')}</h3>
+    el.innerHTML = `<div class="empty-state"><div class="empty-icon">▷</div><h3>${t('services.empty.title')}</h3>
       <p>Define route templates with stops and platforms.</p>
       <button class="btn btn-primary" onclick="openServiceModal()">+ Add Service</button></div>`;
     return;
@@ -1968,7 +1968,7 @@ function renderServices() {
   }
 
   // Build table
-  html += `<table class="data-table"><thead><tr>${sortableHeader('services','name',t('th.service'))}<th>${t("th.line")}</th><th>${t("th.mode")}</th><th>${t("th.stock")}</th>${sortableHeader('services','stops',t('th.stops'))}<th>${t("th.route")}</th>${sortableHeader('services','departures',t('th.departures'))}<th>${t('th.pattern')}</th><th></th></tr></thead><tbody>`;
+  html += `<table class="data-table"><thead><tr>${sortableHeader('services','name',t('services.th.service'))}<th>${t("lines.th.line")}</th><th>${t("modes.th.mode")}</th><th>${t("stock.th.stock")}</th>${sortableHeader('services','stops',t('services.th.stops'))}<th>${t("services.th.route")}</th>${sortableHeader('services','departures',t('departures.th.departures'))}<th>${t('services.th.pattern')}</th><th></th></tr></thead><tbody>`;
 
   if (isSorted) {
     // Flat sorted list (no grouping)
@@ -2012,10 +2012,10 @@ function svcTableRow(s) {
     <td class="mono">${depC || '—'}</td>
     <td class="pattern-cell">${esc(describePattern(s.schedulePattern))}</td>
     <td class="actions-cell">
-      <button class="btn btn-sm" onclick="openServiceModal('${s.id}')">${t('btn.edit')}</button>
-      <button class="btn btn-sm" onclick="duplicateService('${s.id}')" title="${t('tooltip.duplicate_service')}">${t("btn.dup_short")}</button>
-      <button class="btn btn-sm" onclick="reverseService('${s.id}')" title="${t('tooltip.reverse_service')}">${t("btn.reverse")}</button>
-      <button class="btn btn-sm" onclick="openScheduleModal('${s.id}')">${t("btn.gen_schedule")}</button>
+      <button class="btn btn-sm" onclick="openServiceModal('${s.id}')">${t('common.edit')}</button>
+      <button class="btn btn-sm" onclick="duplicateService('${s.id}')" title="${t('services.tooltip.duplicate')}">${t("common.dup_short")}</button>
+      <button class="btn btn-sm" onclick="reverseService('${s.id}')" title="${t('services.tooltip.reverse')}">${t("common.reverse")}</button>
+      <button class="btn btn-sm" onclick="openScheduleModal('${s.id}')">${t("services.btn.gen_schedule")}</button>
       <button class="btn btn-sm btn-danger" onclick="deleteSvc('${s.id}')">✕</button></td>
   </tr>`;
 }
@@ -2024,29 +2024,29 @@ function openGroupModal(id) {
   editingId = id || null;
   const g = id ? getGroup(id) : null;
   const lineColor = g?.color || '#8899aa';
-  openModal(g ? t('modal.edit_line') : t('modal.new_line'), `
+  openModal(g ? t('lines.modal.edit') : t('lines.modal.new'), `
     <div class="form-row">
-      <div class="form-group"><label>${t('field.line_name')}</label>
-        <input type="text" id="f-grpN" value="${esc(g?.name||'')}" placeholder="${t('placeholder.eg_line')}"></div>
-      <div class="form-group"><label>${t('field.color')}</label><input type="text" id="f-grpC" value="${esc(lineColor)}" oninput="document.querySelectorAll('#f-grpC-palette .color-swatch').forEach(s=>s.classList.toggle('active',s.title.startsWith(this.value)))">
+      <div class="form-group"><label>${t('lines.field.name')}</label>
+        <input type="text" id="f-grpN" value="${esc(g?.name||'')}" placeholder="${t('lines.placeholder.eg_line')}"></div>
+      <div class="form-group"><label>${t('common.field.color')}</label><input type="text" id="f-grpC" value="${esc(lineColor)}" oninput="document.querySelectorAll('#f-grpC-palette .color-swatch').forEach(s=>s.classList.toggle('active',s.title.startsWith(this.value)))">
         <div id="f-grpC-palette">${colorPaletteHtml('f-grpC', lineColor)}</div></div>
     </div>
-    <div class="form-group"><label>${t('field.description')}</label>
+    <div class="form-group"><label>${t('common.field.description')}</label>
       <input type="text" id="f-grpD" value="${esc(g?.description||'')}" placeholder="e.g. Intercity service between Hemstein and Zaalkirk"></div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
      <button class="btn btn-primary" onclick="saveGroup()">${g?'Save':'Create'}</button>`);
 }
 function saveGroup() {
   const name = document.getElementById('f-grpN').value.trim();
-  if (!name) { toast(t('toast.name_required'), 'error'); return; }
+  if (!name) { toast(t('nodes.toast.name_required'), 'error'); return; }
   const color = document.getElementById('f-grpC')?.value?.trim() || '#8899aa';
   const description = document.getElementById('f-grpD')?.value?.trim() || '';
   if (editingId) {
     Object.assign(getGroup(editingId), { name, color, description });
-    toast(t('toast.line_updated'), 'success');
+    toast(t('lines.toast.updated'), 'success');
   } else {
     data.serviceGroups.push({ id: uid(), name, color, description });
-    toast(t('toast.line_created'), 'success');
+    toast(t('lines.toast.created'), 'success');
   }
   save(); closeModal(); renderServices(); renderLines(); updateBadges();
 }
@@ -2055,10 +2055,10 @@ function deleteGroup(id) {
   const svcCount = data.services.filter(s => s.groupId === id).length;
   let impact = '';
   if (svcCount) impact += `\n• ${svcCount} service${svcCount!==1?'s':''} will be unassigned`;
-  appConfirm(t('confirm.delete_line', { name: g?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
+  appConfirm(t('lines.confirm.delete', { name: g?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
     data.services.forEach(s => { if (s.groupId === id) s.groupId = null; });
     data.serviceGroups = data.serviceGroups.filter(g => g.id !== id);
-    save(); closeModal(); renderServices(); renderLines(); updateBadges(); toast(t('toast.line_deleted'), 'success');
+    save(); closeModal(); renderServices(); renderLines(); updateBadges(); toast(t('lines.toast.deleted'), 'success');
   });
 }
 function quickCreateGroup() {
@@ -2068,7 +2068,7 @@ function quickCreateGroup() {
   const div = document.createElement('div');
   div.id = 'inline-grp-create';
   div.className = 'flex gap-4 items-center mt-8';
-  div.innerHTML = `<input type="text" id="f-inlineGrp" placeholder="${t('placeholder.eg_line_name')}" style="flex:1;font-size:12px;padding:5px 8px">
+  div.innerHTML = `<input type="text" id="f-inlineGrp" placeholder="${t('lines.placeholder.eg_line_name')}" style="flex:1;font-size:12px;padding:5px 8px">
     <button class="btn btn-sm btn-primary" onclick="finishQuickGroup()">Add</button>
     <button class="btn btn-sm" onclick="document.getElementById('inline-grp-create').remove()">✕</button>`;
   container.appendChild(div);
@@ -2077,7 +2077,7 @@ function quickCreateGroup() {
 }
 function finishQuickGroup() {
   const name = document.getElementById('f-inlineGrp')?.value?.trim();
-  if (!name) { toast(t('toast.name_required'), 'error'); return; }
+  if (!name) { toast(t('nodes.toast.name_required'), 'error'); return; }
   const g = { id: uid(), name, color: '#8899aa' };
   data.serviceGroups.push(g);
   save();
@@ -2087,7 +2087,7 @@ function finishQuickGroup() {
     sel.value = g.id;
   }
   document.getElementById('inline-grp-create')?.remove();
-  toast(t('toast.line_created', { name }), 'success');
+  toast(t('lines.toast.created', { name }), 'success');
 }
 
 function showServiceDetail(svcId) {
@@ -2122,7 +2122,7 @@ function showServiceDetail(svcId) {
   html += '<div class="detail-map-clear"></div>';
 
   // Route overview
-  html += `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('th.route')}</strong>
+  html += `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('services.th.route')}</strong>
     <div class="mt-8">` + svc.stops.map((st, i) => {
       const n = getNode(st.nodeId);
       const label = n ? n.name : '???';
@@ -2138,10 +2138,10 @@ function showServiceDetail(svcId) {
     }).join('') + '</div></div>';
 
   // Departures table with edit buttons
-  html += `<div class="flex items-center" style="justify-content:space-between"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('th.departures')} (${deps.length})</strong>
-    ${deps.length ? `<button class="btn btn-sm" onclick="recalcSvcAndRefresh('${svcId}')">↻ ${t('btn.recalculate')}</button>` : ''}</div>`;
+  html += `<div class="flex items-center" style="justify-content:space-between"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('departures.th.departures')} (${deps.length})</strong>
+    ${deps.length ? `<button class="btn btn-sm" onclick="recalcSvcAndRefresh('${svcId}')">↻ ${t('common.recalculate')}</button>` : ''}</div>`;
   if (deps.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>${t('th.dep_time')}</th>`;
+    html += `<table class="schedule-table mt-8"><thead><tr><th>${t('schedule.th.dep_time')}</th>`;
     svc.stops.forEach((st, i) => {
       html += `<th>${esc(nodeName(st.nodeId).substring(0, 12))}</th>`;
     });
@@ -2155,7 +2155,7 @@ function showServiceDetail(svcId) {
         html += `<td>${display}</td>`;
       });
       html += `<td class="actions-cell">
-        <button class="btn btn-sm" onclick="openDepEditModal('${dep.id}')">${t('btn.edit')}</button>
+        <button class="btn btn-sm" onclick="openDepEditModal('${dep.id}')">${t('common.edit')}</button>
         <button class="btn btn-sm btn-danger" onclick="delDep('${dep.id}');showServiceDetail('${svcId}')">✕</button></td></tr>`;
     }
     html += '</tbody></table>';
@@ -2231,28 +2231,28 @@ function buildPatternEditor(pat) {
   const preview = describePattern(pat);
 
   return `<div class="form-group" id="pattern-editor">
-    <label>${t('pattern.schedule_pattern')}</label>
+    <label>${t('schedule.pattern.schedule_pattern')}</label>
     <div class="pattern-preview text-dim mb-8" id="pattern-preview" style="font-size:12px">${esc(preview)}</div>
     <div class="pattern-days mb-8">${dayBtns}</div>
     <div id="pattern-ranges">${rangeRows}</div>
-    <button type="button" class="btn btn-sm mb-8" onclick="addPatternRange()">${t('pattern.add_date_range')}</button>
+    <button type="button" class="btn btn-sm mb-8" onclick="addPatternRange()">${t('schedule.pattern.add_date_range')}</button>
     <div class="form-group" style="margin-bottom:4px">
-      <label style="font-size:11px;text-transform:none;font-weight:400;color:var(--text-dim)">${t('pattern.specific_dates')}</label>
-      <input type="text" id="f-patSpecific" value="${esc(specifics.join(', '))}" placeholder="${t('pattern.placeholder_specific')}" oninput="updatePatternPreview()">
+      <label style="font-size:11px;text-transform:none;font-weight:400;color:var(--text-dim)">${t('schedule.pattern.specific_dates')}</label>
+      <input type="text" id="f-patSpecific" value="${esc(specifics.join(', '))}" placeholder="${t('schedule.pattern.placeholder_specific')}" oninput="updatePatternPreview()">
     </div>
     <div class="form-group" style="margin-bottom:0">
-      <label style="font-size:11px;text-transform:none;font-weight:400;color:var(--text-dim)">${t('pattern.exclude_dates')}</label>
-      <input type="text" id="f-patExcl" value="${esc(excludes.join(', '))}" placeholder="${t('pattern.placeholder_exclude')}" oninput="updatePatternPreview()">
+      <label style="font-size:11px;text-transform:none;font-weight:400;color:var(--text-dim)">${t('schedule.pattern.exclude_dates')}</label>
+      <input type="text" id="f-patExcl" value="${esc(excludes.join(', '))}" placeholder="${t('schedule.pattern.placeholder_exclude')}" oninput="updatePatternPreview()">
     </div>
   </div>`;
 }
 
 function _patternRangeRow(idx, from, to) {
   return `<div class="pattern-range-row flex gap-8 items-center mb-4" data-range="${idx}">
-    <span style="font-size:11px;color:var(--text-dim)">${t('pattern.date_range_from')}</span>
-    <input type="text" class="pat-range-from" value="${esc(from || '')}" placeholder="${t('pattern.placeholder_mmdd')}" style="width:70px;font-size:13px" oninput="updatePatternPreview()">
-    <span style="font-size:11px;color:var(--text-dim)">${t('pattern.date_range_to')}</span>
-    <input type="text" class="pat-range-to" value="${esc(to || '')}" placeholder="${t('pattern.placeholder_mmdd')}" style="width:70px;font-size:13px" oninput="updatePatternPreview()">
+    <span style="font-size:11px;color:var(--text-dim)">${t('schedule.pattern.date_range_from')}</span>
+    <input type="text" class="pat-range-from" value="${esc(from || '')}" placeholder="${t('schedule.pattern.placeholder_mmdd')}" style="width:70px;font-size:13px" oninput="updatePatternPreview()">
+    <span style="font-size:11px;color:var(--text-dim)">${t('schedule.pattern.date_range_to')}</span>
+    <input type="text" class="pat-range-to" value="${esc(to || '')}" placeholder="${t('schedule.pattern.placeholder_mmdd')}" style="width:70px;font-size:13px" oninput="updatePatternPreview()">
     <button type="button" class="btn btn-sm" onclick="removePatternRange(this)" style="padding:2px 8px">×</button>
   </div>`;
 }
@@ -2332,30 +2332,30 @@ function openServiceModal(id, hField) {
   window._routeStops = s ? JSON.parse(JSON.stringify(s.stops)) : [];
   window._svcEditStockId = s?.stockId || '';
 
-  openModal(s ? t('modal.edit_service') : t('modal.add_service'), `
+  openModal(s ? t('services.modal.edit') : t('services.modal.add'), `
     <div class="form-row">
-      <div class="form-group"><label>${t('field.service_name')}</label><input type="text" id="f-svN" value="${esc(s?.name||'')}" placeholder="${t('placeholder.eg_service')}"></div>
-      <div class="form-group"><label>${t('field.mode')}</label><select id="f-svC" onchange="rebuildStockOpts()"><option value="">${t('label.select_default')}</option>${catOpts}</select></div>
+      <div class="form-group"><label>${t('services.field.name')}</label><input type="text" id="f-svN" value="${esc(s?.name||'')}" placeholder="${t('services.placeholder.eg_service')}"></div>
+      <div class="form-group"><label>${t('services.field.mode')}</label><select id="f-svC" onchange="rebuildStockOpts()"><option value="">${t('common.select')}</option>${catOpts}</select></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>${t('field.rolling_stock')}</label><select id="f-svSt"></select></div>
-      <div class="form-group"><label>${t('field.line')}</label>
+      <div class="form-group"><label>${t('services.field.rolling_stock')}</label><select id="f-svSt"></select></div>
+      <div class="form-group"><label>${t('services.field.line')}</label>
         <div class="flex gap-8 items-center">
-          <select id="f-svG" style="flex:1"><option value="">${t('label.none_default')}</option>${grpOpts}</select>
-          <button class="btn btn-sm" type="button" onclick="quickCreateGroup()">${t("btn.new_line_short")}</button>
+          <select id="f-svG" style="flex:1"><option value="">${t('common.none')}</option>${grpOpts}</select>
+          <button class="btn btn-sm" type="button" onclick="quickCreateGroup()">${t("lines.btn.new_short")}</button>
         </div></div>
     </div>
-    <div class="form-group"><label>${t('field.description')}</label>
+    <div class="form-group"><label>${t('common.field.description')}</label>
       <input type="text" id="f-svDesc" value="${esc(s?.description||'')}" placeholder="e.g. Skips Almere, runs express to Lelystad"></div>
     ${buildPatternEditor(s?.schedulePattern)}
     <div class="form-group">
-      <label>${t('field.route')}</label>
+      <label>${t('services.field.route')}</label>
       <div id="route-add-prev" class="mb-8"></div>
       <div id="route-builder"></div>
       <div id="route-add-next" class="mt-8"></div>
     </div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="saveSvc()">${s?t('btn.save'):t('btn.add_service')}</button>`);
+    `<button class="btn" onclick="closeModal()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="saveSvc()">${s?t('common.save'):t('services.btn.add')}</button>`);
 
   rebuildStockOpts();
   renderRouteBuilder();
@@ -2378,7 +2378,7 @@ function rebuildStockOpts() {
     else unassigned.push(st);
   }
 
-  let html = `<option value="">${t('label.none_default')}</option>`;
+  let html = `<option value="">${t('common.none')}</option>`;
   const makeOpt = (st, prefix) =>
     `<option value="${st.id}" ${st.id===currentStockId?'selected':''}>${prefix}${esc(st.name)}${st.code?' ['+esc(st.code)+']':''}  (${st.traction}, ${st.acceleration}m/s², ${st.maxSpeed}km/h)</option>`;
 
@@ -2412,11 +2412,11 @@ function renderRouteBuilder() {
   if (prependContainer) prependContainer.innerHTML = '';
 
   if (!stops.length) {
-    container.innerHTML = `<div class="text-dim" style="font-size:13px">${t('empty.no_stops')}</div>`;
+    container.innerHTML = `<div class="text-dim" style="font-size:13px">${t('services.empty.no_stops')}</div>`;
     const sorted = [...data.nodes].sort((a, b) => a.name.localeCompare(b.name));
-    addContainer.innerHTML = `<div class="form-group"><label>${t('field.starting_node')}</label>
+    addContainer.innerHTML = `<div class="form-group"><label>${t('services.field.starting_node')}</label>
       <select onchange="addRouteStop(this.value);this.value='';">
-        <option value="">${t('label.pick_start_node')}</option>
+        <option value="">${t('common.pick_start_node')}</option>
         ${sorted.map(n => `<option value="${n.id}">${esc(n.name)} (${t('type.'+n.type)})</option>`).join('')}
       </select></div>`;
     return;
@@ -2454,7 +2454,7 @@ function renderRouteBuilder() {
           <span class="step-type">${node?.type||''}</span></div>
         ${isStation ? `<div class="step-controls mt-8">
           <select onchange="window._routeStops[${i}].platformId=this.value" style="width:120px">
-            <option value="">${t('label.platf')}</option>${platOpts}</select>
+            <option value="">${t('common.platf')}</option>${platOpts}</select>
           <input type="number" value="${stop.dwell||''}" placeholder="Dwell(s)" min="0" style="width:80px"
             onchange="window._routeStops[${i}].dwell=parseInt(this.value)||null">
           <label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:3px">
@@ -2469,10 +2469,10 @@ function renderRouteBuilder() {
       ${(() => {
         const isFirst = i === 0;
         const isLast = i === stops.length - 1;
-        if (isFirst && stops.length <= 1) return `<button class="remove-step" onclick="clearRoute()" title="${t('tooltip.clear_route')}">✕</button>`;
-        if (isFirst) return `<button class="remove-step" onclick="removeRouteStopFront()" title="${t('tooltip.remove_start')}">✕</button>`;
-        if (isLast) return `<button class="remove-step" onclick="removeRouteStopEnd()" title="${t('tooltip.remove_end')}">✕</button>`;
-        return `<button class="remove-step" onclick="passRouteStop(${i})" title="${t('tooltip.mark_pass_through')}">✕</button>`;
+        if (isFirst && stops.length <= 1) return `<button class="remove-step" onclick="clearRoute()" title="${t('nodes.tooltip.clear_route')}">✕</button>`;
+        if (isFirst) return `<button class="remove-step" onclick="removeRouteStopFront()" title="${t('nodes.tooltip.remove_start')}">✕</button>`;
+        if (isLast) return `<button class="remove-step" onclick="removeRouteStopEnd()" title="${t('nodes.tooltip.remove_end')}">✕</button>`;
+        return `<button class="remove-step" onclick="passRouteStop(${i})" title="${t('nodes.tooltip.mark_pass_through')}">✕</button>`;
       })()}
     </div>`;
 
@@ -2490,7 +2490,7 @@ function renderRouteBuilder() {
         } else {
           // Dropdown to reassign track
           trackLabel = `<select onchange="window._routeStops[${i+1}].trackId=this.value;renderRouteBuilder()" style="font-size:11px;padding:1px 4px;background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--accent);font-weight:500">`;
-          trackLabel += `<option value="" ${!nextStop.trackId ? 'selected' : ''}>${t('field.no_track_assigned')}</option>`;
+          trackLabel += `<option value="" ${!nextStop.trackId ? 'selected' : ''}>${t('segments.field.no_track_assigned')}</option>`;
           for (const tk of trkArr) {
             trackLabel += `<option value="${tk.id}" ${nextStop.trackId === tk.id ? 'selected' : ''}>${esc(tk.name)}</option>`;
           }
@@ -2515,11 +2515,11 @@ function renderRouteBuilder() {
 
   if (connected.length) {
     addContainer.innerHTML = `<select onchange="addRouteStop(this.value);this.value='';" style="width:100%">
-      <option value="">${t('seg.extend_to')}</option>
+      <option value="">${t('segments.seg.extend_to')}</option>
       ${_routeTrackOptions(connected)}
     </select>`;
   } else {
-    addContainer.innerHTML = `<div class="text-dim" style="font-size:12px">${t('empty.no_further_connections')}</div>`;
+    addContainer.innerHTML = `<div class="text-dim" style="font-size:12px">${t('nodes.empty.no_further_connections')}</div>`;
   }
 }
 
@@ -2622,22 +2622,22 @@ function clearRoute() {
 
 function saveSvc() {
   const name = document.getElementById('f-svN').value.trim();
-  if (!name) { toast(t('toast.name_required'), 'error'); return; }
+  if (!name) { toast(t('nodes.toast.name_required'), 'error'); return; }
   const categoryId = document.getElementById('f-svC').value;
   const stockId = document.getElementById('f-svSt').value || null;
   const groupId = document.getElementById('f-svG').value || null;
   const description = document.getElementById('f-svDesc').value.trim();
   const stops = window._routeStops;
-  if (stops.length < 2) { toast(t('toast.min_two_stops'), 'error'); return; }
+  if (stops.length < 2) { toast(t('services.toast.min_two_stops'), 'error'); return; }
 
   const schedulePattern = readPatternFromForm();
 
   if (editingId) {
     Object.assign(getSvc(editingId), { name, categoryId, stockId, groupId, description, stops, schedulePattern });
-    toast(t('toast.service_updated'), 'success');
+    toast(t('services.toast.updated'), 'success');
   } else {
     data.services.push({ id: uid(), name, categoryId, stockId, groupId, description, stops, schedulePattern });
-    toast(t('toast.service_added'), 'success');
+    toast(t('services.toast.added'), 'success');
   }
   save(); closeModal(); renderServices(); updateBadges();
 }
@@ -2698,7 +2698,7 @@ function reverseService(id) {
 
   data.services.push(reversed);
   save(); renderServices(); updateBadges();
-  toast(t('toast.reversed_created', { name: reversed.name }), 'success');
+  toast(t('services.toast.reversed_created', { name: reversed.name }), 'success');
 }
 
 function duplicateService(id) {
@@ -2708,7 +2708,7 @@ function duplicateService(id) {
   dup.name = svc.name + ' (copy)';
   data.services.push(dup);
   save(); renderServices(); updateBadges();
-  toast(t('toast.service_duplicated', { name: dup.name }), 'success');
+  toast(t('services.toast.duplicated', { name: dup.name }), 'success');
 }
 
 function deleteSvc(id) {
@@ -2716,9 +2716,9 @@ function deleteSvc(id) {
   const depCount = data.departures.filter(d => d.serviceId === id).length;
   let impact = '';
   if (depCount) impact += `\n• ${depCount} departure${depCount!==1?'s':''} will be removed`;
-  appConfirm(t('confirm.delete_service', { name: svc?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
+  appConfirm(t('services.confirm.delete', { name: svc?.name || '?' }) + (impact ? '\n' + impact : ''), () => {
     data.services = data.services.filter(s => s.id !== id);
     data.departures = data.departures.filter(d => d.serviceId !== id);
-    save(); renderServices(); updateBadges(); toast(t('toast.service_deleted'), 'success');
+    save(); renderServices(); updateBadges(); toast(t('services.toast.deleted'), 'success');
   });
 }

@@ -68,7 +68,7 @@ async function flushSave() {
   if (!_db || !_activeSaveId) return;
   try {
     await dbPut('saves', { id: _activeSaveId, data: JSON.parse(JSON.stringify(data)) });
-    await dbPut('registry', { id: _activeSaveId, name: data.settings?.systemName || t('save_mgr.unnamed'), modified: new Date().toISOString(), stats: saveSlotStats() });
+    await dbPut('registry', { id: _activeSaveId, name: data.settings?.systemName || t('ie.save_mgr.unnamed'), modified: new Date().toISOString(), stats: saveSlotStats() });
   } catch(e) { console.error('Save failed:', e); }
 }
 
@@ -97,14 +97,14 @@ async function loadSlot(id) {
   migrateSegmentTracks();
   if (_map) { _map.remove(); _map = null; }
   refreshAll(); renderDashboard(); updateSystemName();
-  toast(t('toast.loaded', { name: data.settings?.systemName || t('save_mgr.unnamed') }), 'success');
+  toast(t('ie.toast.loaded', { name: data.settings?.systemName || t('ie.save_mgr.unnamed') }), 'success');
 }
 
 async function deleteSlot(id) {
   const reg = await dbGetAll('registry');
   const entry = reg.find(r => r.id === id);
   if (!entry) return;
-  appConfirm(t('save_mgr.confirm_delete', { name: entry.name }), async () => {
+  appConfirm(t('ie.save_mgr.confirm_delete', { name: entry.name }), async () => {
     await dbDelete('saves', id);
     await dbDelete('registry', id);
     if (_activeSaveId === id) {
@@ -119,7 +119,7 @@ async function deleteSlot(id) {
         refreshAll(); renderDashboard(); updateSystemName();
       }
     }
-    toast(t('toast.save_deleted'), 'success');
+    toast(t('ie.toast.save_deleted'), 'success');
   });
 }
 
@@ -130,14 +130,14 @@ async function duplicateSlot(id) {
   const newId = uid();
   await dbPut('saves', { id: newId, data: slot.data });
   await dbPut('registry', { id: newId, name: regEntry.name + ' (copy)', modified: new Date().toISOString(), stats: regEntry.stats });
-  toast(t('toast.duplicated', { name: regEntry.name }), 'success');
+  toast(t('ie.toast.duplicated', { name: regEntry.name }), 'success');
   openSaveManager();
 }
 
 async function renameSlot(id) {
   const entry = await dbGet('registry', id);
   if (!entry) return;
-  appPrompt(t('save_mgr.prompt_rename'), entry.name, async (newName) => {
+  appPrompt(t('ie.save_mgr.prompt_rename'), entry.name, async (newName) => {
     entry.name = newName;
     await dbPut('registry', entry);
     if (_activeSaveId === id) {
@@ -157,18 +157,18 @@ async function exportData() {
   const defaultName = sysName + '-' + ts + '.json';
   if (window.showSaveFilePicker) {
     try {
-      const handle = await window.showSaveFilePicker({ suggestedName: defaultName, types: [{ description: t('save_mgr.json_file'), accept: { 'application/json': ['.json'] } }] });
+      const handle = await window.showSaveFilePicker({ suggestedName: defaultName, types: [{ description: t('ie.save_mgr.json_file'), accept: { 'application/json': ['.json'] } }] });
       const writable = await handle.createWritable();
       await writable.write(jsonStr);
       await writable.close();
-      toast(t('toast.data_exported'), 'success');
+      toast(t('ie.toast.exported'), 'success');
       return;
     } catch(e) { if (e.name === 'AbortError') return; }
   }
   const blob = new Blob([jsonStr], { type: 'application/json' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = defaultName; a.click(); URL.revokeObjectURL(a.href);
-  toast(t('toast.data_exported'), 'success');
+  toast(t('ie.toast.exported'), 'success');
 }
 
 function importData() { document.getElementById('file-input').click(); }
@@ -188,8 +188,8 @@ function handleImport(e) {
         stats: { nodes: tempData.nodes.length, segments: tempData.segments.length, services: tempData.services.length, departures: tempData.departures.length } });
       await flushSave();
       await loadSlot(newId);
-      toast(t('toast.imported'), 'success');
-    } catch(err) { toast(t('toast.invalid_json'), 'error'); }
+      toast(t('ie.toast.imported'), 'success');
+    } catch(err) { toast(t('ie.toast.invalid_json'), 'error'); }
   };
   reader.readAsText(file); e.target.value = '';
 }
@@ -212,30 +212,30 @@ async function openSaveManager() {
     const mod = r.modified ? new Date(r.modified).toLocaleString() : '—';
     const st = r.stats || {};
     return `<tr style="${isActive ? 'background:var(--accent-glow)' : ''}">
-      <td><strong>${esc(r.name)}</strong>${isActive ? ` <span style="font-size:10px;color:var(--accent)">${t('save_mgr.active')}</span>` : ''}</td>
+      <td><strong>${esc(r.name)}</strong>${isActive ? ` <span style="font-size:10px;color:var(--accent)">${t('ie.save_mgr.active')}</span>` : ''}</td>
       <td class="text-dim" style="font-size:12px">${mod}</td>
       <td class="mono" style="font-size:12px">${st.nodes||0}n · ${st.services||0}s · ${st.departures||0}d</td>
       <td class="actions-cell" style="white-space:nowrap">
-        ${!isActive ? `<button class="btn btn-sm" onclick="closeModal();loadSlot('${r.id}')">${t('btn.load')}</button>` : ''}
-        <button class="btn btn-sm" onclick="renameSlot('${r.id}')">${t('btn.rename')}</button>
-        <button class="btn btn-sm" onclick="duplicateSlot('${r.id}')">${t('btn.duplicate')}</button>
+        ${!isActive ? `<button class="btn btn-sm" onclick="closeModal();loadSlot('${r.id}')">${t('common.load')}</button>` : ''}
+        <button class="btn btn-sm" onclick="renameSlot('${r.id}')">${t('common.rename')}</button>
+        <button class="btn btn-sm" onclick="duplicateSlot('${r.id}')">${t('common.duplicate')}</button>
         ${!isActive ? `<button class="btn btn-sm btn-danger" onclick="deleteSlot('${r.id}');setTimeout(openSaveManager,200)">✕</button>` : ''}
       </td>
     </tr>`;
   }).join('');
 
-  openModal(t('save_mgr.title'), `
-    <table class="data-table"><thead><tr><th>${t('save_mgr.col_system')}</th><th>${t('save_mgr.col_modified')}</th><th>${t('save_mgr.col_stats')}</th><th></th></tr></thead>
-    <tbody>${rows || `<tr><td colspan="4" class="text-dim">${t('save_mgr.no_saves')}</td></tr>`}</tbody></table>
+  openModal(t('ie.save_mgr.title'), `
+    <table class="data-table"><thead><tr><th>${t('ie.save_mgr.col_system')}</th><th>${t('ie.save_mgr.col_modified')}</th><th>${t('ie.save_mgr.col_stats')}</th><th></th></tr></thead>
+    <tbody>${rows || `<tr><td colspan="4" class="text-dim">${t('ie.save_mgr.no_saves')}</td></tr>`}</tbody></table>
     <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center">
       <div class="flex gap-8">
-        <button class="btn btn-sm btn-primary" onclick="closeModal();newSystem()">${t('btn.new_system')}</button>
-        <button class="btn btn-sm" onclick="closeModal();importData()">↑ ${t('btn.import_json')}</button>
-        <button class="btn btn-sm" onclick="closeModal();exportData()">↓ ${t('btn.export_json')}</button>
+        <button class="btn btn-sm btn-primary" onclick="closeModal();newSystem()">${t('ie.btn.new_system')}</button>
+        <button class="btn btn-sm" onclick="closeModal();importData()">↑ ${t('ie.btn.import_json')}</button>
+        <button class="btn btn-sm" onclick="closeModal();exportData()">↓ ${t('ie.btn.export_json')}</button>
       </div>
-      <span class="text-dim" style="font-size:11px">${t('save_mgr.storage')}: ${usedMB} MB${quotaMB > 0 ? ' / ' + quotaMB + ' MB' : ''}</span>
+      <span class="text-dim" style="font-size:11px">${t('ie.save_mgr.storage')}: ${usedMB} MB${quotaMB > 0 ? ' / ' + quotaMB + ' MB' : ''}</span>
     </div>`,
-    `<button class="btn" onclick="closeModal()">${t('btn.close')}</button>`);
+    `<button class="btn" onclick="closeModal()">${t('common.close')}</button>`);
 }
 
 // ---- Saves Dropdown ----
@@ -262,7 +262,7 @@ async function renderSavesDropdown() {
     </div>`;
   }
   html += `<div class="saves-dropdown-divider"></div>`;
-  html += `<div class="saves-dropdown-item" onclick="closeSavesDropdown();newSystem()"><span style="color:var(--accent)">+ ${t('btn.new_system')}</span></div>`;
+  html += `<div class="saves-dropdown-item" onclick="closeSavesDropdown();newSystem()"><span style="color:var(--accent)">+ ${t('ie.btn.new_system')}</span></div>`;
   menu.innerHTML = html;
 }
 
@@ -273,7 +273,7 @@ function closeSavesDropdown() {
 
 function updateSavesDropdownLabel() {
   const el = document.getElementById('saves-dropdown-label');
-  if (el) el.textContent = data.settings?.systemName || t('btn.saves');
+  if (el) el.textContent = data.settings?.systemName || t('common.saves');
 }
 
 // Close dropdown on outside click
@@ -284,7 +284,7 @@ document.addEventListener('click', (e) => {
 
 // Relocated from Settings — fundamentally a persistence operation
 async function newSystem() {
-  appConfirm(t('save_mgr.confirm_new'), async () => {
+  appConfirm(t('ie.save_mgr.confirm_new'), async () => {
     await flushSave();
     data = { nodes: [], segments: [], categories: [], services: [], serviceGroups: [], departures: [], rollingStock: [], stockModeMatrix: {}, settings: {} };
     _activeSaveId = uid();
@@ -293,6 +293,6 @@ async function newSystem() {
     if (_map) { _map.remove(); _map = null; }
     updateSystemName();
     switchTab('dashboard');
-    toast(t('toast.new_system'), 'success');
+    toast(t('ie.toast.new_system'), 'success');
   });
 }

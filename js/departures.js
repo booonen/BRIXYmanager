@@ -20,7 +20,7 @@ function populateStationSelect() {
   const prev = _departureStationId;
   createNodePicker({
     containerId: 'departure-station-picker', pickerId: 'np-dep-station',
-    placeholder: t('dep_board.search_station'),
+    placeholder: t('departures.placeholder.search_station'),
     filterFn: n => isPassengerStop(n),
     displayNameFn: nodeDisplayName,
     onSelect: function(nodeId) {
@@ -48,7 +48,7 @@ function boardSetNow() {
 function boardUpdatePlatforms() {
   const sel = document.getElementById('board-platform');
   if (!sel) return;
-  sel.innerHTML = `<option value="">${t('label.all_platforms')}</option>`;
+  sel.innerHTML = `<option value="">${t('common.all_platforms')}</option>`;
   const group = stationGroup(_departureStationId);
   for (const nid of group) {
     const node = getNode(nid);
@@ -63,7 +63,7 @@ function boardUpdatePlatforms() {
 function renderDepartures() {
   const sid = _departureStationId;
   const board = document.getElementById('departures-board');
-  if (!sid) { board.innerHTML = `<div class="text-dim mt-16" style="font-size:13px;">${t('msg.select_station')}</div>`; return; }
+  if (!sid) { board.innerHTML = `<div class="text-dim mt-16" style="font-size:13px;">${t('departures.msg.select_station')}</div>`; return; }
   const station = getNode(sid);
   const isArr = boardMode === 'arrivals';
 
@@ -154,24 +154,24 @@ function renderDepartures() {
 
   if (!visible.length) {
     const platName = platFilter ? (() => { const n = getNode(sid); const p = (n?.platforms||[]).find(x=>x.id===platFilter); return p ? platDisplayName(p.name) : 'selected platform'; })() : '';
-    board.innerHTML = `<div class="text-dim mt-16" style="font-size:13px;">${t('empty.no_services_at_time', { mode: isArr ? t('btn.arrivals').toLowerCase() : t('btn.departures').toLowerCase(), time: toTime(boardTime) })}</div>`;
+    board.innerHTML = `<div class="text-dim mt-16" style="font-size:13px;">${t('departures.empty.no_services_at_time', { mode: isArr ? t('common.arrivals').toLowerCase() : t('common.departures').toLowerCase(), time: toTime(boardTime) })}</div>`;
     return;
   }
 
-  const headerLabel = isArr ? t('btn.arrivals').toUpperCase() : t('btn.departures').toUpperCase();
-  const dirLabel = isArr ? t('dep_board.col_origin') : t('dep_board.col_destination');
+  const headerLabel = isArr ? t('common.arrivals').toUpperCase() : t('common.departures').toUpperCase();
+  const dirLabel = isArr ? t('departures.col.origin') : t('departures.col.destination');
   const platLabel = platFilter ? (() => { const n = getNode(sid); const p = (n?.platforms||[]).find(x=>x.id===platFilter); return p ? ' · ' + esc(platDisplayName(p.name)) : ''; })() : '';
 
   board.innerHTML = `<div class="departure-board">
     <div class="departure-board-header"><h3>${headerLabel} — ${esc(nodeDisplayName(sid)).toUpperCase()}${platLabel}</h3>
-      <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${t('dep_board.showing', { n: visible.length + (totalCount > BOARD_LIMIT ? ' / ' + totalCount : ''), time: toTime(boardTime) })}</span></div>
-    <div class="departure-row departure-row-header"><div>${t('dep_board.col_time')}</div><div>${t('dep_board.col_mode')}</div><div>${dirLabel}</div><div>${t('dep_board.col_line')}</div><div>${t('dep_board.col_plt')}</div></div>
+      <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-muted);">${t('departures.showing', { n: visible.length + (totalCount > BOARD_LIMIT ? ' / ' + totalCount : ''), time: toTime(boardTime) })}</span></div>
+    <div class="departure-row departure-row-header"><div>${t('departures.col.time')}</div><div>${t('departures.col.mode')}</div><div>${dirLabel}</div><div>${t('departures.col.line')}</div><div>${t('departures.col.plt')}</div></div>
     ${visible.map(d => {
       const platDisplay = platDisplayName(d.platform);
       return `<div class="departure-row" onclick="showTrainSchedule('${d.depId}')">
       <div class="dep-time">${toTime(d.time)}</div>
       <div style="font-size:12px;color:var(--text-dim)">${esc(d.catAbbr)}</div>
-      <div class="dep-destination">${esc(d.destination || d.origin)}${d.via.length ? `<div style="font-size:12px;color:var(--text-dim);margin-top:2px">${t('dep_board.via')} ${d.via.map(v => esc(v)).join(', ')}</div>` : ''}</div>
+      <div class="dep-destination">${esc(d.destination || d.origin)}${d.via.length ? `<div style="font-size:12px;color:var(--text-dim);margin-top:2px">${t('departures.via')} ${d.via.map(v => esc(v)).join(', ')}</div>` : ''}</div>
       <div>${d.lineColor ? `<span class="dep-line" style="background:${d.lineColor};color:${contrastText(d.lineColor)}">${esc(d.lineName)}</span>` : `<span class="dep-line" style="background:var(--bg-input);color:var(--text-dim)">${esc(d.lineName || '—')}</span>`}</div>
       <div class="dep-platform">${esc(platDisplay)}</div>
     </div>`;

@@ -626,3 +626,168 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
   font-size: 11px; color: var(--danger); font-style: italic;
 }
 .csv-match-select { min-width: 200px; font-size: 12px; }
+
+/* ============================================================
+   L10N EDITOR — full-screen overlay.
+   Visually distinct from the main app (warm paper background,
+   serif headings, mono grid) so it's obvious you've stepped out
+   of the program proper and into a maintenance surface.
+   ============================================================ */
+#l10n-editor-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  background: #f4ecd8;
+  color: #24201a;
+  font-family: 'Fraunces', Georgia, serif;
+  overflow: hidden;
+  display: grid;
+}
+#l10n-editor-overlay .le-chrome {
+  display: grid; grid-template-rows: auto auto 1fr auto; height: 100vh;
+}
+#l10n-editor-overlay .le-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 28px 14px;
+  background: #ebe1c7;
+  border-bottom: 2px solid #c4b48a;
+  box-shadow: 0 2px 0 #d8c9a0;
+}
+#l10n-editor-overlay .le-brand {
+  display: flex; align-items: baseline; gap: 14px;
+  font-family: 'Fraunces', Georgia, serif;
+  font-weight: 600; font-size: 22px; letter-spacing: -0.01em;
+  color: #2b2518;
+}
+#l10n-editor-overlay .le-brand-mark {
+  font-size: 26px; color: #8c6e35; margin-right: 2px;
+}
+#l10n-editor-overlay .le-brand-lang {
+  font-style: italic; font-size: 16px; color: #5b4a28;
+}
+#l10n-editor-overlay .le-code {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: #8c6e35; font-style: normal;
+  background: #e1d5b1; padding: 2px 6px; border-radius: 4px;
+}
+#l10n-editor-overlay .le-header-actions { display: flex; gap: 8px; }
+#l10n-editor-overlay .le-btn {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: 14px; font-weight: 500;
+  padding: 8px 16px; border: 1px solid #b8a77a;
+  background: #f4ecd8; color: #2b2518;
+  border-radius: 3px; cursor: pointer;
+  transition: 120ms ease;
+}
+#l10n-editor-overlay .le-btn:hover { background: #ebe0bd; border-color: #8c6e35; }
+#l10n-editor-overlay .le-btn-primary {
+  background: #5a4a2a; color: #f4ecd8; border-color: #3e3218;
+}
+#l10n-editor-overlay .le-btn-primary:hover { background: #3e3218; color: #fff; }
+#l10n-editor-overlay .le-toolbar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 12px 28px; background: #f0e7ce;
+  border-bottom: 1px solid #d8c9a0;
+}
+#l10n-editor-overlay .le-filters { display: flex; gap: 6px; }
+#l10n-editor-overlay .le-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: 'Fraunces', Georgia, serif; font-size: 13px;
+  padding: 6px 12px; border: 1px solid #c4b48a;
+  background: #f4ecd8; color: #5b4a28;
+  border-radius: 20px; cursor: pointer; transition: 120ms ease;
+}
+#l10n-editor-overlay .le-chip:hover { background: #ebe0bd; }
+#l10n-editor-overlay .le-chip-active {
+  background: #5a4a2a; color: #f4ecd8; border-color: #3e3218;
+}
+#l10n-editor-overlay .le-chip-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: #8c6e35;
+}
+#l10n-editor-overlay .le-chip-ok .le-chip-dot      { background: #4f8b4a; }
+#l10n-editor-overlay .le-chip-stale .le-chip-dot   { background: #b53b3b; }
+#l10n-editor-overlay .le-chip-missing .le-chip-dot { background: #c48a2a; }
+#l10n-editor-overlay .le-chip-all .le-chip-dot     { background: #5b4a28; }
+#l10n-editor-overlay .le-chip-count {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  background: rgba(0,0,0,0.08); padding: 1px 6px; border-radius: 10px;
+}
+#l10n-editor-overlay .le-chip-active .le-chip-count { background: rgba(255,255,255,0.18); }
+#l10n-editor-overlay .le-search {
+  flex: 0 0 320px; max-width: 50%;
+  font-family: 'Fraunces', Georgia, serif; font-size: 14px;
+  padding: 8px 12px; border: 1px solid #c4b48a;
+  background: #fffaf0; color: #24201a;
+  border-radius: 3px;
+}
+#l10n-editor-overlay .le-search:focus {
+  outline: none; border-color: #8c6e35; background: #fff;
+}
+#l10n-editor-overlay .le-grid-wrap {
+  overflow: auto; padding: 0 28px 28px;
+  background: #f4ecd8;
+}
+#l10n-editor-overlay .le-grid {
+  width: 100%; border-collapse: collapse;
+  margin-top: 12px; font-size: 13px;
+  background: #fffaf0; border: 1px solid #d8c9a0;
+}
+#l10n-editor-overlay .le-grid thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: #e1d5b1; color: #3e3218;
+  font-family: 'Fraunces', Georgia, serif; font-weight: 600;
+  font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em;
+  text-align: left; padding: 10px 12px;
+  border-bottom: 2px solid #8c6e35;
+}
+#l10n-editor-overlay .le-th-status { width: 24px; }
+#l10n-editor-overlay .le-th-key    { width: 26%; }
+#l10n-editor-overlay .le-th-en     { width: 30%; }
+#l10n-editor-overlay .le-th-tr     { width: 32%; }
+#l10n-editor-overlay .le-th-hash   { width: 12%; }
+#l10n-editor-overlay .le-grid tbody td {
+  padding: 8px 12px; vertical-align: top;
+  border-bottom: 1px solid #ebe1c7;
+}
+#l10n-editor-overlay .le-row-missing { background: #fbf2d6; }
+#l10n-editor-overlay .le-row-stale   { background: #fae4df; }
+#l10n-editor-overlay .le-row-ok      { background: #fffaf0; }
+#l10n-editor-overlay .le-dot {
+  display: inline-block; width: 10px; height: 10px; border-radius: 50%;
+  margin-top: 4px;
+}
+#l10n-editor-overlay .le-dot-ok      { background: #4f8b4a; }
+#l10n-editor-overlay .le-dot-stale   { background: #b53b3b; }
+#l10n-editor-overlay .le-dot-missing { background: #c48a2a; }
+#l10n-editor-overlay .le-cell-key {
+  font-family: 'JetBrains Mono', monospace; font-size: 12px;
+  color: #5b4a28; word-break: break-all;
+}
+#l10n-editor-overlay .le-cell-en {
+  color: #24201a; line-height: 1.5;
+}
+#l10n-editor-overlay .le-cell-hash {
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: #8c6e35;
+}
+#l10n-editor-overlay .le-hash-old {
+  color: #b53b3b; text-decoration: line-through;
+}
+#l10n-editor-overlay .le-input {
+  width: 100%; font-family: 'Fraunces', Georgia, serif; font-size: 14px;
+  background: #fff; color: #24201a;
+  border: 1px solid #c4b48a; border-radius: 3px;
+  padding: 6px 8px; resize: vertical; overflow: hidden;
+  line-height: 1.4; min-height: 32px;
+}
+#l10n-editor-overlay .le-input:focus {
+  outline: none; border-color: #8c6e35; background: #fffdf5;
+  box-shadow: 0 0 0 2px rgba(140, 110, 53, 0.15);
+}
+#l10n-editor-overlay .le-empty {
+  text-align: center; padding: 40px; color: #8c6e35; font-style: italic;
+}
+#l10n-editor-overlay .le-footer {
+  padding: 10px 28px; background: #ebe1c7;
+  border-top: 1px solid #c4b48a;
+  font-size: 12px; color: #5b4a28; font-style: italic;
+}

@@ -131,7 +131,7 @@ function canMerge(thisId, targetId) {
     const ep = [seg.nodeA, seg.nodeB].sort();
     const mp = [thisId, targetId].sort();
     if (ep[0] === mp[0] && ep[1] === mp[1])
-      return { ok: false, reason: t('merge.abort_self_loop') };
+      return { ok: false, reason: t('nodes.merge.abort_self_loop') };
   }
   return { ok: true };
 }
@@ -172,11 +172,11 @@ function openSplitModal(nodeId) {
   };
 
   _openNodeOpsOverlay(
-    esc(t('split.modal_title', { name: node.name })),
+    esc(t('nodes.split.modal_title', { name: node.name })),
     'split-body',
     `<div id="split-error" style="flex:1;color:var(--danger);font-size:13px"></div>
-     <button class="btn" onclick="_nodeOpsClose()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="applySplit()">${t('split.apply_btn')}</button>`,
+     <button class="btn" onclick="_nodeOpsClose()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="applySplit()">${t('nodes.split.apply_btn')}</button>`,
     { wide: true }
   );
   _renderSplitBody();
@@ -211,8 +211,8 @@ function _renderSplitBody() {
 }
 
 function _splitFieldInputs(side, vals) {
-  const fields = [['name', t('field.name')], ['ref', t('field.ref_code')],
-    ['ogf', t('field.ogf_node')], ['addr', t('field.address')], ['desc', t('field.description')]];
+  const fields = [['name', t('common.field.name')], ['ref', t('common.field.ref_code')],
+    ['ogf', t('nodes.field.ogf_node')], ['addr', t('nodes.field.address')], ['desc', t('common.field.description')]];
   const map = { name: 'name', ref: 'refCode', ogf: 'ogfNode', addr: 'address', desc: 'description' };
   return fields.map(([k, label]) =>
     `<div class="form-group" style="margin-bottom:8px"><label style="font-size:12px">${label}</label>
@@ -243,7 +243,7 @@ function _splitPlatCol(side, node) {
       <button class="btn btn-sm btn-danger" onclick="_splitDeleteNewPlat('${p.id}')">&#x2715;</button></div>`;
   }
   if (!plats.length && !newPlats.length) h += '<div class="text-dim" style="font-size:12px;padding:4px 0">(empty)</div>';
-  h += `<button class="btn btn-sm" style="margin-top:4px" onclick="_splitAddPlat('${side}')">+ ${t('btn.add_platform')}</button>`;
+  h += `<button class="btn btn-sm" style="margin-top:4px" onclick="_splitAddPlat('${side}')">+ ${t('nodes.btn.add_platform')}</button>`;
   return h;
 }
 
@@ -269,12 +269,12 @@ function _splitSegCol(side) {
       const svcNames = [...g.serviceIds].map(id => getSvc(id)?.name || '?');
       const svcLabel = svcNames.length > 3 ? svcNames.slice(0, 3).join(', ') + '\u2026' : svcNames.join(', ');
       h += '<div class="nops-sticky-group">';
-      h += `<div class="nops-sticky-hdr">${t('split.group_label', { n: gi + 1, services: esc(svcLabel) })}</div>`;
+      h += `<div class="nops-sticky-hdr">${t('nodes.split.group_label', { n: gi + 1, services: esc(svcLabel) })}</div>`;
       for (const segId of g.segIds) {
         const seg = getSeg(segId); if (!seg) continue;
         h += `<div style="padding:2px 0 2px 8px;font-size:13px">\u2194 ${esc(nodeName(_segOtherNode(seg, s.nodeId)))}</div>`;
       }
-      const moveLabel = side === 'left' ? t('split.move_group_right') : t('split.move_group_left');
+      const moveLabel = side === 'left' ? t('nodes.split.move_group_right') : t('nodes.split.move_group_left');
       h += `<button class="btn btn-sm" style="margin-top:4px" onclick="_splitMoveGroup(${gi},'${other}')">${moveLabel}</button></div>`;
     }
   }
@@ -297,27 +297,27 @@ function _buildSplitHTML() {
   const node = getNode(s.nodeId);
   let h = '';
   // Fields
-  h += '<div class="nops-cols"><div class="nops-col"><div class="nops-col-hdr">' + t('split.left_header') + '</div>';
+  h += '<div class="nops-cols"><div class="nops-col"><div class="nops-col-hdr">' + t('nodes.split.left_header') + '</div>';
   h += _splitFieldInputs('left', s.left);
-  h += '</div><div class="nops-col"><div class="nops-col-hdr">' + t('split.right_header') + '</div>';
+  h += '</div><div class="nops-col"><div class="nops-col-hdr">' + t('nodes.split.right_header') + '</div>';
   h += _splitFieldInputs('right', s.right);
   h += '</div></div>';
   // Platforms
-  h += '<div class="nops-sec-hdr">' + t('split.platforms_section') + '</div>';
+  h += '<div class="nops-sec-hdr">' + t('nodes.split.platforms_section') + '</div>';
   h += '<div class="nops-cols"><div class="nops-col">' + _splitPlatCol('left', node) + '</div>';
   h += '<div class="nops-col">' + _splitPlatCol('right', node) + '</div></div>';
   // Segments
-  h += '<div class="nops-sec-hdr">' + t('split.segments_section') + '</div>';
+  h += '<div class="nops-sec-hdr">' + t('nodes.split.segments_section') + '</div>';
   h += '<div class="nops-cols"><div class="nops-col">' + _splitSegCol('left') + '</div>';
   h += '<div class="nops-col">' + _splitSegCol('right') + '</div></div>';
   // Options
-  h += '<div class="nops-sec-hdr">' + t('split.options_section') + '</div>';
+  h += '<div class="nops-sec-hdr">' + t('nodes.split.options_section') + '</div>';
   h += `<label style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <input type="checkbox" id="split-isi-cb" ${s.createISI ? 'checked' : ''}
       onchange="document.getElementById('split-isi-dist').disabled=!this.checked">
-    ${t('split.create_isi')}</label>`;
+    ${t('nodes.split.create_isi')}</label>`;
   h += `<div style="margin-left:24px;display:flex;align-items:center;gap:6px">
-    ${t('split.isi_distance')}
+    ${t('nodes.split.isi_distance')}
     <input type="number" id="split-isi-dist" value="${s.isiDistance}" step="0.01" min="0.01"
       style="width:80px" ${s.createISI ? '' : 'disabled'}> km</div>`;
   // Warnings
@@ -426,23 +426,23 @@ function _splitComputeWarnings() {
     for (const sm of Object.values(data.beckmap.lineStations)) { if (sm[s.nodeId]) beckCount++; }
   }
 
-  if (rightPlats > 0) w.push(t('split.warning_platforms_moved', { n: rightPlats }));
-  if (unassigned > 0) w.push(t('split.warning_stops_unassigned', { n: unassigned }));
-  if (rightSegs > 0) w.push(t('split.warning_segments_moved', { n: rightSegs }));
-  if (repointed > 0) w.push(t('split.warning_services_repointed', { n: repointed }));
-  if (beckCount > 0) w.push(t('split.warning_beckmap_migrated', { n: beckCount }));
+  if (rightPlats > 0) w.push(t('nodes.split.warn_platforms_moved', { n: rightPlats }));
+  if (unassigned > 0) w.push(t('nodes.split.warn_stops_unassigned', { n: unassigned }));
+  if (rightSegs > 0) w.push(t('nodes.split.warn_segments_moved', { n: rightSegs }));
+  if (repointed > 0) w.push(t('nodes.split.warn_services_repointed', { n: repointed }));
+  if (beckCount > 0) w.push(t('nodes.split.warn_beckmap_migrated', { n: beckCount }));
   return w;
 }
 
 function _splitValidate() {
   const s = _splitState;
-  if (!s.left.name.trim() || !s.right.name.trim()) return t('split.err_name_required');
-  if (s.left.name.trim() === s.right.name.trim()) return t('split.err_names_same');
+  if (!s.left.name.trim() || !s.right.name.trim()) return t('nodes.split.err_name_required');
+  if (s.left.name.trim() === s.right.name.trim()) return t('nodes.split.err_names_same');
   const hasRight = Object.values(s.segmentPlacements).some(v => v === 'right')
     || Object.values(s.platformPlacements).some(v => v === 'right')
     || s.newPlatforms.some(p => p.side === 'right');
-  if (!hasRight) return t('split.err_nothing_split');
-  if (s.createISI && s.isiDistance <= 0) return t('split.err_isi_distance');
+  if (!hasRight) return t('nodes.split.err_nothing_split');
+  if (s.createISI && s.isiDistance <= 0) return t('nodes.split.err_isi_distance');
   return null;
 }
 
@@ -602,7 +602,7 @@ function applySplit() {
   const origId = orig.id;
   _nodeOpsClose();
   save(); refreshAll();
-  toast(t('toast.split_done', { name: rightNode.name }), 'success');
+  toast(t('nodes.toast.split_done', { name: rightNode.name }), 'success');
   setTimeout(() => showNodeDetail(origId), 150);
 }
 
@@ -614,21 +614,21 @@ function openMergeChooser(nodeId) {
   _mergeState = { thisId: nodeId };
   let body = '';
   for (const c of candidates) {
-    const rk = c.reason === 'osi' ? 'merge.chooser_reason_osi'
-      : c.reason === 'isi' ? 'merge.chooser_reason_isi' : 'merge.chooser_reason_same_name';
+    const rk = c.reason === 'osi' ? 'nodes.merge.reason_osi'
+      : c.reason === 'isi' ? 'nodes.merge.reason_isi' : 'nodes.merge.reason_same_name';
     body += `<label style="display:block;padding:8px 4px;cursor:pointer">
       <input type="radio" name="merge-target" value="${c.node.id}" style="margin-right:8px">
       ${esc(c.node.name)} <span class="text-dim" style="font-size:12px">(${t(rk)})</span></label>`;
   }
-  _openNodeOpsOverlay(esc(t('merge.chooser_title')), 'merge-chooser-body',
-    `<button class="btn" onclick="_nodeOpsClose()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" onclick="_mergeChooserContinue()">${t('merge.chooser_continue')}</button>`, {});
+  _openNodeOpsOverlay(esc(t('nodes.merge.chooser_title')), 'merge-chooser-body',
+    `<button class="btn" onclick="_nodeOpsClose()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" onclick="_mergeChooserContinue()">${t('nodes.merge.chooser_continue')}</button>`, {});
   document.getElementById('merge-chooser-body').innerHTML = body;
 }
 
 function _mergeChooserContinue() {
   const sel = document.querySelector('#node-ops-overlay input[name="merge-target"]:checked');
-  if (!sel) { toast(t('merge.chooser_no_candidates'), 'error'); return; }
+  if (!sel) { toast(t('nodes.merge.chooser_no_candidates'), 'error'); return; }
   openMergePreview(_mergeState.thisId, sel.value);
 }
 
@@ -652,17 +652,17 @@ function openMergePreview(thisId, targetId) {
 
   // Fields comparison (only show differing fields)
   const fields = [
-    { key: 'name', label: t('merge.field_name') },
-    { key: 'refCode', label: t('merge.field_ref') },
-    { key: 'ogfNode', label: t('merge.field_ogf') },
-    { key: 'address', label: t('merge.field_address') },
-    { key: 'description', label: t('merge.field_description') }
+    { key: 'name', label: t('nodes.merge.field_name') },
+    { key: 'refCode', label: t('nodes.merge.field_ref') },
+    { key: 'ogfNode', label: t('nodes.merge.field_ogf') },
+    { key: 'address', label: t('nodes.merge.field_address') },
+    { key: 'description', label: t('nodes.merge.field_description') }
   ];
   const visFields = fields.filter(f => (thisNode[f.key] || '') !== (targetNode[f.key] || ''));
 
   let body = '';
   if (visFields.length) {
-    body += `<div class="nops-sec-hdr">${t('merge.fields_section')}</div>`;
+    body += `<div class="nops-sec-hdr">${t('nodes.merge.fields_section')}</div>`;
     body += `<table class="nops-merge-tbl"><thead><tr><th></th><th>${esc(thisNode.name)}</th><th>${esc(targetNode.name)}</th></tr></thead><tbody>`;
     for (const f of visFields) {
       const tv = thisNode[f.key] || '', xv = targetNode[f.key] || '';
@@ -678,37 +678,37 @@ function openMergePreview(thisId, targetId) {
   }
 
   // Info sections
-  body += `<div class="nops-sec-hdr">${t('merge.platforms_section')}</div>`;
-  body += `<div class="text-dim" style="font-size:13px">${t('merge.platforms_desc')}</div>`;
+  body += `<div class="nops-sec-hdr">${t('nodes.merge.platforms_section')}</div>`;
+  body += `<div class="text-dim" style="font-size:13px">${t('nodes.merge.platforms_desc')}</div>`;
   const allPlats = [...(thisNode.platforms || []).map(p => p.name + ' [1]'),
     ...(targetNode.platforms || []).map(p => p.name + ' [2]')];
   if (allPlats.length) body += '<div style="margin:4px 0 8px;font-size:13px">' + allPlats.map(n => esc(n)).join(', ') + '</div>';
 
-  body += `<div class="nops-sec-hdr">${t('merge.segments_section')}</div>`;
-  if (segsToMigrate > 0) body += `<div class="text-dim" style="font-size:13px">${t('merge.segments_desc', { n: segsToMigrate })}</div>`;
-  if (directISI.length) body += `<div style="font-size:13px;color:var(--warn)">${t('merge.isi_removal_note', { n: directISI.length })}</div>`;
+  body += `<div class="nops-sec-hdr">${t('nodes.merge.segments_section')}</div>`;
+  if (segsToMigrate > 0) body += `<div class="text-dim" style="font-size:13px">${t('nodes.merge.segments_desc', { n: segsToMigrate })}</div>`;
+  if (directISI.length) body += `<div style="font-size:13px;color:var(--warn)">${t('nodes.merge.isi_removal_note', { n: directISI.length })}</div>`;
 
   if (svcsAffected > 0) {
-    body += `<div class="nops-sec-hdr">${t('merge.services_section')}</div>`;
-    body += `<div class="text-dim" style="font-size:13px">${t('merge.services_desc', { n: svcsAffected })}</div>`;
+    body += `<div class="nops-sec-hdr">${t('nodes.merge.services_section')}</div>`;
+    body += `<div class="text-dim" style="font-size:13px">${t('nodes.merge.services_desc', { n: svcsAffected })}</div>`;
   }
   if (targetHasSchem) {
-    body += `<div class="nops-sec-hdr">${t('merge.schematic_section')}</div>`;
-    body += `<div class="text-dim" style="font-size:13px">${t('merge.schematic_desc')}</div>`;
+    body += `<div class="nops-sec-hdr">${t('nodes.merge.schematic_section')}</div>`;
+    body += `<div class="text-dim" style="font-size:13px">${t('nodes.merge.schematic_desc')}</div>`;
   }
   if (beckCount > 0) {
-    body += `<div class="nops-sec-hdr">${t('merge.beckmap_section')}</div>`;
-    body += `<div class="text-dim" style="font-size:13px">${t('merge.beckmap_desc', { n: beckCount })}</div>`;
+    body += `<div class="nops-sec-hdr">${t('nodes.merge.beckmap_section')}</div>`;
+    body += `<div class="text-dim" style="font-size:13px">${t('nodes.merge.beckmap_desc', { n: beckCount })}</div>`;
   }
   if (!check.ok) {
     body += `<div style="margin-top:12px;padding:12px;background:var(--danger-dim);border:1px solid var(--danger);border-radius:var(--radius);color:var(--danger);font-size:13px">${esc(check.reason)}</div>`;
   }
 
-  _openNodeOpsOverlay(esc(t('merge.preview_title', { 'this': thisNode.name, target: targetNode.name })),
+  _openNodeOpsOverlay(esc(t('nodes.merge.preview_title', { 'this': thisNode.name, target: targetNode.name })),
     'merge-preview-body',
     `<div id="merge-error" style="flex:1;color:var(--danger);font-size:13px"></div>
-     <button class="btn" onclick="_nodeOpsClose()">${t('btn.cancel')}</button>
-     <button class="btn btn-primary" ${check.ok ? '' : 'disabled'} onclick="applyMerge()">${t('merge.apply_btn')}</button>`, {});
+     <button class="btn" onclick="_nodeOpsClose()">${t('common.cancel')}</button>
+     <button class="btn btn-primary" ${check.ok ? '' : 'disabled'} onclick="applyMerge()">${t('nodes.merge.apply_btn')}</button>`, {});
   document.getElementById('merge-preview-body').innerHTML = body;
 }
 
@@ -879,8 +879,8 @@ function applyMerge() {
   _nodeOpsClose();
   save(); refreshAll();
   const mergeMsg = mergedSegCount
-    ? t('toast.merge_done_with_segs', { name: thisNode.name, n: mergedSegCount })
-    : t('toast.merge_done', { name: thisNode.name });
+    ? t('nodes.toast.merge_done_with_segs', { name: thisNode.name, n: mergedSegCount })
+    : t('nodes.toast.merge_done', { name: thisNode.name });
   toast(mergeMsg, 'success');
   setTimeout(() => showNodeDetail(savedId), 150);
 }
