@@ -62,6 +62,8 @@ function save() {
   if (!_activeSaveId) return;
   clearTimeout(_saveDebounce);
   _saveDebounce = setTimeout(() => flushSave(), 300);
+  if (typeof bumpTHIVersion === 'function') bumpTHIVersion();
+  if (typeof animOnDataChange === 'function') animOnDataChange();
 }
 
 async function flushSave() {
@@ -85,6 +87,8 @@ async function load() {
     localStorage.setItem('railmanager:active', _activeSaveId);
     await flushSave();
   }
+  if (typeof bumpTHIVersion === 'function') bumpTHIVersion();
+  if (typeof animOnDataChange === 'function') animOnDataChange();
 }
 
 async function loadSlot(id) {
@@ -96,6 +100,8 @@ async function loadSlot(id) {
   if (slot?.data) data = { ...data, ...slot.data };
   migrateSegmentTracks();
   if (_map) { _map.remove(); _map = null; }
+  if (typeof bumpTHIVersion === 'function') bumpTHIVersion();
+  if (typeof animOnDataChange === 'function') animOnDataChange();
   refreshAll(); renderDashboard(); updateSystemName();
   toast(t('toast.loaded', { name: data.settings?.systemName || t('save_mgr.unnamed') }), 'success');
 }

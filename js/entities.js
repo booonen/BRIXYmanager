@@ -1,16 +1,342 @@
 // ============================================================
+// INLINE DETAIL ACCORDION
+// ============================================================
+// Each entity table renders a detail row inline below the clicked row.
+// Single-expand per kind (kind = 'nodes' | 'segments' | 'lines' | 'services').
+// Animated expand/collapse. After re-render (sort/filter), the previously
+// open row is silently re-expanded if it survived the filter.
+
+const _detailExpanded = { nodes: null, segments: null, lines: null, services: null };
+const _DETAIL_MAP_ID = { nodes: 'dm-node', segments: 'dm-seg', lines: 'dm-line', services: 'dm-svc' };
+const _DETAIL_ANIM_MS = 260;
+let _detailRestoring = false;
+
+function _detailGetTable(listId) {
+  const list = document.getElementById(listId);
+  return list ? list.querySelector('table') : null;
+}
+
+function _detailRemoveRow(table, kind) {
+  if (!table) return;
+  const detailRow = table.querySelector('.detail-row');
+  const expandedRow = table.querySelector('tr.expanded');
+  if (detailRow) detailRow.remove();
+  if (expandedRow) expandedRow.classList.remove('expanded');
+  if (kind && _DETAIL_MAP_ID[kind]) detailMapDestroy(_DETAIL_MAP_ID[kind]);
+}
+
+function expandDetailRow(kind, entityId, listId, html, afterRender) {
+  const table = _detailGetTable(listId);
+  if (!table) return;
+
+  // Same row clicked twice while not restoring → collapse it
+  if (_detailExpanded[kind] === entityId && !_detailRestoring) {
+    return collapseDetailRow(kind, listId);
+  }
+
+  // Different row (or fresh restore) → blow away any existing detail row immediately
+  if (table.querySelector('.detail-row')) _detailRemoveRow(table, kind);
+
+  const targetRow = table.querySelector(`tr[data-id="${CSS.escape(entityId)}"]`);
+  if (!targetRow) { _detailExpanded[kind] = null; return; }
+
+  // Capture the table's natural rendered width AFTER clearing any prior detail row.
+  // We clamp the new detail-content to this so wide internals (e.g. service detail's
+  // per-stop departures table) scroll inside the row instead of stretching the
+  // parent .data-table's column widths.
+  const lockedWidth = Math.round(table.getBoundingClientRect().width);
+
+  const headerRow = table.querySelector('thead tr');
+  const colspan = headerRow ? headerRow.children.length : 1;
+
+  const detailRow = document.createElement('tr');
+  detailRow.className = 'detail-row';
+  detailRow.dataset.kind = kind;
+  detailRow.innerHTML = `<td colspan="${colspan}"><div class="detail-content">${html}</div></td>`;
+  targetRow.classList.add('expanded');
+  targetRow.parentNode.insertBefore(detailRow, targetRow.nextSibling);
+  _detailExpanded[kind] = entityId;
+
+  // Sync keyboard-nav highlight with the newly-opened row
+  if (typeof _kbNav !== 'undefined') {
+    document.querySelectorAll(`#${listId} tr.kb-highlighted`).forEach(r => r.classList.remove('kb-highlighted'));
+    targetRow.classList.add('kb-highlighted');
+    _kbNav[kind] = entityId;
+  }
+
+  const content = detailRow.querySelector('.detail-content');
+  if (lockedWidth > 0) {
+    content.style.maxWidth = lockedWidth + 'px';
+    content.style.width = lockedWidth + 'px';
+  }
+
+  if (_detailRestoring) {
+    content.style.maxHeight = 'none';
+    content.classList.add('open');
+    if (afterRender) afterRender();
+    return;
+  }
+
+  // Animate open: 0 → scrollHeight → none
+  const targetH = content.scrollHeight;
+  content.style.maxHeight = '0px';
+  content.style.opacity = '0';
+  void content.offsetHeight;
+  requestAnimationFrame(() => {
+    content.style.maxHeight = targetH + 'px';
+    content.style.opacity = '1';
+  });
+
+  setTimeout(() => {
+    if (_detailExpanded[kind] !== entityId) return;
+    content.style.maxHeight = 'none';
+    content.classList.add('open');
+    if (afterRender) afterRender();
+    targetRow.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, _DETAIL_ANIM_MS);
+}
+
+function collapseDetailRow(kind, listId) {
+  const table = _detailGetTable(listId);
+  if (!table) { _detailExpanded[kind] = null; return; }
+  const detailRow = table.querySelector('.detail-row');
+  const expandedRow = table.querySelector('tr.expanded');
+  if (!detailRow) {
+    if (expandedRow) expandedRow.classList.remove('expanded');
+    _detailExpanded[kind] = null;
+    if (_DETAIL_MAP_ID[kind]) detailMapDestroy(_DETAIL_MAP_ID[kind]);
+    return;
+  }
+  if (expandedRow) expandedRow.classList.remove('expanded');
+  _detailExpanded[kind] = null;
+
+  const content = detailRow.querySelector('.detail-content');
+  if (!content) {
+    detailRow.remove();
+    if (_DETAIL_MAP_ID[kind]) detailMapDestroy(_DETAIL_MAP_ID[kind]);
+    return;
+  }
+
+  // Pin current height, then animate to 0
+  content.style.maxHeight = content.scrollHeight + 'px';
+  content.classList.remove('open');
+  void content.offsetHeight;
+  requestAnimationFrame(() => {
+    content.style.maxHeight = '0px';
+    content.style.opacity = '0';
+  });
+
+  setTimeout(() => {
+    detailRow.remove();
+    if (_DETAIL_MAP_ID[kind]) detailMapDestroy(_DETAIL_MAP_ID[kind]);
+  }, _DETAIL_ANIM_MS);
+}
+
+// Click guard for row-level onclick — ignore clicks on interactive children.
+function _detailRowClickGuard(e) {
+  return !e.target.closest('button, a, input, select, textarea, label, .chip.clickable, .clickable');
+}
+
+// Restore the previously-open detail row after a table re-render. The kind+id
+// are taken from _detailExpanded; if the entity no longer exists in the
+// rebuilt table, clear the state.
+function _detailRestoreAfterRender(kind, listId, showFn) {
+  const id = _detailExpanded[kind];
+  if (!id) return;
+  const table = _detailGetTable(listId);
+  if (!table || !table.querySelector(`tr[data-id="${CSS.escape(id)}"]`)) {
+    _detailExpanded[kind] = null;
+    if (_DETAIL_MAP_ID[kind]) detailMapDestroy(_DETAIL_MAP_ID[kind]);
+    return;
+  }
+  _detailRestoring = true;
+  try { showFn(id); } finally { _detailRestoring = false; }
+}
+
+// Inline collapsible block for bulky sub-sections (e.g. service schedule).
+// Renders an <h4>-style toggle with a caret and an animated content panel.
+function detailCollapsibleHTML(id, title, contentHtml, opts) {
+  const open = !!(opts && opts.open);
+  const sub = (opts && opts.sub) ? `<span class="dc-sub">${opts.sub}</span>` : '';
+  return `<div class="detail-collapsible${open ? ' open' : ''}" data-dc-id="${id}">
+    <button type="button" class="dc-toggle" onclick="event.stopPropagation();_detailToggleCollapsible('${id}')">
+      <span class="dc-caret">▸</span><span class="dc-title">${title}</span>${sub}
+    </button>
+    <div class="dc-body"><div class="dc-inner">${contentHtml}</div></div>
+  </div>`;
+}
+
+function _detailToggleCollapsible(id) {
+  const root = document.querySelector(`.detail-collapsible[data-dc-id="${CSS.escape(id)}"]`);
+  if (!root) return;
+  const body = root.querySelector('.dc-body');
+  if (!body) return;
+  if (root.classList.contains('open')) {
+    // Closing — restore overflow: hidden so the height animation clips correctly,
+    // pin to current scrollHeight, then animate to 0.
+    body.style.overflow = 'hidden';
+    body.style.maxHeight = body.scrollHeight + 'px';
+    void body.offsetHeight;
+    requestAnimationFrame(() => { body.style.maxHeight = '0px'; });
+    root.classList.remove('open');
+    setTimeout(() => {
+      if (!root.classList.contains('open')) {
+        body.style.maxHeight = '';
+        body.style.overflow = '';
+      }
+    }, _DETAIL_ANIM_MS);
+  } else {
+    // Opening — overflow: hidden during the height animation, then switch to
+    // overflow-x: auto / overflow-y: visible so wide content (e.g. multi-stop
+    // schedule tables) gets a horizontal scrollbar inside the collapsible.
+    body.style.overflow = 'hidden';
+    const target = body.scrollHeight;
+    body.style.maxHeight = '0px';
+    void body.offsetHeight;
+    requestAnimationFrame(() => { body.style.maxHeight = target + 'px'; });
+    root.classList.add('open');
+    setTimeout(() => {
+      if (root.classList.contains('open')) {
+        body.style.maxHeight = 'none';
+        body.style.overflow = '';
+        body.style.overflowY = 'visible';
+        body.style.overflowX = 'auto';
+      }
+    }, _DETAIL_ANIM_MS);
+  }
+}
+
+// ============================================================
+// KEYBOARD NAV (entity tables)
+// ============================================================
+// Per-tab highlighted row id (separate from _detailExpanded so users can
+// scan rows without firing detail/map renders on every arrow press).
+
+const _kbNav = { nodes: null, segments: null, lines: null, services: null };
+const _KB_TAB_MAP = { 'panel-nodes': 'nodes', 'panel-segments': 'segments', 'panel-lines': 'lines', 'panel-services': 'services' };
+const _KB_LIST_ID = { nodes: 'nodes-list', segments: 'segments-list', lines: 'lines-list', services: 'services-list' };
+const _KB_SEARCH_ID = { nodes: 'node-search', segments: 'segment-search', lines: 'line-search', services: 'service-search' };
+
+function _kbActiveKind() {
+  const id = document.querySelector('.tab-panel.active')?.id;
+  return _KB_TAB_MAP[id] || null;
+}
+
+function _kbDataRows(kind) {
+  const list = document.getElementById(_KB_LIST_ID[kind]);
+  const table = list ? list.querySelector('table') : null;
+  if (!table) return [];
+  return Array.from(table.querySelectorAll('tbody > tr[data-id]:not(.detail-row)'));
+}
+
+function _kbApplyClass(kind) {
+  const list = document.getElementById(_KB_LIST_ID[kind]);
+  if (!list) return;
+  list.querySelectorAll('tr.kb-highlighted').forEach(r => r.classList.remove('kb-highlighted'));
+  const id = _kbNav[kind];
+  if (!id) return;
+  const row = list.querySelector(`tr[data-id="${CSS.escape(id)}"]`);
+  if (row) row.classList.add('kb-highlighted');
+}
+
+function _kbSet(kind, id, opts) {
+  _kbNav[kind] = id || null;
+  _kbApplyClass(kind);
+  if (id && (!opts || opts.scroll !== false)) {
+    const list = document.getElementById(_KB_LIST_ID[kind]);
+    const row = list && list.querySelector(`tr[data-id="${CSS.escape(id)}"]`);
+    if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+}
+
+function _kbMove(kind, dir) {
+  const rows = _kbDataRows(kind);
+  if (!rows.length) return;
+  const cur = _kbNav[kind];
+  let idx = cur ? rows.findIndex(r => r.dataset.id === cur) : -1;
+  let nextIdx;
+  if (idx === -1) nextIdx = dir > 0 ? 0 : rows.length - 1;
+  else nextIdx = (idx + dir + rows.length) % rows.length;
+  _kbSet(kind, rows[nextIdx].dataset.id);
+}
+
+function _kbToggleExpand(kind) {
+  const id = _kbNav[kind];
+  if (!id) return;
+  const fn = { nodes: showNodeDetail, segments: showSegmentDetail, lines: showLineDetail, services: showServiceDetail }[kind];
+  if (fn) fn(id);
+}
+
+function _kbCloseDetail(kind) {
+  if (!_detailExpanded[kind]) return false;
+  const fn = { nodes: closeNodeDetail, segments: closeSegmentDetail, lines: closeLineDetail, services: closeServiceDetail }[kind];
+  if (fn) { fn(); return true; }
+  return false;
+}
+
+function _kbRestoreAfterRender(kind) {
+  if (!_kbNav[kind]) return;
+  const list = document.getElementById(_KB_LIST_ID[kind]);
+  if (!list) return;
+  const row = list.querySelector(`tr[data-id="${CSS.escape(_kbNav[kind])}"]`);
+  if (row) row.classList.add('kb-highlighted');
+  else _kbNav[kind] = null;
+}
+
+document.addEventListener('keydown', (e) => {
+  // Skip while modal or palette is open
+  if (document.getElementById('modal-overlay')?.classList.contains('open')) return;
+  if (document.getElementById('palette-overlay')?.classList.contains('open')) return;
+
+  const kind = _kbActiveKind();
+  if (!kind) return;
+
+  const target = e.target;
+  const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+  const isOwnSearch = isInput && target.id === _KB_SEARCH_ID[kind];
+
+  // From any other input, ignore — don't hijack typing in modals, schematic editor inputs, etc.
+  if (isInput && !isOwnSearch) return;
+
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _kbMove(kind, 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _kbMove(kind, -1);
+  } else if (e.key === 'Enter') {
+    if (_kbNav[kind]) {
+      e.preventDefault();
+      _kbToggleExpand(kind);
+    }
+  } else if (e.key === 'Escape') {
+    if (_detailExpanded[kind]) {
+      e.preventDefault();
+      _kbCloseDetail(kind);
+    } else if (_kbNav[kind]) {
+      e.preventDefault();
+      _kbSet(kind, null);
+    }
+  }
+});
+
+// ============================================================
 // NODES
 // ============================================================
 const _nodePrefixMap = {
   name: n => n.name,
   ref: n => n.refCode,
   type: n => n.type,
-  platforms: n => n.type === 'station' ? (n.platforms || []).length : null,
+  platforms: n => isPassengerStop(n) ? (n.platforms || []).length : null,
   desc: n => n.description,
   address: n => n.address,
   ogf: n => !!n.ogfNode,
   connections: n => connectedNodes(n.id).length,
-  placed: n => n.mapX != null,
+  placed: n => {
+    const ls = data.beckmap?.lineStations || {};
+    for (const gid in ls) { if (ls[gid] && ls[gid][n.id]) return true; }
+    return !!(data.beckmap?.infraStations && data.beckmap.infraStations[n.id]);
+  },
   schematic: n => !!(n.schematic && n.schematic.tracks && n.schematic.tracks.length > 0),
   line: n => {
     for (const svc of data.services) {
@@ -27,8 +353,9 @@ function _nodeFreeText(n, q) {
 }
 const _nodeSortDefs = {
   name: n => n.name, ref: n => n.refCode || '', type: n => n.type,
-  platforms: n => n.type === 'station' ? (n.platforms || []).length : null,
-  connections: n => connectedNodes(n.id).length
+  platforms: n => isPassengerStop(n) ? (n.platforms || []).length : null,
+  connections: n => connectedNodes(n.id).length,
+  thi: n => isPassengerStop(n) ? (typeof thiForNode === 'function' ? thiForNode(n.id) : 0) : null
 };
 
 function renderNodes() {
@@ -40,7 +367,6 @@ function renderNodes() {
   if (!_sortState.nodes) list.sort((a, b) => a.name.localeCompare(b.name));
   const el = document.getElementById('nodes-list');
   detailMapDestroy('dm-node');
-  document.getElementById('node-detail').innerHTML = '';
 
   if (!list.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">◉</div>
@@ -49,17 +375,19 @@ function renderNodes() {
     return;
   }
   el.innerHTML = `<table class="data-table"><thead><tr>
-    ${sortableHeader('nodes','name',t('th.name'))}${sortableHeader('nodes','ref',t('th.ref'))}${sortableHeader('nodes','type',t('th.type'))}${sortableHeader('nodes','platforms',t('th.platforms'))}${sortableHeader('nodes','connections',t('th.connections'))}<th>${t("th.ogf")}</th><th>${t("th.coords")}</th><th>${t("th.schematic")}</th><th></th></tr></thead><tbody>` +
+    ${sortableHeader('nodes','name',t('th.name'))}${sortableHeader('nodes','ref',t('th.ref'))}${sortableHeader('nodes','type',t('th.type'))}${sortableHeader('nodes','platforms',t('th.platforms'))}${sortableHeader('nodes','connections',t('th.connections'))}${sortableHeader('nodes','thi','THI')}<th>${t("th.ogf")}</th><th>${t("th.coords")}</th><th>${t("th.schematic")}</th><th></th></tr></thead><tbody>` +
     list.map(n => {
       const conns = connectedNodes(n.id).length;
       const hasOgf = !!n.ogfNode;
       const hasSch = (n.type === 'station' || n.type === 'junction') && n.schematic && n.schematic.tracks && n.schematic.tracks.length > 0;
-      return `<tr data-id="${n.id}">
-      <td><strong class="clickable" onclick="showNodeDetail('${n.id}')">${esc(n.name)}</strong>${n.description ? `<div class="text-dim" style="font-size:11px;margin-top:1px">${esc(n.description)}</div>` : ''}</td>
+      const thi = isPassengerStop(n) && typeof thiForNode === 'function' ? thiForNode(n.id) : 0;
+      return `<tr data-id="${n.id}" class="row-clickable" onclick="if(_detailRowClickGuard(event)) showNodeDetail('${n.id}')">
+      <td><strong>${esc(n.name)}</strong>${n.description ? `<div class="text-dim" style="font-size:11px;margin-top:1px">${esc(n.description)}</div>` : ''}</td>
       <td class="mono text-dim" style="font-size:11px">${esc(n.refCode || '—')}</td>
       <td><span class="type-badge type-${n.type}">${t('type.'+n.type)}</span></td>
-      <td class="mono">${n.type === 'station' ? (n.platforms||[]).length : '—'}</td>
+      <td class="mono">${isPassengerStop(n) ? (n.platforms||[]).length : '—'}</td>
       <td class="mono">${conns}</td>
+      <td class="mono">${isPassengerStop(n) ? (thi > 0 ? thi.toFixed(2) : '0') : '—'}</td>
       <td style="text-align:center">${hasOgf ? '<span title="OGF node linked" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>'}</td>
       <td style="text-align:center">${n.lat != null ? '<span title="' + n.lat.toFixed(5) + ', ' + n.lon.toFixed(5) + '" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>'}</td>
       <td style="text-align:center">${(n.type==='station' || n.type==='junction') ? (hasSch ? '<span title="Schematic defined" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>') : ''}</td>
@@ -68,13 +396,14 @@ function renderNodes() {
         <button class="btn btn-sm btn-danger" onclick="deleteNode('${n.id}')">✕</button></td>
     </tr>`;
     }).join('') + '</tbody></table>';
+  _detailRestoreAfterRender('nodes', 'nodes-list', showNodeDetail);
+  _kbRestoreAfterRender('nodes');
 }
 
 function showNodeDetail(id) {
   const node = getNode(id);
   if (!node) return;
-  highlightEntity(id);
-  const el = document.getElementById('node-detail');
+  if (!_detailRestoring) highlightEntity(id);
 
   // Find all departures through this node
   const deps = [];
@@ -105,11 +434,25 @@ function showNodeDetail(id) {
   // Connected segments (track + interchange)
   const conns = connectedNodes(id);
   const allConns = allConnectedSegments(id);
-  const ichConns = allConns.filter(c => c.interchange === 'osi' || c.interchange === 'isi');
+  const ichConns = allConns.filter(c => c.interchange);
+
+  // THI badge — passenger stops only, hover for component breakdown.
+  let thiBadge = '';
+  if (isPassengerStop(node) && typeof thiByNodeMap === 'function') {
+    const tEntry = thiByNodeMap().get(id);
+    if (tEntry && tEntry.thi > 0) {
+      const spatialPart = (tEntry.spatial != null && Math.abs(tEntry.spatial) >= 0.05)
+        ? `, spatial ${tEntry.spatial >= 0 ? '+' : ''}${tEntry.spatial.toFixed(2)}`
+        : '';
+      const rawPart = tEntry.rawThi != null ? ` (raw ${tEntry.rawThi.toFixed(2)})` : '';
+      const breakdown = `traffic ${tEntry.traffic}, lines ${tEntry.lines}, degree ${tEntry.degree}${tEntry.terminus ? ', terminus' : ''}${spatialPart}`;
+      thiBadge = ` <span class="type-badge mono" style="font-size:10px;background:var(--bg-input);color:var(--text-dim);font-weight:400;border:1px solid var(--border)" title="Total Hub Importance${rawPart} — ${breakdown}">THI ${tEntry.thi.toFixed(1)}</span>`;
+    }
+  }
 
   let html = `<div class="detail-panel">
     <h3>${esc(node.name)} ${node.refCode ? `<span class="mono text-dim" style="font-size:12px;margin-left:4px">[${esc(node.refCode)}]</span>` : ''}
-    <span class="type-badge type-${node.type}" style="font-size:10px">${t('type.'+node.type)}</span>
+    <span class="type-badge type-${node.type}" style="font-size:10px">${t('type.'+node.type)}</span>${thiBadge}
     <button class="close-detail" onclick="closeNodeDetail()">✕</button></h3>`;
 
   const ogfLink = node.ogfNode ? `<a href="https://opengeofiction.net/node/${esc(node.ogfNode)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">OGF ↗</a>` : '';
@@ -118,11 +461,9 @@ function showNodeDetail(id) {
   if (infoParts) html += `<p class="text-dim mb-8" style="font-size:13px">${infoParts}</p>`;
   if (node.description) html += `<p class="text-dim mb-8" style="font-size:13px">${esc(node.description)}</p>`;
 
-  // Link to departure board + Split/Merge
+  // Link to departure board
   if (isPassengerStop(node)) {
-    const _canSplit = nodeCanSplit(id);
-    const _mergeCands = nodeMergeCandidates(id);
-    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">\u25A4 ${t('node_detail.view_departure_board')}</button> <button class="btn btn-sm" ${_canSplit ? '' : 'disabled title="' + esc(t('split.btn_disabled_tooltip')) + '"'} onclick="openSplitModal('${id}')">\u2702 ${t('split.btn')}</button>${_mergeCands.length ? ` <button class="btn btn-sm" onclick="openMergeChooser('${id}')">\u21C4 ${t('merge.btn')}</button>` : ''}</div>`;
+    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">▤ ${t('node_detail.view_departure_board')}</button></div>`;
   }
 
   // Detail map
@@ -139,13 +480,7 @@ function showNodeDetail(id) {
     html += `<div class="mt-8">`;
     html += conns.map(c => {
       const seg = getSeg(c.segId);
-      const road = isRoad(seg);
-      const info = road ? `${seg.distance}km · ${seg.maxSpeed}km/h` : `${seg.distance}km · ${seg.maxSpeed}km/h`;
-      const style = road
-        ? 'background:#1a2a1a;border-color:#6cc070;color:#6cc070'
-        : 'background:var(--accent-glow);border-color:var(--accent);color:var(--accent)';
-      const typeLabel = road ? ' · Road' : '';
-      return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;${style}" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))}${typeLabel} · ${seg.distance}km · ${seg.maxSpeed}km/h</span>`;
+      return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;background:var(--accent-glow);border-color:var(--accent);color:var(--accent)" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))} · ${seg.distance}km · ${seg.maxSpeed}km/h</span>`;
     }).join('');
     html += ichConns.map(c => {
       const seg = data.segments.find(s => s.id === c.segId);
@@ -154,7 +489,7 @@ function showNodeDetail(id) {
       return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;background:${seg?.interchangeType==='osi'?'#2a1f3d':'#1f2a2a'};border-color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'};color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'}" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))} · ${label} · ${walkMins} min</span>`;
     }).join('');
     html += '</div>';
-  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_segments')}</div>`;
+  } else html += '<div class="text-dim mt-8" style="font-size:13px">No segments.</div>';
   html += '</div>';
 
   html += '<div class="detail-map-clear"></div>';
@@ -172,23 +507,23 @@ function showNodeDetail(id) {
     html += `</div>`;
   }
 
-  // Schedule
-  html += `<div><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nav.schedule')} (${deps.length})</strong>`;
+  // Schedule (collapsible — bulky for major stations)
   if (deps.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>${t("th.arrive")}</th><th>${t("th.depart")}</th><th>${t("th.service")}</th><th>${t("th.origin_dest")}</th><th>${t("th.platform")}</th></tr></thead><tbody>` +
+    const schedTable = `<table class="schedule-table"><thead><tr><th>${t("th.arrive")}</th><th>${t("th.depart")}</th><th>${t("th.service")}</th><th>${t("th.origin_dest")}</th><th>${t("th.platform")}</th></tr></thead><tbody>` +
       deps.map(d => `<tr>
         <td>${toTime(d.arrive)}</td>
         <td style="color:var(--warn)">${toTime(d.depart)}</td>
-        <td><span class="clickable" onclick="showServiceDetail('${d.svcId}')">${esc(d.service)}</span></td>
+        <td><span class="clickable" onclick="event.stopPropagation();showServiceDetail('${d.svcId}')">${esc(d.service)}</span></td>
         <td class="text-dim">${esc(d.origin)} → ${esc(d.destination)}</td>
         <td>${esc(d.platform)}</td>
       </tr>`).join('') + '</tbody></table>';
-  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_scheduled_trains')}</div>`;
-  html += '</div></div>';
+    html += detailCollapsibleHTML(`node-sched-${id}`, t('nav.schedule'), schedTable, { sub: `${deps.length}`, open: deps.length <= 8 });
+  } else {
+    html += `<div><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nav.schedule')}</strong><div class="text-dim mt-8" style="font-size:13px">${t('empty.no_scheduled_trains')}</div></div>`;
+  }
+  html += '</div>';
 
-  el.innerHTML = html;
-  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-
+  expandDetailRow('nodes', id, 'nodes-list', html, () => {
   // Init detail map
   if (hasGeo) {
     // Find nearby passenger stops — BFS through junctions/waypoints, tracking segment paths
@@ -272,9 +607,10 @@ function showNodeDetail(id) {
     const svgEl = document.getElementById('dm-node-beck');
     if (svgEl) renderMiniBeck(svgEl, { focusGroupIds: nodeGroupIds, focusNodeIds: nodeSvcNodeIds2, mode: 'service', svcStopsList: nodeSvcStopsList2, focusZoomNodeIds: new Set([id]) });
   }
+  });
 }
 
-function closeNodeDetail() { detailMapDestroy('dm-node'); document.getElementById('node-detail').innerHTML = ''; }
+function closeNodeDetail() { collapseDetailRow('nodes', 'nodes-list'); }
 
 let _lastNodeType = 'station';
 
@@ -297,7 +633,7 @@ function openNodeModal(id, hField) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>${t('field.type')}</label>
-        <select id="f-type" onchange="document.getElementById('plat-sec').style.display=(this.value==='station')?'':'none'">
+        <select id="f-type" onchange="document.getElementById('plat-sec').style.display=(this.value==='station'||this.value==='bus_stop')?'':'none'">
           ${['station','bus_stop','junction','waypoint','depot','freight_yard'].map(tp =>
             `<option value="${tp}" ${(n ? n.type : _lastNodeType)===tp?'selected':''}>${t('type.'+tp)}</option>`).join('')}
         </select></div>
@@ -305,20 +641,20 @@ function openNodeModal(id, hField) {
     </div>
     <div class="form-group"><label>${t('field.address')}</label><input type="text" id="f-addr" value="${esc(n?.address||'')}"></div>
     <div class="form-group"><label>${t('field.description')}</label><input type="text" id="f-ndesc" value="${esc(n?.description||'')}" placeholder="${t('placeholder.eg_description')}"></div>
-    <div id="plat-sec" style="${(n ? n.type === 'station' : _lastNodeType==='station')?'':'display:none'}">
+    <div id="plat-sec" style="${(n ? isPassengerStop(n) : (_lastNodeType==='station'||_lastNodeType==='bus_stop'))?'':'display:none'}">
       <div class="form-group"><label>${t('field.platforms')}</label><div id="plat-list">${plats}</div>
         <button class="btn btn-sm mt-8" onclick="addPlatRow()">${t('btn.add_platform')}</button></div>
       ${n && n.type === 'station' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.station_schematic")}</label>
-        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
+        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
         ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
       </div>` : ''}
     </div>
     ${n && n.type === 'junction' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.junction_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}
     ${n && n.type === 'waypoint' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.waypoint_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}`,
     `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
@@ -341,7 +677,7 @@ function saveNode() {
   const refCode = document.getElementById('f-ref').value.trim();
   const description = document.getElementById('f-ndesc').value.trim();
   let platforms = [];
-  if (type === 'station') {
+  if (type === 'station' || type === 'bus_stop') {
     document.querySelectorAll('#plat-list .plat-name').forEach(inp => {
       const pn = inp.value.trim(); if (pn) platforms.push({ id: uid(), name: pn });
     });
@@ -830,7 +1166,6 @@ function renderSegments() {
   list = applySortable(list, 'segments', _segSortDefs);
   const el = document.getElementById('segments-list');
   detailMapDestroy('dm-seg');
-  document.getElementById('segment-detail').innerHTML = '';
 
   if (!list.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">─</div>
@@ -860,9 +1195,9 @@ function renderSegments() {
         : road
         ? `<span class="chip" style="font-size:10px;background:#3d2a1f;color:#e0a860">ROAD</span>`
         : `<span class="chip" style="font-size:10px;background:var(--accent-glow);color:var(--accent)">${t('seg.type_track_display')}</span>`;
-      return `<tr data-id="${s.id}">
-      <td><strong class="clickable" onclick="showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))}</strong></td>
-      <td><strong class="clickable" onclick="showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeB))}</strong></td>
+      return `<tr data-id="${s.id}" class="row-clickable" onclick="if(_detailRowClickGuard(event)) showSegmentDetail('${s.id}')">
+      <td><strong>${esc(nodeName(s.nodeA))}</strong></td>
+      <td><strong>${esc(nodeName(s.nodeB))}</strong></td>
       <td>${typeChip}</td>
       <td class="mono">${ich || road ? '—' : segTrackCount(s)}</td>
       <td class="mono">${ich ? t('seg_detail.walk_time', { n: walkMins }) : s.maxSpeed + ' km/h'}</td>
@@ -874,26 +1209,27 @@ function renderSegments() {
         <button class="btn btn-sm btn-danger" onclick="deleteSegment('${s.id}')">✕</button></td>
     </tr>`;
     }).join('') + '</tbody></table>';
+  _detailRestoreAfterRender('segments', 'segments-list', showSegmentDetail);
+  _kbRestoreAfterRender('segments');
 }
 
 function showSegmentDetail(segId) {
   const seg = data.segments.find(s => s.id === segId); if (!seg) return;
-  highlightEntity(segId);
-  const el = document.getElementById('segment-detail');
+  if (!_detailRestoring) highlightEntity(segId);
   if (isInterchange(seg)) {
     // Interchange segment detail
     const walkMins = Math.round(seg.distance / WALKING_SPEED() * 60);
-    el.innerHTML = `<div class="detail-panel">
+    const ichHtml = `<div class="detail-panel">
       <h3>${esc(nodeName(seg.nodeA))} — ${esc(nodeName(seg.nodeB))}
         <span class="chip" style="font-size:10px;background:${seg.interchangeType==='osi'?'#2a1f3d':'#1f2a2a'};color:${seg.interchangeType==='osi'?'#b08ae0':'#7ec8c8'};margin-left:8px">${seg.interchangeType.toUpperCase()}</span>
-        <button class="close-detail" onclick="closeSegmentDetail()">✕</button></h3>
+        <button class="close-detail" onclick="event.stopPropagation();closeSegmentDetail()">✕</button></h3>
       ${seg.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(seg.description)}</p>` : ''}
       <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
         <span class="chip">${seg.distance} km</span>
         <span class="chip">${t('seg_detail.walk_time', { n: walkMins })}</span>
         <span class="chip">${seg.interchangeType === 'osi' ? t('seg.osi') : t('seg.isi')}</span>
       </div></div>`;
-    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
+    expandDetailRow('segments', segId, 'segments-list', ichHtml);
     return;
   }
 
@@ -945,7 +1281,7 @@ function showSegmentDetail(segId) {
   let html = `<div class="detail-panel">
     <h3>${esc(nodeName(seg.nodeA))} — ${esc(nodeName(seg.nodeB))} ${seg.refCode ? `<span class="mono text-dim" style="font-size:12px;margin-left:4px">[${esc(seg.refCode)}]</span>` : ''}
     ${road ? '<span class="chip" style="font-size:10px;background:#3d2a1f;color:#e0a860;margin-left:8px">ROAD</span>' : ''}
-    <button class="close-detail" onclick="closeSegmentDetail()">✕</button></h3>
+    <button class="close-detail" onclick="event.stopPropagation();closeSegmentDetail()">✕</button></h3>
     ${seg.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(seg.description)}</p>` : ''}
     <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
       ${road ? '' : `<span class="chip" title="${Array.isArray(seg.tracks) ? seg.tracks.map(tk => tk.name).join(', ') : ''}">${segTrackCount(seg)} track${segTrackCount(seg)>1?'s':''}</span>`}
@@ -963,7 +1299,7 @@ function showSegmentDetail(segId) {
     const segLines = [...segLineIds].map(gid => getGroup(gid)).filter(Boolean);
     html += `<div class="mb-16"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nav.lines')}</strong>
       <div class="flex gap-8 mt-8" style="flex-wrap:wrap">
-      ${segLines.map(g => `<span class="chip clickable" onclick="switchTab('lines');showLineDetail('${g.id}')"><span class="dot" style="background:${g.color||'var(--text-muted)'}"></span>${esc(g.name)}</span>`).join('')}
+      ${segLines.map(g => `<span class="chip clickable" onclick="event.stopPropagation();switchTab('lines');showLineDetail('${g.id}')"><span class="dot" style="background:${g.color||'var(--text-muted)'}"></span>${esc(g.name)}</span>`).join('')}
       </div></div>`;
   }
 
@@ -995,7 +1331,7 @@ function showSegmentDetail(segId) {
   if (svcSet.size) {
     html += `<table class="schedule-table mt-8 mb-16"><thead><tr><th>Service</th><th>Cat.</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("th.route")}</th><th>${t("th.direction")}</th><th>${t("th.depart")}</th></tr></thead><tbody>` +
       Array.from(svcSet.values()).map(s => `<tr>
-        <td><span class="clickable" onclick="showServiceDetail('${s.svc.id}')">${esc(s.svc.name)}</span></td>
+        <td><span class="clickable" onclick="event.stopPropagation();showServiceDetail('${s.svc.id}')">${esc(s.svc.name)}</span></td>
         <td>${s.cat ? `<span class="chip" style="font-size:10px"><span class="dot" style="background:${svcLineColor(s.svc)}"></span>${esc(s.cat.abbreviation||s.cat.name)}</span>` : '—'}</td>
         ${hasMultiTrack ? `<td class="mono" style="font-size:11px">${s.trackName ? esc(s.trackName) : '—'}</td>` : ''}
         <td class="text-dim" style="font-size:12px">${esc(s.route)}</td>
@@ -1004,25 +1340,25 @@ function showSegmentDetail(segId) {
       </tr>`).join('') + '</tbody></table>';
   } else html += '<div class="text-dim mt-8 mb-16" style="font-size:13px">No services use this segment.</div>';
 
-  html += `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Trains on this segment (${trains.length})</strong>`;
-
+  // Trains on segment — collapsible (can be huge for busy corridors)
   if (trains.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>Enter</th><th>Exit</th><th>Cat.</th><th>Service</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("th.direction")}</th><th>${t("th.route")}</th></tr></thead><tbody>` +
+    const trainsTable = `<table class="schedule-table"><thead><tr><th>Enter</th><th>Exit</th><th>Cat.</th><th>Service</th>${hasMultiTrack ? '<th>Track</th>' : ''}<th>${t("th.direction")}</th><th>${t("th.route")}</th></tr></thead><tbody>` +
       trains.map(t => `<tr>
         <td style="color:var(--warn)">${toTime(t.enter)}</td>
         <td>${toTime(t.exit)}</td>
         <td><span class="chip" style="font-size:10px"><span class="dot" style="background:${t.catColor}"></span>${esc(t.catAbbr)}</span></td>
-        <td><span class="clickable" onclick="showServiceDetail('${t.svcId}')">${esc(t.service)}</span></td>
+        <td><span class="clickable" onclick="event.stopPropagation();showServiceDetail('${t.svcId}')">${esc(t.service)}</span></td>
         ${hasMultiTrack ? `<td class="mono" style="font-size:11px">${t.trackName ? esc(t.trackName) : '—'}</td>` : ''}
         <td class="text-dim">${esc(t.direction)}</td>
         <td class="text-dim" style="font-size:11px">${esc(t.route)}</td>
       </tr>`).join('') + '</tbody></table>';
-  } else html += '<div class="text-dim mt-8" style="font-size:13px">No trains scheduled.</div>';
+    html += detailCollapsibleHTML(`seg-trains-${segId}`, 'Trains on this segment', trainsTable, { sub: `${trains.length}`, open: trains.length <= 10 });
+  } else {
+    html += `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Trains on this segment</strong><div class="text-dim mt-8" style="font-size:13px">No trains scheduled.</div>`;
+  }
   html += '</div>';
 
-  el.innerHTML = html;
-  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-
+  expandDetailRow('segments', segId, 'segments-list', html, () => {
   // Init detail map for track/road segments
   if (nA?.lat != null && nB?.lat != null) {
     const segLines = [...segLineIds].map(gid => getGroup(gid)).filter(Boolean);
@@ -1043,9 +1379,10 @@ function showSegmentDetail(segId) {
     const svgEl = document.getElementById('dm-seg-beck');
     if (svgEl) renderMiniBeck(svgEl, { focusGroupIds: segLineIds, focusNodeIds: new Set([seg.nodeA, seg.nodeB]), mode: 'segment' });
   }
+  });
 }
 
-function closeSegmentDetail() { detailMapDestroy('dm-seg'); document.getElementById('segment-detail').innerHTML = ''; }
+function closeSegmentDetail() { collapseDetailRow('segments', 'segments-list'); }
 
 // Sticky segment defaults — remembered per segment type
 let _lastSegType = ''; // '' = track, 'road', 'osi'
@@ -1100,9 +1437,9 @@ function openSegmentModal(id, hField) {
   openModal(s ? t('modal.edit_segment') : t('modal.add_segment'), `
     <div class="form-group"><label>${t('field.segment_type')}</label>
       <select id="f-sType" onchange="segTypeChanged(this.value)">
-        <option value="" ${!isInterchange?'selected':''}>${t('seg.track_segment')}</option>
-        <option value="road" ${isInterchange==='road'?'selected':''}>${t('seg.road_segment')}</option>
-        <option value="osi" ${isInterchange==='osi'||isInterchange==='isi'?'selected':''}>${t('seg.walking_interchange')}</option>
+        <option value="" ${!isInterchange?'selected':''}>Track segment</option>
+        <option value="road" ${isInterchange==='road'?'selected':''}>Road segment</option>
+        <option value="osi" ${isInterchange==='osi'||isInterchange==='isi'?'selected':''}>Walking interchange</option>
       </select></div>
     <div class="form-row">
       <div class="form-group"><label>${t('field.from_node')}</label><div id="seg-node-a-picker"></div></div>
@@ -1114,7 +1451,7 @@ function openSegmentModal(id, hField) {
         <div class="form-group"><label>${t('field.distance')}</label><input type="number" id="f-sDi" value="${s?.distance||''}" min="0.1" step="0.1"></div>
       </div>
       <div class="form-row">
-        <div class="form-group" id="seg-elec-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
+        <div class="form-group" id="seg-elec-group">
           <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
             <input type="checkbox" id="f-sEl" ${defElec?'checked':''}>${t('field.electrified_label')}</label>
         </div>
@@ -1139,9 +1476,9 @@ function openSegmentModal(id, hField) {
         }).join('')}</div>
         <p class="text-dim" style="font-size:11px;margin-top:4px">${t('field.allowed_modes_help')}</p>
       </div>` : ''}
-      <div class="form-group" id="seg-tracks-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
+      <div class="form-group" id="seg-tracks-group">
         <label>${t('field.tracks')}</label>
-        <div id="seg-track-list">${segTypeVal === 'road' ? '' : defTrackRows}</div>
+        <div id="seg-track-list">${defTrackRows}</div>
         <button type="button" class="btn btn-sm mt-4" onclick="addSegTrackRow()">+ ${t('btn.add_track')}</button>
       </div>
     </div>
@@ -1288,7 +1625,7 @@ async function saveSegment() {
     _lastSegDefaults.road.maxSpeed = maxSpeed;
     _lastSegDefaults.road.refCode = refCode;
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
-    const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
+    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
     const obj = { nodeA, nodeB, tracks: [], maxSpeed, distance, electrification: false, refCode, description, interchangeType: 'road', ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
@@ -1310,7 +1647,7 @@ async function saveSegment() {
     const refCode = document.getElementById('f-sRef').value.trim();
     _lastSegDefaults.track = { trackCount: tracks.length, maxSpeed, electrification, refCode };
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
-    const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
+    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
     const obj = { nodeA, nodeB, tracks, maxSpeed, distance, electrification, refCode, description, interchangeType: null, ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
@@ -1481,7 +1818,6 @@ function renderLines() {
   list = applySortable(list, 'lines', _lineSortDefs);
 
   detailMapDestroy('dm-line');
-  document.getElementById('line-detail').innerHTML = '';
 
   if (!list.length && !data.serviceGroups.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">≡</div><h3>${t('empty.no_lines')}</h3>
@@ -1491,7 +1827,7 @@ function renderLines() {
   }
 
   if (!list.length) {
-    el.innerHTML = `<div class="text-dim mt-16">${t('empty.no_lines_match', { q })}</div>`;
+    el.innerHTML = `<div class="text-dim mt-16">No lines matching "${esc(q)}".</div>`;
     return;
   }
 
@@ -1503,8 +1839,8 @@ function renderLines() {
       const depCount = lineSvcs.reduce((sum, s) => sum + data.departures.filter(d => d.serviceId === s.id).length, 0);
       const stationSet = new Set();
       for (const s of lineSvcs) { for (const st of s.stops) { const n = getNode(st.nodeId); if (isPassengerStop(n) && !st.passThrough) stationSet.add(nodeDisplayName(n.id)); } }
-      return `<tr data-id="${g.id}">
-        <td><strong class="clickable" onclick="showLineDetail('${g.id}')">${esc(g.name)}</strong>${g.description ? `<div class="text-muted" style="font-size:11px;margin-top:1px">${esc(g.description)}</div>` : ''}</td>
+      return `<tr data-id="${g.id}" class="row-clickable" onclick="if(_detailRowClickGuard(event)) showLineDetail('${g.id}')">
+        <td><strong>${esc(g.name)}</strong>${g.description ? `<div class="text-muted" style="font-size:11px;margin-top:1px">${esc(g.description)}</div>` : ''}</td>
         <td><span class="chip"><span class="dot" style="background:${g.color||'var(--text-muted)'}"></span>${g.color||'none'}</span></td>
         <td class="mono">${svcCount}</td>
         <td class="mono">${depCount}</td>
@@ -1515,18 +1851,19 @@ function renderLines() {
           <button class="btn btn-sm btn-danger" onclick="deleteLine('${g.id}')">✕</button></td>
       </tr>`;
     }).join('') + '</tbody></table>';
+  _detailRestoreAfterRender('lines', 'lines-list', showLineDetail);
+  _kbRestoreAfterRender('lines');
 }
 
 function showLineDetail(id) {
   const g = getGroup(id); if (!g) return;
-  highlightEntity(id);
-  const el = document.getElementById('line-detail');
+  if (!_detailRestoring) highlightEntity(id);
   const svcs = data.services.filter(s => s.groupId === id);
   const segIds = lineSegments(id);
 
   let html = `<div class="detail-panel">
     <h3><span class="dot" style="background:${g.color||'var(--text-muted)'};width:12px;height:12px;display:inline-block;border-radius:50%;margin-right:8px"></span>${esc(g.name)}
-    <button class="close-detail" onclick="closeLineDetail()">✕</button></h3>
+    <button class="close-detail" onclick="event.stopPropagation();closeLineDetail()">✕</button></h3>
     ${g.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(g.description)}</p>` : ''}`;
 
   // Map — collect stations on this line with geo data
@@ -1544,13 +1881,13 @@ function showLineDetail(id) {
       ${svcs.map(s => {
         const cat = getCat(s.categoryId);
         const route = s.stops.length ? `${nodeDisplayName(s.stops[0].nodeId)} → ${nodeDisplayName(s.stops[s.stops.length-1].nodeId)}` : '';
-        return `<span class="chip clickable" onclick="switchTab('services');showServiceDetail('${s.id}')">
+        return `<span class="chip clickable" onclick="event.stopPropagation();switchTab('services');showServiceDetail('${s.id}')">
           ${cat ? `<span class="dot" style="background:${svcLineColor(s)}"></span>` : ''}${esc(s.name)}${route ? ` <span class="text-muted" style="font-size:11px;margin-left:4px">${esc(route)}</span>` : ''}
         </span>`;
       }).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_services')}</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">No services assigned to this line yet.</div>`;
   }
   html += `</div>`;
 
@@ -1559,16 +1896,14 @@ function showLineDetail(id) {
   if (segIds.size) {
     const segs = [...segIds].map(sid => getSeg(sid)).filter(Boolean);
     html += `<div class="flex gap-8 mt-8" style="flex-wrap:wrap">
-      ${segs.map(s => `<span class="chip clickable" onclick="switchTab('segments');showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))} — ${esc(nodeName(s.nodeB))} <span class="text-muted" style="font-size:11px">${s.distance}km</span></span>`).join('')}
+      ${segs.map(s => `<span class="chip clickable" onclick="event.stopPropagation();switchTab('segments');showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))} — ${esc(nodeName(s.nodeB))} <span class="text-muted" style="font-size:11px">${s.distance}km</span></span>`).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_segments')}</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">No segments covered — add services with routes to this line.</div>`;
   }
   html += `<div class="detail-map-clear"></div></div></div>`;
 
-  el.innerHTML = html;
-  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-
+  expandDetailRow('lines', id, 'lines-list', html, () => {
   if (lineHasGeo) {
     const lineColor = g.color || '#888';
     const _segIds = segIds;
@@ -1593,9 +1928,10 @@ function showLineDetail(id) {
     const svgEl = document.getElementById('dm-line-beck');
     if (svgEl) renderMiniBeck(svgEl, { focusGroupIds: lineGroupSet });
   }
+  });
 }
 
-function closeLineDetail() { detailMapDestroy('dm-line'); document.getElementById('line-detail').innerHTML = ''; }
+function closeLineDetail() { collapseDetailRow('lines', 'lines-list'); }
 
 function openLineModal(id) {
   editingId = id || null;
@@ -1925,7 +2261,6 @@ function renderServices() {
   );
   const el = document.getElementById('services-list');
   detailMapDestroy('dm-svc');
-  document.getElementById('service-detail').innerHTML = '';
 
   if (!list.length && !data.services.length) {
     el.innerHTML = `<div class="empty-state"><div class="empty-icon">▷</div><h3>${t('empty.no_services')}</h3>
@@ -1992,6 +2327,8 @@ function renderServices() {
   html += '</tbody></table>';
 
   el.innerHTML = html;
+  _detailRestoreAfterRender('services', 'services-list', showServiceDetail);
+  _kbRestoreAfterRender('services');
 }
 
 function svcTableRow(s) {
@@ -2002,8 +2339,8 @@ function svcTableRow(s) {
   const depC = data.departures.filter(d => d.serviceId === s.id).length;
   const grp = getGroup(s.groupId);
   const desc = s.description ? `<div class="text-muted" style="font-size:11px;margin-top:2px">${esc(s.description)}</div>` : '';
-  return `<tr data-id="${s.id}">
-    <td><strong class="clickable" onclick="showServiceDetail('${s.id}')">${esc(s.name)}</strong>${desc}</td>
+  return `<tr data-id="${s.id}" class="row-clickable" onclick="if(_detailRowClickGuard(event)) showServiceDetail('${s.id}')">
+    <td><strong>${esc(s.name)}</strong>${desc}</td>
     <td class="text-dim" style="font-size:12px">${grp ? `<span class="chip clickable" onclick="event.stopPropagation();switchTab('lines');showLineDetail('${grp.id}')"><span class="dot" style="background:${grp.color||'var(--text-muted)'}"></span>${esc(grp.name)}</span>` : '—'}</td>
     <td>${cat ? `<span class="chip"><span class="dot" style="background:${svcLineColor(s)}"></span>${esc(cat.abbreviation||cat.name)}</span>` : '—'}</td>
     <td class="text-dim" style="font-size:12px">${stock ? esc(stock.code||stock.name) : '—'}</td>
@@ -2095,7 +2432,7 @@ function showServiceDetail(svcId) {
   // Switch to services tab if not there
   const panel = document.getElementById('panel-services');
   if (!panel.classList.contains('active')) switchTab('services');
-  highlightEntity(svcId);
+  if (!_detailRestoring) highlightEntity(svcId);
 
   const cat = getCat(svc.categoryId);
   const grp = getGroup(svc.groupId);
@@ -2103,14 +2440,13 @@ function showServiceDetail(svcId) {
   const deps = data.departures.filter(d => d.serviceId === svcId).sort((a, b) => {
     return (a.startTime < DAY_CUTOFF_() ? a.startTime + 1440 : a.startTime) - (b.startTime < DAY_CUTOFF_() ? b.startTime + 1440 : b.startTime);
   });
-  const el = document.getElementById('service-detail');
 
   let html = `<div class="detail-panel">
     <h3>${esc(svc.name)} ${cat ? `<span class="chip"><span class="dot" style="background:${svcLineColor(svc)}"></span>${esc(cat.name)}</span>` : ''}
     ${stock ? `<span class="chip" style="margin-left:4px">${stock.traction==='electric'?'⚡':stock.traction==='diesel'?'⛽':'⚡⛽'} ${esc(stock.code||stock.name)}</span>` : ''}
     ${grp ? `<span class="chip clickable" style="margin-left:4px;cursor:pointer" onclick="event.stopPropagation();switchTab('lines');showLineDetail('${grp.id}')"><span class="dot" style="background:${grp.color||'var(--text-muted)'}"></span>${esc(grp.name)}</span>` : ''}
     <span class="chip" style="margin-left:4px;font-size:11px">${esc(describePattern(svc.schedulePattern))}</span>
-    <button class="close-detail" onclick="closeServiceDetail()">✕</button></h3>`;
+    <button class="close-detail" onclick="event.stopPropagation();closeServiceDetail()">✕</button></h3>`;
 
   // Map
   const svcStopNodes = svc.stops.map(st => getNode(st.nodeId)).filter(n => n && n.lat != null);
@@ -2137,34 +2473,36 @@ function showServiceDetail(svcId) {
       return `<div style="font-size:13px"><span class="mono text-muted" style="margin-right:6px">${i+1}.</span><strong>${esc(label)}</strong>${plat}${pass}${dwell}</div>${segInfo}`;
     }).join('') + '</div></div>';
 
-  // Departures table with edit buttons
-  html += `<div class="flex items-center" style="justify-content:space-between"><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('th.departures')} (${deps.length})</strong>
-    ${deps.length ? `<button class="btn btn-sm" onclick="recalcSvcAndRefresh('${svcId}')">↻ ${t('btn.recalculate')}</button>` : ''}</div>`;
+  // Departures — collapsible (bulky for high-frequency services)
   if (deps.length) {
-    html += `<table class="schedule-table mt-8"><thead><tr><th>${t('th.dep_time')}</th>`;
+    let schedTable = `<div class="flex items-center mb-8" style="justify-content:flex-end">
+      <button class="btn btn-sm" onclick="event.stopPropagation();recalcSvcAndRefresh('${svcId}')">↻ ${t('btn.recalculate')}</button>
+    </div>`;
+    schedTable += `<table class="schedule-table"><thead><tr><th>${t('th.dep_time')}</th>`;
     svc.stops.forEach((st, i) => {
-      html += `<th>${esc(nodeName(st.nodeId).substring(0, 12))}</th>`;
+      schedTable += `<th>${esc(nodeName(st.nodeId).substring(0, 12))}</th>`;
     });
-    html += `<th></th></tr></thead><tbody>`;
+    schedTable += `<th></th></tr></thead><tbody>`;
     for (const dep of deps) {
-      html += `<tr><td style="color:var(--warn);font-weight:500">${toTime(dep.startTime)}</td>`;
+      schedTable += `<tr><td style="color:var(--warn);font-weight:500">${toTime(dep.startTime)}</td>`;
       dep.times.forEach(t => {
         const arr = toTime(t.arrive);
         const dept = toTime(t.depart);
         const display = t.arrive != null && t.depart != null ? `${arr}/${dept}` : (t.depart != null ? dept : arr);
-        html += `<td>${display}</td>`;
+        schedTable += `<td>${display}</td>`;
       });
-      html += `<td class="actions-cell">
-        <button class="btn btn-sm" onclick="openDepEditModal('${dep.id}')">${t('btn.edit')}</button>
-        <button class="btn btn-sm btn-danger" onclick="delDep('${dep.id}');showServiceDetail('${svcId}')">✕</button></td></tr>`;
+      schedTable += `<td class="actions-cell">
+        <button class="btn btn-sm" onclick="event.stopPropagation();openDepEditModal('${dep.id}')">${t('btn.edit')}</button>
+        <button class="btn btn-sm btn-danger" onclick="event.stopPropagation();delDep('${dep.id}');showServiceDetail('${svcId}')">✕</button></td></tr>`;
     }
-    html += '</tbody></table>';
-  } else html += '<div class="text-dim mt-8" style="font-size:13px">No departures generated yet.</div>';
+    schedTable += '</tbody></table>';
+    html += detailCollapsibleHTML(`svc-deps-${svcId}`, t('th.departures'), schedTable, { sub: `${deps.length}`, open: deps.length <= 6 });
+  } else {
+    html += `<div><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('th.departures')}</strong><div class="text-dim mt-8" style="font-size:13px">No departures generated yet.</div></div>`;
+  }
   html += '</div>';
 
-  el.innerHTML = html;
-  setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 200);
-
+  expandDetailRow('services', svcId, 'services-list', html, () => {
   if (svcHasGeo) {
     const svcColor = grp?.color || '#ffc917';
     detailMapInitGeo('dm-svc', map => {
@@ -2206,9 +2544,10 @@ function showServiceDetail(svcId) {
     const svgEl = document.getElementById('dm-svc-beck');
     if (svgEl) renderMiniBeck(svgEl, { focusGroupIds: svcGroupSet, focusNodeIds: svcNodeSet2, mode: 'service', svcStopsList: svcStopsList2 });
   }
+  });
 }
 
-function closeServiceDetail() { detailMapDestroy('dm-svc'); document.getElementById('service-detail').innerHTML = ''; }
+function closeServiceDetail() { collapseDetailRow('services', 'services-list'); }
 
 // ---- Schedule pattern editor ----
 
@@ -2412,7 +2751,7 @@ function renderRouteBuilder() {
   if (prependContainer) prependContainer.innerHTML = '';
 
   if (!stops.length) {
-    container.innerHTML = `<div class="text-dim" style="font-size:13px">${t('empty.no_stops')}</div>`;
+    container.innerHTML = '<div class="text-dim" style="font-size:13px">No stops yet. Pick a starting node below.</div>';
     const sorted = [...data.nodes].sort((a, b) => a.name.localeCompare(b.name));
     addContainer.innerHTML = `<div class="form-group"><label>${t('field.starting_node')}</label>
       <select onchange="addRouteStop(this.value);this.value='';">
@@ -2519,7 +2858,7 @@ function renderRouteBuilder() {
       ${_routeTrackOptions(connected)}
     </select>`;
   } else {
-    addContainer.innerHTML = `<div class="text-dim" style="font-size:12px">${t('empty.no_further_connections')}</div>`;
+    addContainer.innerHTML = '<div class="text-dim" style="font-size:12px">No further connections from this node.</div>';
   }
 }
 

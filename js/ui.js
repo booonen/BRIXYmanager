@@ -428,15 +428,12 @@ function switchTab(tab) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   document.getElementById(`panel-${tab}`).classList.add('active');
   document.querySelector(`.nav-item[data-tab="${tab}"]`)?.classList.add('active');
-  // Clear detail panels when switching
-  ['node-detail','segment-detail','service-detail','line-detail'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.innerHTML = '';
-  });
   const renders = {
     dashboard: renderDashboard, nodes: renderNodes, segments: renderSegments,
     lines: renderLines, modes: renderCategories, stock: renderStock, services: renderServices,
     schedule: renderSchedule,
     map: () => { if (!_map) initMap(); else { _map.invalidateSize(); renderMapContent(false); } },
+    animated: () => { if (typeof initAnimatedMap === 'function') { if (!_animMap) initAnimatedMap(); else { _animMap.invalidateSize(); animOnTabShow(); } } },
     schematic: () => { initSchematic(); renderSchematic(); },
     departures: () => { populateStationSelect(); renderDepartures(); },
     journey: initJourneyPlanner,

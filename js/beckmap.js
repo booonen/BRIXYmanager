@@ -1336,7 +1336,10 @@ function renderSchemSidebar() {
     }
     if (!items.length) continue;
     anyItems = true;
-    items.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    // Tiebreak equal placement scores by THI so the more important station floats up.
+    items.sort((a, b) => b.score - a.score
+      || (typeof thiForNode === 'function' ? thiForNode(b.nodeId) - thiForNode(a.nodeId) : 0)
+      || a.name.localeCompare(b.name));
     let lineHtml = '';
     const fg = contrastText(group.color || '#888');
     lineHtml += `<div class="schem-sidebar-section" style="background:${group.color || '#888'};color:${fg};padding:4px 10px;margin-top:4px;border-radius:4px;font-size:11px;font-weight:700">${esc(group.name)}</div>`;
@@ -1354,7 +1357,9 @@ function renderSchemSidebar() {
     // Deduplicate by nodeId+groupId, sort by score desc
     const seen = new Set();
     const deduped = [];
-    allTopWanted.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    allTopWanted.sort((a, b) => b.score - a.score
+      || (typeof thiForNode === 'function' ? thiForNode(b.nodeId) - thiForNode(a.nodeId) : 0)
+      || a.name.localeCompare(b.name));
     for (const tw of allTopWanted) {
       const key = `${tw.groupId}|${tw.nodeId}`;
       if (seen.has(key)) continue;
@@ -1949,25 +1954,39 @@ function schemCleanOrphanedStations() {
 // Render cache — computed once per render, used by multiple subsystems
 let _renderCache = {};
 
-function renderSchematic() {
+// renderSchematic(target, wrapDim, opts)
+//   target  : SVG / G element to receive content (default: editor's #schem-svg)
+//   wrapDim : { w, h } in CSS px (default: getBoundingClientRect of #schem-canvas-wrap)
+//   opts    : { noGrid: bool } — skip the editor grid for read-only embeddings
+// All optional. Existing callers (the editor) pass nothing and get the original behaviour.
+function renderSchematic(target = null, wrapDim = null, opts = null) {
   schemCleanOrphanedStations();
   // Build render cache
   _renderCache = { interchanges: schemFindInterchanges(), routes: {} };
   for (const group of data.serviceGroups) _renderCache.routes[group.id] = schemDeriveRoutes(group.id);
 
-  const svg = document.getElementById('schem-svg');
+  const svg = target || document.getElementById('schem-svg');
   if (!svg) return;
-  const wrap = document.getElementById('schem-canvas-wrap');
-  const rect = wrap.getBoundingClientRect();
-  const w = rect.width, h = rect.height;
-  svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  let w, h;
+  if (wrapDim) {
+    w = wrapDim.w; h = wrapDim.h;
+  } else {
+    const wrap = document.getElementById('schem-canvas-wrap');
+    if (!wrap) return;
+    const rect = wrap.getBoundingClientRect();
+    w = rect.width; h = rect.height;
+  }
+  // Only set viewBox on actual <svg> targets, not on <g>
+  const isSvgTarget = (svg.tagName === 'svg' || svg.tagName === 'SVG');
+  if (isSvgTarget) svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
 
+  const noGrid = !!(opts && opts.noGrid);
   let svgContent = '';
   const isDragging = !!(_schemState.lsDrag || _schemState.sidebarDrag);
 
   // ---- Grid ----
   const gridMinZoom = isDragging ? 0.3 : 0.6;
-  if (_schemState.zoom > gridMinZoom) {
+  if (!noGrid && _schemState.zoom > gridMinZoom) {
     const wl = -_schemState.viewX / _schemState.zoom;
     const wt = -_schemState.viewY / _schemState.zoom;
     const wr = (w - _schemState.viewX) / _schemState.zoom;
@@ -3125,46 +3144,21 @@ function schemDrawDebug() {
 
 function schemMigrateData() {
   if (!data.beckmap) data.beckmap = {};
-  if (data.beckmap.lineStations && data.beckmap.version === 3) {
-    if (!data.beckmap.routeBends) data.beckmap.routeBends = {};
-    if (!data.beckmap.segmentStyles) data.beckmap.segmentStyles = {};
-    if (!data.beckmap.lineStyles) data.beckmap.lineStyles = {};
-    if (!data.beckmap.labelOverrides) data.beckmap.labelOverrides = {};
-    if (!data.beckmap.labelWrap) {
-      // Migrate old labelNoWrap → labelWrap
-      if (data.beckmap.labelNoWrap) {
-        data.beckmap.labelWrap = {};
-        for (const k in data.beckmap.labelNoWrap) { if (data.beckmap.labelNoWrap[k]) data.beckmap.labelWrap[k] = 'single'; }
-        delete data.beckmap.labelNoWrap;
-      } else {
-        data.beckmap.labelWrap = {};
-      }
-    }
-    if (!data.beckmap.markOverrides) data.beckmap.markOverrides = {};
-    // Migrate from groupOverrides to stationGroups
-    if (!data.beckmap.stationGroups) {
-      data.beckmap.stationGroups = {};
-      schemAutoGenerateGroups();
-      delete data.beckmap.groupOverrides;
-      save();
-    }
-    return;
+  if (!data.beckmap.lineStations) data.beckmap.lineStations = {};
+  if (!data.beckmap.routeBends) data.beckmap.routeBends = {};
+  if (!data.beckmap.segmentStyles) data.beckmap.segmentStyles = {};
+  if (!data.beckmap.lineStyles) data.beckmap.lineStyles = {};
+  if (!data.beckmap.labelOverrides) data.beckmap.labelOverrides = {};
+  if (!data.beckmap.labelWrap) data.beckmap.labelWrap = {};
+  if (!data.beckmap.markOverrides) data.beckmap.markOverrides = {};
+  if (!data.beckmap.stationGroups) {
+    data.beckmap.stationGroups = {};
+    schemAutoGenerateGroups();
   }
-  delete data.beckmap.guides;
-  delete data.beckmap.lineOrder;
-  delete data.beckmap.lineRoutes;
-  delete data.beckmap.stationCells;
-  for (const n of data.nodes) {
-    if (n.mapX != null) { n.mapX = undefined; n.mapY = undefined; }
+  if (data.beckmap.version !== 3) {
+    data.beckmap.version = 3;
+    save();
   }
-  data.beckmap.lineStations = {};
-  data.beckmap.routeBends = {};
-  data.beckmap.segmentStyles = {};
-  data.beckmap.lineStyles = {};
-  data.beckmap.labelOverrides = {};
-  data.beckmap.groupOverrides = {};
-  data.beckmap.version = 3;
-  save();
 }
 
 // ---- SVG Export ----

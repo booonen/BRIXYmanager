@@ -36,6 +36,7 @@
       <div class="nav-section" data-t="nav_section.views">Views</div>
       <div class="nav-item" data-tab="map" onclick="switchTab('map')"><span class="nav-icon">🗺</span> <span data-t="nav.geomap">Geomap</span></div>
       <div class="nav-item" data-tab="schematic" onclick="switchTab('schematic')"><span class="nav-icon">⬡</span> <span data-t="nav.railmap">Railmap</span></div>
+      <div class="nav-item" data-tab="animated" onclick="switchTab('animated')"><span class="nav-icon">▶</span> <span data-t="nav.animated">Animated</span></div>
       <div class="nav-item" data-tab="departures" onclick="switchTab('departures')"><span class="nav-icon">▤</span> <span data-t="nav.departures">Departures</span></div>
       <div class="nav-item" data-tab="journey" onclick="switchTab('journey')"><span class="nav-icon">⇄</span> <span data-t="nav.journey">Journey</span></div>
       <div class="nav-item" data-tab="issues" onclick="switchTab('issues')"><span class="nav-icon">⚠</span> <span data-t="nav.issues">Issues</span><span class="badge" id="badge-issues" style="color:var(--warn)">0</span></div>
@@ -43,7 +44,7 @@
       <div class="nav-item" data-tab="settings" onclick="switchTab('settings')"><span class="nav-icon">⚙</span> <span data-t="nav.settings">Settings</span></div>
       <div class="nav-item" data-tab="import-export" onclick="switchTab('import-export')"><span class="nav-icon">⇅</span> <span data-t="nav.import_export">Import / Export</span></div>
       <div class="spacer"></div>
-      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.17.4.1</div>
+      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.19.4.2</div>
     </nav>
     <div class="content">
       <!-- DASHBOARD -->
@@ -63,17 +64,15 @@
           <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="node-search" placeholder="Search nodes..." data-t-placeholder="placeholder.search_nodes" oninput="renderNodes()"></div>
         </div>
         <div id="nodes-list"></div>
-        <div id="node-detail"></div>
       </div>
       <!-- SEGMENTS -->
       <div class="tab-panel" id="panel-segments">
         <div id="segments-header">
-          <div class="page-header"><div><h1 data-t="page.segments">Segments</h1><div class="subtitle" data-t="subtitle.segments">Track connections between nodes</div></div>
+          <div class="page-header"><div><h1 data-t="page.segments">Segments</h1><div class="subtitle" data-t="subtitle.segments">Connections between nodes</div></div>
           <button class="btn btn-primary" onclick="openSegmentModal()" data-t="btn.add_segment">+ Add Segment</button></div>
           <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="segment-search" placeholder="Search segments..." data-t-placeholder="placeholder.search_segments" oninput="renderSegments()"></div>
         </div>
         <div id="segments-list"></div>
-        <div id="segment-detail"></div>
       </div>
       <!-- LINES -->
       <div class="tab-panel" id="panel-lines">
@@ -83,17 +82,16 @@
           <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="line-search" placeholder="Search lines..." data-t-placeholder="placeholder.search_lines" oninput="renderLines()"></div>
         </div>
         <div id="lines-list"></div>
-        <div id="line-detail"></div>
       </div>
       <!-- CATEGORIES -->
       <div class="tab-panel" id="panel-modes">
-        <div class="page-header"><div><h1 data-t="page.modes">Service Modes</h1><div class="subtitle" data-t="subtitle.modes">Define types of rail services</div></div>
+        <div class="page-header"><div><h1 data-t="page.modes">Service Modes</h1><div class="subtitle" data-t="subtitle.modes">Define types of services</div></div>
         <button class="btn btn-primary" onclick="openCategoryModal()" data-t="btn.add_mode">+ Add Mode</button></div>
         <div id="modes-list"></div>
       </div>
       <!-- ROLLING STOCK -->
       <div class="tab-panel" id="panel-stock">
-        <div class="page-header"><div><h1 data-t="page.stock">Rolling Stock</h1><div class="subtitle" data-t="subtitle.stock">Train types and their properties</div></div>
+        <div class="page-header"><div><h1 data-t="page.stock">Rolling Stock</h1><div class="subtitle" data-t="subtitle.stock">Rolling stock types and their properties</div></div>
         <button class="btn btn-primary" onclick="openStockModal()" data-t="btn.add_stock">+ Add Stock Type</button></div>
         <div id="stock-list"></div>
         <div id="stock-matrix"></div>
@@ -101,12 +99,11 @@
       <!-- SERVICES -->
       <div class="tab-panel" id="panel-services">
         <div id="services-header">
-          <div class="page-header"><div><h1 data-t="page.services">Services</h1><div class="subtitle" data-t="subtitle.services">Route templates defining train paths</div></div>
+          <div class="page-header"><div><h1 data-t="page.services">Services</h1><div class="subtitle" data-t="subtitle.services">Route templates defining service paths</div></div>
           <button class="btn btn-primary" onclick="openServiceModal()" data-t="btn.add_service">+ Add Service</button></div>
           <div class="search-bar"><span class="search-icon">⌕</span><input type="text" id="service-search" placeholder="Search services..." data-t-placeholder="placeholder.search_services" oninput="renderServices()"></div>
         </div>
         <div id="services-list"></div>
-        <div id="service-detail"></div>
       </div>
       <!-- SCHEDULE -->
       <div class="tab-panel" id="panel-schedule">
@@ -125,6 +122,50 @@
         </div></div>
         <div id="map-warnings"></div>
         <div id="network-map" style="height:calc(100vh - 180px);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);background:var(--bg)"></div>
+      </div>
+      <!-- ANIMATED MAP -->
+      <div class="tab-panel" id="panel-animated">
+        <div class="anim-header">
+          <div>
+            <h1 data-t="page.animated">Animated</h1>
+            <div class="subtitle" data-t="subtitle.animated">Live vehicle positions across the network</div>
+          </div>
+          <div class="flex gap-8">
+            <div class="anim-view-toggle">
+              <button class="anim-view-btn active" id="anim-view-geo" onclick="animSetView('geo')" title="Geographic view">Geo</button>
+              <button class="anim-view-btn" id="anim-view-schem" onclick="animSetView('schem')" title="Schematic view">Schem</button>
+            </div>
+            <span id="anim-time-display" class="mono">--:--</span>
+            <button class="btn btn-sm" id="anim-play-pause" onclick="animTogglePlayPause()" title="Pause">⏸</button>
+            <select id="anim-speed" class="btn btn-sm" onchange="animSetSpeed(this.value)" data-t-title="tooltip.anim_speed" title="Sim minutes per real second">
+              <option value="1" selected data-t="anim.speed_live">Live</option>
+              <option value="10">10×</option>
+              <option value="60">60×</option>
+              <option value="300">300×</option>
+            </select>
+            <button class="btn btn-sm" onclick="animSetNow()" data-t-title="tooltip.anim_now" title="Snap to live wall-clock time"><span data-t="anim.now">Now</span></button>
+            <label id="anim-tiles-label" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-dim);cursor:pointer;user-select:none">
+              <input type="checkbox" id="anim-tiles-toggle" onchange="animToggleTiles()"> <span data-t="btn.show_map_tiles">Show map tiles</span>
+            </label>
+            <button class="btn btn-sm" onclick="animFitBounds()" data-t-title="tooltip.fit_map" title="Fit to bounds">⊞ <span data-t="btn.fit">Fit</span></button>
+          </div>
+        </div>
+        <div class="anim-scrubber-row">
+          <input type="date" id="anim-date" onchange="animSetDate(this.value)" title="Pick sim date — schedule patterns (days/dateRanges/excludes) are evaluated against this">
+          <span class="anim-scrubber-time">00:00</span>
+          <input type="range" id="anim-scrubber" min="0" max="1439" step="1" value="0" oninput="animScrubberInput(this.value)" title="Drag to set sim time">
+          <span class="anim-scrubber-time">23:59</span>
+        </div>
+        <div class="anim-view-stack">
+          <div id="animated-map"></div>
+          <svg id="animated-schem" style="display:none">
+            <g id="animated-schem-vp">
+              <g id="animated-schem-base"></g>
+              <g id="animated-schem-highlight"></g>
+              <g id="animated-schem-trains"></g>
+            </g>
+          </svg>
+        </div>
       </div>
       <!-- SCHEMATIC MAP -->
       <div class="tab-panel" id="panel-schematic" style="padding:0;overflow:hidden">
@@ -245,6 +286,22 @@
 <div class="toast-container" id="toast-container"></div>
 <input type="file" id="file-input" accept=".json" style="display:none" onchange="handleImport(event)">
 
+<div class="palette-overlay" id="palette-overlay">
+  <div class="palette-box">
+    <div class="palette-search">
+      <span class="palette-search-icon">⌕</span>
+      <input type="text" id="palette-input" placeholder="Search actions, tabs, lines, services, stations…" autocomplete="off" spellcheck="false">
+      <span class="palette-hint"><kbd>Esc</kbd></span>
+    </div>
+    <div class="palette-results" id="palette-results"></div>
+    <div class="palette-footer">
+      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+      <span><kbd>↵</kbd> open</span>
+      <span><kbd>Ctrl</kbd>+<kbd>K</kbd> toggle</span>
+    </div>
+  </div>
+</div>
+
 <script src="js/l10n.js"></script>
 <script src="lang/en.js"></script>
 <script src="lang/hs.js"></script>
@@ -256,9 +313,10 @@
 <script src="js/scheduling.js"></script>
 <script src="js/departures.js"></script>
 <script src="js/journey.js"></script>
-<script src="js/node_ops.js"></script>
 <script src="js/views.js"></script>
 <script src="js/beckmap.js"></script>
+<script src="js/animate.js"></script>
+<script src="js/palette.js"></script>
 <script>
 (async () => {
   await load();
@@ -267,6 +325,7 @@
   refreshAll();
   renderDashboard();
   updateSystemName();
+  paletteInit();
 })();
 </script>
 </body>

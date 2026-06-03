@@ -177,21 +177,93 @@ input[type="checkbox"]:checked::after {
 }
 .modal .close-btn:hover { color: var(--text); }
 
-/* Node Split & Merge */
-.nops-cols { display: flex; gap: 16px; margin-bottom: 12px; }
-.nops-col { flex: 1; min-width: 0; }
-.nops-col-hdr { font-weight: 600; font-size: 13px; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
-.nops-sec-hdr { font-size: 12px; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.04em; font-weight: 600; margin: 16px 0 8px; padding-bottom: 4px; border-bottom: 1px solid var(--border); }
-.nops-plat-row { display: flex; align-items: center; gap: 4px; margin-bottom: 4px; }
-.nops-plat-row input[type="text"] { font-size: 13px; padding: 4px 8px; }
-.nops-seg-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 13px; }
-.nops-sticky-group { border: 2px solid var(--accent-dim); border-radius: var(--radius); padding: 8px; margin: 4px 0; }
-.nops-sticky-hdr { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
-.nops-warnings { margin-top: 12px; padding: 8px 12px; background: var(--warn-dim); border-radius: var(--radius); }
-.nops-merge-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.nops-merge-tbl th, .nops-merge-tbl td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
-.nops-merge-tbl th { font-size: 12px; color: var(--text-dim); text-align: left; }
-.nops-merge-tbl input[type="text"] { font-size: 12px; padding: 3px 6px; }
+/* ---------------- COMMAND PALETTE (Ctrl+K) ---------------- */
+.palette-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 14vh;
+  z-index: 1500; opacity: 0; pointer-events: none; transition: opacity 150ms ease;
+}
+.palette-overlay.open { opacity: 1; pointer-events: all; }
+.palette-box {
+  background: var(--bg-raised); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  width: 600px; max-width: 92vw;
+  display: flex; flex-direction: column;
+  transform: translateY(-8px); transition: transform 150ms ease;
+  overflow: hidden;
+}
+.palette-overlay.open .palette-box { transform: translateY(0); }
+
+.palette-search {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+}
+.palette-search-icon {
+  color: var(--text-muted); font-size: 18px; flex-shrink: 0;
+}
+.palette-search input {
+  flex: 1; background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--font-body); font-size: 15px;
+  padding: 4px 0;
+}
+.palette-search input::placeholder { color: var(--text-muted); }
+.palette-hint { color: var(--text-muted); font-size: 11px; flex-shrink: 0; }
+
+.palette-results {
+  max-height: 50vh; overflow-y: auto; padding: 6px 0;
+}
+.palette-results::-webkit-scrollbar { width: 6px; }
+.palette-results::-webkit-scrollbar-track { background: transparent; }
+.palette-results::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+.palette-section {
+  font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em;
+  color: var(--text-muted); padding: 10px 18px 4px;
+}
+.palette-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 18px; cursor: pointer;
+  font-size: 13px; color: var(--text);
+  border-left: 2px solid transparent;
+}
+.palette-row.selected {
+  background: var(--accent-glow); border-left-color: var(--accent);
+}
+.palette-row .palette-icon {
+  width: 18px; flex-shrink: 0; text-align: center;
+  color: var(--text-dim); font-size: 13px;
+}
+.palette-row .palette-color {
+  width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.palette-row .palette-label {
+  flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.palette-row .palette-label mark {
+  background: transparent; color: var(--accent); font-weight: 600; padding: 0;
+}
+.palette-row .palette-secondary {
+  color: var(--text-muted); font-size: 11px; flex-shrink: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
+}
+
+.palette-empty {
+  padding: 32px 18px; text-align: center; color: var(--text-muted); font-size: 13px;
+}
+
+.palette-footer {
+  display: flex; gap: 14px; justify-content: flex-start;
+  padding: 8px 18px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-muted);
+}
+.palette-footer kbd {
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: 3px; padding: 1px 5px; font-family: var(--font-mono);
+  font-size: 10px; color: var(--text-dim); margin: 0 2px;
+}
 
 .empty-state { text-align: center; padding: 60px 20px; color: var(--text-dim); }
 .empty-state .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
@@ -433,6 +505,85 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
 }
 .detail-panel .close-detail:hover { color: var(--text); }
 
+/* ---------------- INLINE DETAIL ACCORDION ---------------- */
+/* Clickable data rows */
+.data-table tr.row-clickable { cursor: pointer; }
+.data-table tr.row-clickable.expanded > td {
+  background: var(--bg-hover);
+  border-bottom-color: transparent;
+  position: relative;
+}
+.data-table tr.row-clickable.expanded > td:first-child::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--accent);
+}
+/* Keyboard-nav highlight — distinct from .expanded so users can scan rows */
+.data-table tr.row-clickable.kb-highlighted > td {
+  background: var(--accent-glow);
+  position: relative;
+}
+.data-table tr.row-clickable.kb-highlighted > td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent-dim);
+}
+/* When both classes apply, expanded's solid accent border wins on the
+   first cell, but kb's accent-glow tint still shows through the row. */
+.data-table tr.row-clickable.kb-highlighted.expanded > td:first-child {
+  box-shadow: none;
+}
+
+/* Detail row sits directly below an expanded data row */
+.data-table tr.detail-row > td {
+  padding: 0; background: var(--bg-input);
+  border-top: 1px solid var(--border);
+}
+.data-table tr.detail-row:hover > td { background: var(--bg-input); }
+
+/* Animated content wrapper inside the detail row's <td>.
+   Width is locked via JS to the table container's clientWidth so wide
+   content (e.g. service-detail's per-stop departures table) scrolls
+   horizontally inside instead of pushing the parent table wider. */
+.detail-content {
+  overflow: hidden;
+  max-height: 0; opacity: 0;
+  transition: max-height 260ms cubic-bezier(0.2, 0, 0, 1), opacity 200ms ease;
+}
+.detail-content.open { overflow-y: visible; overflow-x: auto; }
+/* Neutralize legacy .detail-panel styling when nested inline */
+.detail-content > .detail-panel {
+  background: transparent; border: none; padding: 18px 20px; margin: 0; border-radius: 0;
+}
+
+/* Sub-collapsible (e.g. service schedule, segment trains, node departures) */
+.detail-collapsible { margin: 12px 0; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.detail-collapsible .dc-toggle {
+  width: 100%; display: flex; align-items: center; gap: 8px;
+  background: var(--bg); border: none; padding: 10px 14px;
+  font-family: var(--font-body); font-size: 12px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-dim);
+  cursor: pointer; border-radius: var(--radius-sm);
+  text-align: left;
+}
+.detail-collapsible .dc-toggle:hover { color: var(--text); background: var(--bg-hover); }
+.detail-collapsible .dc-caret {
+  display: inline-block; transition: transform 200ms ease;
+  font-size: 10px; color: var(--text-muted); width: 12px; flex-shrink: 0;
+}
+.detail-collapsible.open .dc-caret { transform: rotate(90deg); }
+.detail-collapsible .dc-title { flex: 1; }
+.detail-collapsible .dc-sub {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  font-weight: 400; letter-spacing: 0; text-transform: none;
+}
+.detail-collapsible .dc-body {
+  max-height: 0; overflow: hidden;
+  transition: max-height 260ms cubic-bezier(0.2, 0, 0, 1);
+}
+.detail-collapsible.open .dc-body {
+  max-height: none;
+  overflow-y: visible; overflow-x: auto;
+}
+.detail-collapsible .dc-inner { padding: 12px 14px 16px; }
+
 .schedule-table { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
 .schedule-table th {
   text-align: left; font-size: 10px; font-weight: 600; text-transform: uppercase;
@@ -626,3 +777,128 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
   font-size: 11px; color: var(--danger); font-style: italic;
 }
 .csv-match-select { min-width: 200px; font-size: 12px; }
+
+/* Animated map tab — fills viewport below the app header, no scroll */
+#panel-animated.active {
+  display: flex; flex-direction: column;
+  position: fixed; top: 56px; left: 220px; right: 0; bottom: 0;
+  padding: 0; margin: 0; overflow: hidden;
+  background: var(--bg);
+}
+.anim-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px; border-bottom: 1px solid var(--border);
+  background: var(--bg-raised); flex-shrink: 0; gap: 16px;
+}
+.anim-header > div:first-child {
+  min-width: 0; overflow: hidden;
+}
+.anim-header h1 {
+  font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: -0.02em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.anim-header .subtitle {
+  color: var(--text-dim); font-size: 12px; margin-top: 2px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* Slim, single-line controls for the animated header. */
+.anim-header .flex.gap-8 { align-items: center; flex-wrap: nowrap; }
+.anim-header .flex.gap-8 > * { flex-shrink: 0; white-space: nowrap; }
+.anim-header .flex.gap-8 label { white-space: nowrap; }
+.anim-header .btn,
+.anim-header .btn-sm,
+.anim-header select {
+  padding: 3px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  border-radius: var(--radius-sm);
+}
+#anim-time-display {
+  padding: 3px 10px; min-width: 64px; text-align: center;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 12px;
+  font-family: var(--font-mono); line-height: 1.4;
+}
+#anim-play-pause { min-width: 30px; padding: 3px 8px; font-size: 12px; }
+#anim-speed {
+  display: inline-block;     /* override .btn inline-flex which weirdly inflates select widths */
+  width: 78px; flex-shrink: 0;
+}
+.anim-view-stack { flex: 1; position: relative; background: var(--bg); display: flex; }
+#animated-map { flex: 1; background: var(--bg); }
+/* White background to preserve the Beck-style aesthetic of the schematic editor. */
+#animated-schem { flex: 1; background: #fff; cursor: grab; user-select: none; }
+#animated-schem.dragging { cursor: grabbing; }
+.anim-view-toggle {
+  display: inline-flex; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  overflow: hidden; background: var(--bg-input);
+}
+.anim-view-btn {
+  background: transparent; border: 0; color: var(--text-dim);
+  padding: 3px 12px; font-size: 12px; font-family: var(--font-body);
+  cursor: pointer; border-right: 1px solid var(--border); line-height: 1.4;
+}
+.anim-view-btn:last-child { border-right: 0; }
+.anim-view-btn:hover { background: var(--bg-hover); color: var(--text); }
+.anim-view-btn.active { background: var(--accent); color: #fff; }
+.anim-schem-train { cursor: pointer; }
+/* Geo divIcon container — disable Leaflet's default white border + rounding. */
+.anim-vehicle-icon { background: transparent !important; border: 0 !important; }
+.anim-scrubber-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 24px; background: var(--bg-raised);
+  border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.anim-scrubber-time {
+  font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-muted); min-width: 36px;
+}
+#anim-date {
+  width: 140px; flex-shrink: 0;
+  padding: 3px 8px;
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); color: var(--text);
+  font-family: var(--font-mono); font-size: 11px;
+  color-scheme: dark;
+}
+#anim-scrubber {
+  flex: 1; min-width: 0; height: 8px; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  background: var(--bg-input); border-radius: 4px; outline: none;
+  /* dynamic background gradient applied by _animRenderBusyness */
+}
+#anim-scrubber::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+  border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--border);
+}
+#anim-scrubber::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+  border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--border);
+}
+.anim-landmark-label {
+  background: rgba(20, 22, 30, 0.88) !important;
+  color: #c8cad4 !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 3px !important;
+  padding: 1px 6px !important;
+  font-size: 10px !important;
+  font-family: var(--font-mono) !important;
+  white-space: nowrap;
+  box-shadow: none !important;
+  letter-spacing: 0.02em;
+}
+.leaflet-tooltip.anim-landmark-label::before { display: none !important; }
+.anim-vehicle-tooltip {
+  background: rgba(20, 22, 30, 0.94) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius-sm) !important;
+  padding: 5px 9px !important;
+  box-shadow: var(--shadow) !important;
+}
+.leaflet-tooltip.anim-vehicle-tooltip::before { border-top-color: var(--border) !important; }
+#animated-map .leaflet-interactive { cursor: pointer; }

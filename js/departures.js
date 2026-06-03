@@ -247,10 +247,13 @@ function jpBoardVia(dep, svc, fromIdx, toIdx, excludeNodeId, hubCounts) {
   const firstHub = candidates.find(c => !usedIds.has(c.nodeId) && candidateNewDests[c.nodeId] > 0);
   if (firstHub) { selected.push(firstHub); usedIds.add(firstHub.nodeId); }
 
-  // Slots 3-4: Additional hubs with most new destinations, spread out
+  // Slots 3-4: Additional hubs (still required to unlock new destinations for the
+  // viewer), but ranked by THI so prominent interchanges/junctions win over
+  // stations that just happen to expose many obscure destinations.
   const remainingHubs = candidates
     .filter(c => !usedIds.has(c.nodeId) && candidateNewDests[c.nodeId] > 0)
-    .sort((a, b) => candidateNewDests[b.nodeId] - candidateNewDests[a.nodeId]);
+    .sort((a, b) => (typeof thiForNode === 'function' ? thiForNode(b.nodeId) - thiForNode(a.nodeId) : 0)
+                 || candidateNewDests[b.nodeId] - candidateNewDests[a.nodeId]);
 
   // Pick up to 2 more, preferring spread
   if (remainingHubs.length > 0) {

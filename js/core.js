@@ -243,6 +243,171 @@ function migrateSegmentTracks() {
 }
 
 // ============================================================
+// STATION IMPORTANCE — THI (Total Hub Importance)
+// ============================================================
+// Composite score that ranks passenger stations by network prominence.
+// Pooled per nodeDisplayName so multi-node stations (e.g. ISI/OSI splits) sum.
+// Cached; invalidated by bumpTHIVersion() on any data change (see persistence.js).
+//
+// Components (raw):
+//   - traffic:    daily train calls (log-dampened so a busy single line can't dominate)
+//   - lineCount:  unique service groups calling here (interchange hubs win)
+//   - degree:     network branching beyond degree 2 (junctions get a bonus)
+//   - terminus:   any service starts or ends here (line endpoints are salient)
+//
+// Spatial pass: each station's score is adjusted by its nearby neighbors. Per
+// pair, the magnitude of the transfer is `min(A.raw, B.raw) × w × α` — i.e.
+// scaled to the WEAKER station's raw THI rather than the gap. This prevents a
+// tiny station next to a giant from being crushed: a weak station can only
+// lose a small absolute amount per pair, even when the gap is huge. Falloff
+// is linear (`w = 1 − d/R`); zero-sum per pair under normal conditions.
+//
+// A safety floor (`THI_SPATIAL_FLOOR × rawThi`) caps total suppression so no
+// station ever drops below 25% of its raw score, even when surrounded by
+// many strong neighbors. The floor breaks zero-sum only at the edges.
+//
+// Used by: Animated tab landmarks, Geomap label placement, Departure Board "via"
+// selection, Beckmap most-wanted tiebreaker, node detail display.
+
+const THI_RADIUS_KM = 15;        // competition radius
+const THI_SPATIAL_ALPHA = 0.15;  // per-pair fraction of weaker station transferred
+const THI_SPATIAL_FLOOR = 0.25;  // retain at least 25% of raw THI
+
+let _thiVersion = 0;
+let _thiBuiltVersion = -1;
+let _thiCache = { sorted: [], byDn: new Map(), byNode: new Map() };
+
+function _thiHaversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function bumpTHIVersion() { _thiVersion++; }
+
+function _buildTHI() {
+  const groups = {};
+  const byNode = new Map();
+  if (!data || !data.departures || !data.nodes) {
+    _thiCache = { sorted: [], byDn: new Map(), byNode };
+    return;
+  }
+  for (const dep of data.departures) {
+    const svc = getSvc(dep.serviceId); if (!svc) continue;
+    const lastIdx = dep.times.length - 1;
+    for (let i = 0; i < dep.times.length; i++) {
+      const stop = svc.stops[i];
+      if (!stop || stop.passThrough) continue;
+      const node = getNode(dep.times[i].nodeId);
+      if (!node || !isPassengerStop(node)) continue;
+      if (node.lat == null || node.lon == null) continue;
+      const dn = nodeDisplayName(node.id);
+      let g = groups[dn];
+      if (!g) {
+        g = { dn, node: node, nodes: new Set(), traffic: 0, lines: new Set(), hasTerminus: false };
+        groups[dn] = g;
+      }
+      g.nodes.add(node.id);
+      g.traffic++;
+      if (svc.groupId) g.lines.add(svc.groupId);
+      if (i === 0 || i === lastIdx) g.hasTerminus = true;
+    }
+  }
+  // Network degree per group: unique connected stations across all member nodes.
+  for (const dn in groups) {
+    const g = groups[dn];
+    const connected = new Set();
+    for (const nid of g.nodes) {
+      for (const c of connectedNodes(nid)) connected.add(c.nodeId);
+    }
+    for (const nid of g.nodes) connected.delete(nid);
+    g.degree = connected.size;
+  }
+  // Raw THI per group.
+  for (const dn in groups) {
+    const g = groups[dn];
+    if (!g.node) continue;
+    g.rawThi = 0.5 * Math.log10(1 + g.traffic)
+             + 2.0 * g.lines.size
+             + 1.5 * Math.max(0, g.degree - 2)
+             + (g.hasTerminus ? 3.5 : 0);
+  }
+
+  // Spatial pass: lateral inhibition, scaled to the WEAKER station's raw THI
+  // so small stations can't be crushed by huge ones. Per pair: stronger gains
+  // and weaker loses `min(rawA, rawB) × w × α`. Linear falloff over R.
+  const geoList = [];
+  for (const dn in groups) {
+    const g = groups[dn];
+    if (g.node && g.node.lat != null && g.node.lon != null) geoList.push(g);
+    else if (g.node) g.spatial = 0;
+  }
+  for (const g of geoList) {
+    let adj = 0;
+    const lat1 = g.node.lat, lon1 = g.node.lon;
+    for (const other of geoList) {
+      if (other === g) continue;
+      const dKm = _thiHaversineKm(lat1, lon1, other.node.lat, other.node.lon);
+      if (dKm >= THI_RADIUS_KM) continue;
+      const w = 1 - dKm / THI_RADIUS_KM;
+      const minRaw = Math.min(g.rawThi, other.rawThi);
+      const sign = g.rawThi > other.rawThi ? 1 : (g.rawThi < other.rawThi ? -1 : 0);
+      adj += sign * minRaw * w * THI_SPATIAL_ALPHA;
+    }
+    g.spatial = adj;
+  }
+
+  const sorted = [];
+  const byDn = new Map();
+  for (const dn in groups) {
+    const g = groups[dn];
+    if (!g.node) continue;
+    const rawSpatial = g.spatial || 0;
+    // Hard floor: never drop below THI_SPATIAL_FLOOR of raw, regardless of
+    // how many strong neighbors pile on. The "spatial" stored on the entry
+    // is the effective (post-floor) adjustment, so `thi == rawThi + spatial`
+    // remains an invariant for downstream display code.
+    const minThi = g.rawThi * THI_SPATIAL_FLOOR;
+    const finalThi = Math.max(minThi, g.rawThi + rawSpatial);
+    const effectiveSpatial = finalThi - g.rawThi;
+    const entry = {
+      dn, node: g.node, thi: finalThi,
+      rawThi: g.rawThi, spatial: effectiveSpatial,
+      traffic: g.traffic, lines: g.lines.size, degree: g.degree, terminus: g.hasTerminus
+    };
+    sorted.push(entry);
+    byDn.set(dn, entry);
+    for (const nid of g.nodes) byNode.set(nid, entry);
+  }
+  sorted.sort((a, b) => b.thi - a.thi);
+  _thiCache = { sorted, byDn, byNode };
+}
+
+function _ensureTHI() {
+  if (_thiBuiltVersion !== _thiVersion) {
+    _buildTHI();
+    _thiBuiltVersion = _thiVersion;
+  }
+}
+
+// Returns sorted-by-THI array of { dn, node, thi, traffic, lines, degree, terminus }.
+function computeTHI() { _ensureTHI(); return _thiCache.sorted; }
+
+// Returns Map<displayName, entry>.
+function thiByDisplayName() { _ensureTHI(); return _thiCache.byDn; }
+
+// Returns Map<nodeId, entry>.
+function thiByNodeMap() { _ensureTHI(); return _thiCache.byNode; }
+
+// Returns numeric THI for a node, or 0 if it's not a ranked station.
+function thiForNode(nodeId) { _ensureTHI(); return _thiCache.byNode.get(nodeId)?.thi || 0; }
+
+// Returns numeric THI for a display name, or 0 if not ranked.
+function thiForDisplayName(dn) { _ensureTHI(); return _thiCache.byDn.get(dn)?.thi || 0; }
+
+// ============================================================
 // GEOMETRY HELPERS
 // ============================================================
 
@@ -272,9 +437,21 @@ function segmentCoords(seg) {
   return [];
 }
 
-// Return coordinates directed from a specific node (reversed if fromNodeId is nodeB)
+// Return coordinates directed from a specific node. Way geometry is sometimes
+// stored in the opposite direction of nodeA→nodeB (e.g. when a way was imported
+// with reversed orientation), so we orient by which endpoint is geographically
+// closer to fromNode rather than trusting the nominal nodeA/nodeB ordering.
 function segmentCoordsDirected(seg, fromNodeId) {
   const coords = segmentCoords(seg);
+  if (coords.length < 2) return coords;
+  const fromNode = getNode(fromNodeId);
+  if (fromNode && fromNode.lat != null && typeof _ptDist === 'function') {
+    const fromLL = [fromNode.lat, fromNode.lon];
+    const dStart = _ptDist(coords[0], fromLL);
+    const dEnd = _ptDist(coords[coords.length - 1], fromLL);
+    return dStart > dEnd ? [...coords].reverse() : coords;
+  }
+  // Fallback when fromNode has no coordinates: trust nominal nodeA/nodeB order
   if (fromNodeId === seg.nodeB) return [...coords].reverse();
   return coords;
 }
