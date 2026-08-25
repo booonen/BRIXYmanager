@@ -603,7 +603,8 @@ function applySplit() {
   _nodeOpsClose();
   save(); refreshAll();
   toast(t('toast.split_done', { name: rightNode.name }), 'success');
-  setTimeout(() => showNodeDetail(origId), 150);
+  // showNodeDetail toggles since the accordion refactor — only open if not already restored
+  setTimeout(() => { if (_detailExpanded.nodes !== origId) showNodeDetail(origId); }, 150);
 }
 
 // ---- Merge modals ----
@@ -882,5 +883,6 @@ function applyMerge() {
     ? t('toast.merge_done_with_segs', { name: thisNode.name, n: mergedSegCount })
     : t('toast.merge_done', { name: thisNode.name });
   toast(mergeMsg, 'success');
-  setTimeout(() => showNodeDetail(savedId), 150);
+  // showNodeDetail toggles since the accordion refactor — only open if not already restored
+  setTimeout(() => { if (_detailExpanded.nodes !== savedId) showNodeDetail(savedId); }, 150);
 }

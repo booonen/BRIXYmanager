@@ -1,5 +1,20 @@
 # BRIXYmanager — Version History
 
+## v0.19.5.0 — Phase 19 Session 5: Restore work lost in the June 3rd upload
+**What happened.** The 2026-06-03 "Add files via upload" commit synced the local working copy (v0.19.4.2) over the GitHub repo — but the local copy never contained the two April PRs that were merged on GitHub (#2: relation importer enhancements, #3: v0.17.4 Node Split & Merge). The upload silently reverted all of their changes. `js/node_ops.js` survived on disk only because uploads don't delete files; its `<script>` tag, its UI entry points, and its 47 `split.*`/`merge.*` translation keys were all gone, and `js/import.js` was reverted byte-for-byte to its pre-PR state.
+
+**Restored by three-way merge** (base = pre-PR main, ours = v0.19.4.2, theirs = the PR #3 merge commit `af703b8`):
+
+- **Node Split & Merge (v0.17.4.x)** — `js/node_ops.js` re-wired: `<script>` tag back in `railmanager.html`, ✂ Split / ⇄ Merge buttons back in the node detail view, all `split.*` / `merge.*` / `toast.split_done` / `toast.merge_done*` keys back in `lang/en.js`, `.nops-*` styles back in `styles.css`. The post-apply `showNodeDetail` calls were adapted for the v0.19.3.0 detail accordion (guarded so they don't toggle the freshly-restored row closed).
+- **Relation importer enhancements (PR #2)** — `js/import.js` restored to the PR state: polyline densification before divergence walk, divergence-orientation fix via coordinate proximity, parallel-segment divergence handling, speed-waypoint insertion helpers, interpolated departure times when overlap resolution inserts a junction. `js/views.js`: multi-relation batch import (IDs textarea, per-relation section headers), optional service creation from relation stop sequences (new wizard step 4), cross-relation + proximity dedup with reset-and-rerun after name edits, verified-segments review section on the Issues tab with un-verify.
+- **Auto-schedule custom frequency** — inline custom-frequency row in the suggestions table (`js/scheduling.js`).
+- **Localization pass** — the PR's `t()` wiring for previously hardcoded strings across `js/entities.js`, `js/views.js`, `js/journey.js`, `js/scheduling.js`, plus all its `lang/en.js` keys.
+- **Misc PR fixes** — bus stop detail no longer lists road segments twice (interchange chips filter on `osi`/`isi` only); platforms are station-only again (`bus_stop` drops the platform editor); road segments hide electrification/tracks in the segment modal; way geometry is preserved on segment save even when no OGF way IDs are entered; overlap/suspicious-segment issue checks skip cross-infrastructure (road vs. rail) pairs.
+
+**Fixed while restoring** (bugs in the PR code itself): the relation import service-creation dropdowns iterated `data.stock`/`data.lines`, which don't exist — corrected to `data.rollingStock`/`data.serviceGroups`; the duplicate `isInterchange` local in `openSegmentModal` was consolidated into the PR's `segTypeVal` (unshadowing the global `isInterchange()` helper).
+
+**Housekeeping.** The stranded `VERSION_HISTORY.md` (created by PR #3 next to the real "VERSION HISTORY.md") was folded into this file as the v0.17.4.x entry below and deleted. Local-side changes from 0.18/0.19 were preserved throughout the merge (accordion refresh path, THI label scoring, new issue checks, removed step-2 Back button, stripped import diagnostics).
+
 ## v0.19.4.2 — Animated geomap: trains no longer travel backwards on flipped-geometry segments
 **Bug.** For some segments, animated trains crossed the segment in reverse — visible on the Northbound Line 2 in Wib's `zemruthiserk` save, where trains crossing between Şehitali [Line 2] and Şehitali [Line 1] glided in the wrong direction.
 
@@ -389,6 +404,21 @@ Top ~12% of passenger stations (clamped 5–25) by THI become landmarks. Tooltip
 **New module:** `js/animate.js` (~330 lines, `anim*` prefix). Separate Leaflet map (`_animMap`) — does not share state with the geomap. `animOnDataChange()` called from `save()`, `load()`, and `loadSlot()` invalidates the active-set cache and the per-segment cumulative-distance memo. `ui.js` `switchTab` calls `initAnimatedMap()` on first open; subsequent opens call `animOnTabShow()`.
 
 **Known limitations (later sessions):** No GIF export yet. No tooltips / click-to-highlight on vehicles. No date picker (sim is always today; fast-forward can roll into tomorrow). No direction-arrow icons (circles only). No beckmap animation.
+
+## v0.17.4.0 / v0.17.4.1 — Node Split & Merge (PR #3, restored in v0.19.5.0)
+*This entry was originally stranded in a separate `VERSION_HISTORY.md` file created by the PR; folded in here during the v0.19.5.0 restoration. The feature was merged on GitHub 2026-04-17, silently reverted by the 2026-06-03 upload, and restored in v0.19.5.0.*
+
+- Added ability to split a station or bus_stop node into two separate nodes.
+- Segments with shared service usage are grouped as "sticky groups" that move together, preventing accidental service breakage.
+- Segments with no service usage can be moved freely.
+- Platforms can be moved, renamed, added, or removed per side.
+- Optional ISI segment creation between the two halves.
+- Added ability to merge two nodes of the same type that share a display name or are connected by ISI/OSI.
+- Direct track segments between the two nodes abort the merge.
+- Direct ISI segments are automatically removed during merge.
+- Platforms retained with [1]/[2] suffixes. Schematic tracks appended.
+- Beckmap placements and station groups migrated correctly in both operations.
+- v0.17.4.1: fixed overlap resolution for roads; skip cross-type overlap checks; bus stop detail no longer shows road segments twice.
 
 ## v0.17.3.2 — Three New Issue Checks
 **Issue: Schedule Never Runs** (medium) — fires when a service's `schedulePattern` has an empty `days` array AND no `specificDates` (or every specific date is also in `excludeDates`). Catches schedule patterns that have been edited into a state where no date will ever match. Action: opens the service editor.

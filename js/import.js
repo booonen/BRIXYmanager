@@ -145,48 +145,72 @@ function findOverlapLength(coordsA, coordsB, snapThresholdKm, graceKm) {
 }
 
 // ---- Divergence Point Detection ----
-// Given two segments sharing an endpoint, find where their tracks diverge.
-// Returns { coord: [lat,lon], idxA, idxB } — the last shared point on each polyline.
+// Given two segments sharing an endpoint, find where their parallel paths diverge.
+// Tolerates initial divergence near the shared node (e.g. parallel roads leaving
+// a station in slightly different directions before running side by side).
 function findDivergencePoint(segA, segB, snapThresholdKm) {
   const sharedNode = segA.nodeA === segB.nodeA || segA.nodeA === segB.nodeB ? segA.nodeA
     : segA.nodeB === segB.nodeA || segA.nodeB === segB.nodeB ? segA.nodeB : null;
   if (!sharedNode) return null;
 
-  // Orient both polylines so they start from the shared endpoint
   let geoA = [...segA.wayGeometry];
   let geoB = [...segB.wayGeometry];
-  const nodeA = getNode(segA.nodeA), nodeB = getNode(segA.nodeB);
   const sharedN = getNode(sharedNode);
   if (!sharedN || sharedN.lat == null) return null;
+  const sharedCoord = [sharedN.lat, sharedN.lon];
 
-  // Flip A if shared endpoint is at the end
-  if (segA.nodeB === sharedNode) geoA.reverse();
-  if (segB.nodeB === sharedNode) geoB.reverse();
+  if (_ptDist(geoA[geoA.length - 1], sharedCoord) < _ptDist(geoA[0], sharedCoord)) geoA.reverse();
+  if (_ptDist(geoB[geoB.length - 1], sharedCoord) < _ptDist(geoB[0], sharedCoord)) geoB.reverse();
 
-  // Walk along geoA, snap to geoB, find where they diverge
+  // Densify sparse polylines so we check proximity at regular intervals,
+  // not just at widely-spaced vertices
+  geoA = _densifyPolyline(geoA, 0.025);
+  geoB = _densifyPolyline(geoB, 0.025);
+
   let lastSharedIdx = 0;
+  let foundProximity = false;
   const cumA = _cumulativeDist(geoA);
   for (let i = 1; i < geoA.length; i++) {
-    // Skip the first 10m (they're at the same station, always close)
     if (cumA[i] < 0.01) { lastSharedIdx = i; continue; }
     const snap = _snapToPolyline(geoA[i], geoB);
-    if (snap.dist >= snapThresholdKm) break;
-    lastSharedIdx = i;
+    if (snap.dist < snapThresholdKm) {
+      lastSharedIdx = i;
+      foundProximity = true;
+    } else if (foundProximity) {
+      break;
+    }
   }
 
-  if (lastSharedIdx <= 0) return null;
+  if (!foundProximity) return null;
 
   const coord = geoA[lastSharedIdx];
-  // Find the corresponding index on original (non-reversed) geometries
   return {
     coord,
     sharedNode,
-    // Distance from shared endpoint to divergence along A's track
     distFromShared: cumA[lastSharedIdx],
-    // The oriented geometries (starting from shared endpoint)
     orientedA: geoA,
     orientedB: geoB
   };
+}
+
+function _densifyPolyline(coords, maxStepKm) {
+  if (coords.length < 2) return coords;
+  const result = [coords[0]];
+  for (let i = 1; i < coords.length; i++) {
+    const d = _ptDist(coords[i - 1], coords[i]);
+    if (d > maxStepKm) {
+      const steps = Math.ceil(d / maxStepKm);
+      for (let s = 1; s < steps; s++) {
+        const t = s / steps;
+        result.push([
+          coords[i - 1][0] + t * (coords[i][0] - coords[i - 1][0]),
+          coords[i - 1][1] + t * (coords[i][1] - coords[i - 1][1])
+        ]);
+      }
+    }
+    result.push(coords[i]);
+  }
+  return result;
 }
 
 // ---- Build Overlap Resolution Proposal ----
@@ -274,12 +298,13 @@ function applyOverlapResolution(proposal) {
   data.nodes.push(junction);
 
   // 2. Create shared segment (sharedNode → junction)
+  const sharedIsRoad = isRoad(segA);
   const sharedSeg = {
     id: uid(), nodeA: sharedNode, nodeB: junction.id,
-    tracks: segA.tracks.map(t => ({ id: uid(), name: t.name })),
+    tracks: sharedIsRoad ? [] : segA.tracks.map(t => ({ id: uid(), name: t.name })),
     maxSpeed: segA.maxSpeed, distance: Math.round(sharedDist * 100) / 100,
-    electrification: segA.electrification, refCode: '', description: '',
-    interchangeType: null, ogfWayIds: [], wayGeometry: sharedGeo,
+    electrification: sharedIsRoad ? false : segA.electrification, refCode: '', description: '',
+    interchangeType: segA.interchangeType, ogfWayIds: [], wayGeometry: sharedGeo,
     allowedModes: [...(segA.allowedModes || []), ...(segB.allowedModes || [])]
       .filter((v, i, a) => a.indexOf(v) === i) // unique
   };
@@ -304,7 +329,7 @@ function applyOverlapResolution(proposal) {
   segB.wayGeometry[segB.wayGeometry.length - 1] = [getNode(farNodeB).lat, getNode(farNodeB).lon];
   segB.distance = Math.round(remainderBDist * 100) / 100;
 
-  // 5. Update services: insert junction as pass-through
+  // 5. Update services: insert junction as pass-through, with matching departure times
   let servicesUpdated = 0;
   for (const svc of data.services) {
     let modified = false;
@@ -314,15 +339,23 @@ function applyOverlapResolution(proposal) {
         (a === sharedNode && (b === farNodeA || b === farNodeB)) ||
         (b === sharedNode && (a === farNodeA || a === farNodeB));
       if (needsJunction) {
-        // Insert junction as pass-through after the shared endpoint
-        const insertIdx = (a === sharedNode) ? i + 1 : i + 1;
-        // Determine correct position: junction goes between shared node and far node
         const junctionStop = { nodeId: junction.id, platformId: null, dwell: 0, passThrough: true };
-        if (a === sharedNode) {
-          svc.stops.splice(i + 1, 0, junctionStop);
-        } else {
-          svc.stops.splice(i + 1, 0, junctionStop);
+        svc.stops.splice(i + 1, 0, junctionStop);
+
+        // Interpolate a time entry into every departure so times stays in sync with stops
+        const isFarA = (b === farNodeA || a === farNodeA);
+        const remDist = isFarA ? remainderADist : remainderBDist;
+        const totalDist = sharedDist + remDist;
+        const fraction = totalDist > 0 ? ((a === sharedNode) ? sharedDist / totalDist : remDist / totalDist) : 0.5;
+        for (const dep of data.departures) {
+          if (dep.serviceId !== svc.id) continue;
+          if (dep.times.length <= i + 1) continue;
+          const prevT = dep.times[i]?.depart ?? dep.times[i]?.arrive ?? 0;
+          const nextT = dep.times[i + 1]?.arrive ?? dep.times[i + 1]?.depart ?? 0;
+          const jTime = Math.round(prevT + (nextT - prevT) * fraction);
+          dep.times.splice(i + 1, 0, { nodeId: junction.id, arrive: jTime, depart: jTime });
         }
+
         modified = true;
       }
     }
@@ -450,10 +483,11 @@ function processRelationImport(config, rawData) {
     else if (stop.tags.highway === 'bus_stop') nodeType = 'bus_stop';
 
     let name = stop.name;
-    if (name && config.disambiguationSuffix) name = `${name} [${config.disambiguationSuffix}]`;
 
     const platforms = [];
-    for (let i = 1; i <= config.defaultPlatformCount; i++) platforms.push({ id: uid(), name: `Platform ${i}` });
+    if (nodeType !== 'bus_stop') {
+      for (let i = 1; i <= config.defaultPlatformCount; i++) platforms.push({ id: uid(), name: `Platform ${i}` });
+    }
 
     if (snapResult.dist > 0.05) {
       warnings.push({ type: 'snap_distance', message: `"${name || stop.ogfId}" is ${Math.round(snapResult.dist * 1000)}m from the nearest way.`, ogfId: stop.ogfId });
@@ -475,7 +509,7 @@ function processRelationImport(config, rawData) {
       lat: stop.lat, lon: stop.lon,
       _snap: snapResult,
       _include: !existingId, // skip by default if existing node found
-      _dupType: dupType, _dupExistingName: dupExistingName, _disambig: '',
+      _dupType: dupType, _dupExistingName: dupExistingName,
       _existingId: existingId // existing model node ID to use for segments
     });
   }
@@ -488,8 +522,10 @@ function processRelationImport(config, rawData) {
 
   // 4. Generate segments between consecutive station pairs
   const segments = [];
-  // Build a map of which way covers which portion of the polyline for maxspeed lookup
+  // Build maps for maxspeed, infrastructure type, and way ID lookup per polyline edge
   const waySpeedMap = _buildWaySpeedMap(ways, polyline);
+  const wayInfraMap = _buildWayInfraMap(ways, polyline);
+  const wayIdMap = _buildWayIdMap(ways, polyline);
 
   for (let i = 0; i < stations.length - 1; i++) {
     const stA = stations[i], stB = stations[i + 1];
@@ -506,13 +542,25 @@ function processRelationImport(config, rawData) {
     coords[0] = [stA.lat, stA.lon];
     coords[coords.length - 1] = [stB.lat, stB.lon];
 
-    // Resolve maxspeed from underlying ways
+    // Resolve maxspeed, infrastructure type and OGF way IDs from underlying ways
+    const minEdge = Math.min(stA._snap.edgeIdx, stB._snap.edgeIdx);
+    const maxEdge = Math.max(stA._snap.edgeIdx, stB._snap.edgeIdx);
     const midEdge = Math.floor((stA._snap.edgeIdx + stB._snap.edgeIdx) / 2);
     const waySpeed = waySpeedMap[midEdge];
     const maxSpeed = waySpeed > 0 ? waySpeed : config.defaultMaxSpeed;
+    const segInfra = wayInfraMap[midEdge] || 'rail';
+    const isRoadSeg = segInfra === 'road';
+    const segWayIdSet = new Set();
+    for (let e = minEdge; e <= maxEdge; e++) {
+      const wids = wayIdMap[e];
+      if (wids) for (const wid of wids) segWayIdSet.add(wid);
+    }
+    const ogfWayIds = [...segWayIdSet].map(id => parseInt(id)).filter(n => n > 0);
 
     const tracks = [];
-    for (let tk = 1; tk <= config.defaultTrackCount; tk++) tracks.push({ id: uid(), name: `Track ${tk}` });
+    if (!isRoadSeg) {
+      for (let tk = 1; tk <= config.defaultTrackCount; tk++) tracks.push({ id: uid(), name: `Track ${tk}` });
+    }
 
     // Use existing node IDs for duplicates, new IDs for fresh stations
     const nodeAId = stA._existingId || stA.id;
@@ -531,8 +579,8 @@ function processRelationImport(config, rawData) {
     segments.push({
       id: uid(), nodeA: nodeAId, nodeB: nodeBId,
       tracks, maxSpeed, distance: Math.round(distance * 100) / 100,
-      electrification: true, refCode: '', description: '',
-      interchangeType: null, ogfWayIds: [], wayGeometry: coords,
+      electrification: isRoadSeg ? false : true, refCode: '', description: '',
+      interchangeType: isRoadSeg ? 'road' : null, ogfWayIds, wayGeometry: coords,
       allowedModes: [...config.allowedModes],
       _include: !dupType, // skip by default if duplicate found
       _dupType: dupType
@@ -541,7 +589,7 @@ function processRelationImport(config, rawData) {
 
   // 5. Maxspeed waypoint insertion (if enabled)
   if (config.maxspeedBoundary === 'waypoints') {
-    _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, config);
+    _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, wayInfraMap, wayIdMap, config);
   }
 
   return { stations, segments, warnings };
@@ -570,6 +618,47 @@ function _buildWaySpeedMap(ways, polyline) {
   return speedMap;
 }
 
+function _buildWayInfraMap(ways, polyline) {
+  // Map each edge of the polyline to an infrastructure type ('rail' or 'road')
+  const infraMap = {};
+  for (const w of ways) {
+    const infra = w.tags.railway ? 'rail' : (w.tags.highway ? 'road' : null);
+    if (!infra) continue;
+    const wFirst = w.coords[0], wLast = w.coords[w.coords.length - 1];
+    for (let e = 0; e < polyline.length - 1; e++) {
+      const p = polyline[e];
+      if ((Math.abs(p[0] - wFirst[0]) < 0.0001 && Math.abs(p[1] - wFirst[1]) < 0.0001) ||
+          (Math.abs(p[0] - wLast[0]) < 0.0001 && Math.abs(p[1] - wLast[1]) < 0.0001)) {
+        for (let j = Math.max(0, e - w.coords.length); j <= Math.min(polyline.length - 2, e + w.coords.length); j++) {
+          if (!infraMap[j]) infraMap[j] = infra;
+        }
+        break;
+      }
+    }
+  }
+  return infraMap;
+}
+
+function _buildWayIdMap(ways, polyline) {
+  // Map each edge of the polyline to the OGF way IDs that cover it
+  const idMap = {};
+  for (const w of ways) {
+    const wFirst = w.coords[0], wLast = w.coords[w.coords.length - 1];
+    for (let e = 0; e < polyline.length - 1; e++) {
+      const p = polyline[e];
+      if ((Math.abs(p[0] - wFirst[0]) < 0.0001 && Math.abs(p[1] - wFirst[1]) < 0.0001) ||
+          (Math.abs(p[0] - wLast[0]) < 0.0001 && Math.abs(p[1] - wLast[1]) < 0.0001)) {
+        for (let j = Math.max(0, e - w.coords.length); j <= Math.min(polyline.length - 2, e + w.coords.length); j++) {
+          if (!idMap[j]) idMap[j] = [];
+          if (!idMap[j].includes(w.id)) idMap[j].push(w.id);
+        }
+        break;
+      }
+    }
+  }
+  return idMap;
+}
+
 function _parseMaxspeed(val) {
   if (!val) return 0;
   const mph = val.match(/^(\d+)\s*mph$/i);
@@ -578,7 +667,7 @@ function _parseMaxspeed(val) {
   return num > 0 ? num : 0;
 }
 
-function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, config) {
+function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, wayInfraMap, wayIdMap, config) {
   // Find edges where speed changes and insert waypoints
   const speedChanges = [];
   let prevSpeed = 0;
@@ -616,7 +705,7 @@ function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, 
         description: `Speed change: ${sc.fromSpeed} → ${sc.toSpeed} km/h`,
         platforms: [], lat: sc.coord[0], lon: sc.coord[1],
         _snap: { edgeIdx: sc.edgeIdx, t: 0, dist: 0, point: sc.coord },
-        _include: true, _dupType: null, _dupExistingName: '', _disambig: '',
+        _include: true, _dupType: null, _dupExistingName: '',
         _isWaypoint: true
       };
       stations.push(wp);
@@ -635,17 +724,29 @@ function _insertSpeedWaypoints(stations, segments, ways, polyline, waySpeedMap, 
       coords[0] = [pA.lat, pA.lon];
       coords[coords.length - 1] = [pB.lat, pB.lon];
 
+      const subMinEdge = Math.min(pA._snap.edgeIdx, pB._snap.edgeIdx);
+      const subMaxEdge = Math.max(pA._snap.edgeIdx, pB._snap.edgeIdx);
       const midEdge = Math.floor((pA._snap.edgeIdx + pB._snap.edgeIdx) / 2);
       const speed = waySpeedMap[midEdge] || config.defaultMaxSpeed;
+      const subInfra = wayInfraMap[midEdge] || 'rail';
+      const subIsRoad = subInfra === 'road';
+      const subWayIdSet = new Set();
+      for (let e = subMinEdge; e <= subMaxEdge; e++) {
+        const wids = wayIdMap[e];
+        if (wids) for (const wid of wids) subWayIdSet.add(wid);
+      }
+      const subOgfWayIds = [...subWayIdSet].map(id => parseInt(id)).filter(n => n > 0);
 
       const tracks = [];
-      for (let tk = 1; tk <= config.defaultTrackCount; tk++) tracks.push({ id: uid(), name: `Track ${tk}` });
+      if (!subIsRoad) {
+        for (let tk = 1; tk <= config.defaultTrackCount; tk++) tracks.push({ id: uid(), name: `Track ${tk}` });
+      }
 
       segments.splice(si + j, 0, {
         id: uid(), nodeA: pA.id, nodeB: pB.id,
         tracks, maxSpeed: speed, distance: Math.round(dist * 100) / 100,
-        electrification: true, refCode: '', description: '',
-        interchangeType: null, ogfWayIds: [], wayGeometry: coords,
+        electrification: subIsRoad ? false : true, refCode: '', description: '',
+        interchangeType: subIsRoad ? 'road' : null, ogfWayIds: subOgfWayIds, wayGeometry: coords,
         allowedModes: [...config.allowedModes],
         _include: true, _dupType: null
       });

@@ -543,7 +543,7 @@ function jpSearch() {
   const timeStr = document.getElementById('jp-time').value || '08:00';
   const startTime = toMin(timeStr);
   const el = document.getElementById('jp-results');
-  el.innerHTML = '<div class="text-dim" style="padding:20px;text-align:center">Searching...</div>';
+  el.innerHTML = `<div class="text-dim" style="padding:20px;text-align:center">${t('jp.searching')}</div>`;
   setTimeout(() => {
     const jpDateStr = document.getElementById('jp-date')?.value || '';
     const searchContext = {
@@ -745,8 +745,8 @@ function jpRenderResults(visible, hasPrev, hasNext, start, total) {
     html += `</div>
       <div style="width:350px;flex-shrink:0">
         <div class="detail-map-tabs">
-          <button class="${(data.settings?.defaultDetailMap||'geo')==='geo'?'active':''}" onclick="jpMapToggle(${jIdx},'geo')">Geomap</button>
-          <button class="${data.settings?.defaultDetailMap==='beck'?'active':''}" onclick="jpMapToggle(${jIdx},'beck')">Railmap</button>
+          <button class="${(data.settings?.defaultDetailMap||'geo')==='geo'?'active':''}" onclick="jpMapToggle(${jIdx},'geo')">${t('nav.geomap')}</button>
+          <button class="${data.settings?.defaultDetailMap==='beck'?'active':''}" onclick="jpMapToggle(${jIdx},'beck')">${t('nav.railmap')}</button>
         </div>
         <div id="jp-map-${jIdx}" style="width:100%;height:322px;${(data.settings?.defaultDetailMap||'geo')==='geo'?'':'display:none;'}border-radius:0 0 var(--radius) var(--radius);overflow:hidden;border:1px solid var(--border);border-top:0;background:var(--bg)"></div>
         <svg id="jp-beck-${jIdx}" style="width:100%;height:322px;${data.settings?.defaultDetailMap==='beck'?'':'display:none;'}border-radius:0 0 var(--radius) var(--radius);border:1px solid var(--border);border-top:0;background:#fff"></svg>
