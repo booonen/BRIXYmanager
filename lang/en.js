@@ -1134,6 +1134,12 @@ registerLanguage('en', 'English', {
     "hour_ago": "{n}h ago",
     "day_ago": "{n}d ago"
   },
+  "gantt": {
+    "title_segment": "Track occupancy",
+    "title_node": "Platform occupancy",
+    "unassigned": "(unassigned track)",
+    "note": "All scheduled departures, ignoring schedule patterns — red outline = overlapping occupation. Click a bar to open its service."
+  },
   "bulk": {
     "selected": "{n} selected",
     "set_line": "Set line…",

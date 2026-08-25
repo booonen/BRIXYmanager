@@ -1,5 +1,17 @@
 # BRIXYmanager — Version History
 
+## v0.19.9.0 — Phase 19 Session 9: Occupancy Gantt
+Gantt-style time-of-day occupancy charts inside detail views — the "who is using this infrastructure when" answer at a glance.
+
+- **Segment detail → "Track occupancy"** collapsible: one row per named track (plus an "(unassigned track)" row when multi-track segments have stops without a track assignment), X-axis 00:00–24:00 with hour gridlines and 3-hour labels. Each scheduled traversal renders as a bar colored by its service's line color. Uses the same track-resolution rules as conflict detection (`findSegByTrack`, single-track auto-resolve).
+- **Node detail → "Platform occupancy"** collapsible: one row per platform, bars = arrive→depart dwell per stop (1-minute visual minimum so brief calls stay visible), platform resolution via `depPlatId` (departure overrides honored).
+- **Conflict cue:** overlapping bars within a row get a red outline — a visual echo of the platform/track conflict checks.
+- **Cross-midnight handling:** occupations past 24:00 are split and wrapped to the start of the axis.
+- Bars are clickable (jump to the service via `gotoEntity`) with time-range tooltips. Charts scroll horizontally inside the collapsible; a footnote clarifies the chart covers **all** departures, ignoring schedule patterns — it's an infrastructure-load view, not a single-day timetable.
+- Implementation: `ganttForSegment` / `ganttForNode` / `renderGanttSVG` in [js/scheduling.js](js/scheduling.js) (pure SVG, no libraries), wired into both detail views behind `detailCollapsibleHTML` (closed by default).
+
+**Also fixed:** the v0.19.6.0 pin buttons in segment and service detail headers referenced an `id` variable that doesn't exist in those functions (`segId`/`svcId`) — opening either detail threw a `ReferenceError` and rendered nothing. Caught by this session's smoke test; both fixed and re-verified.
+
 ## v0.19.8.0 — Phase 19 Session 8: Network reach
 The Journey Planner tab gets a second mode: **Network reach** — "everything I can get to from here within N minutes", riding the existing CSA machinery.
 

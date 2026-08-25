@@ -531,6 +531,15 @@ function showNodeDetail(id) {
   } else {
     html += `<div><strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('nav.schedule')}</strong><div class="text-dim mt-8" style="font-size:13px">${t('empty.no_scheduled_trains')}</div></div>`;
   }
+
+  // Platform occupancy Gantt
+  {
+    const gRows = (typeof ganttForNode === 'function') ? ganttForNode(id) : null;
+    const gCount = gRows ? ganttBarCount(gRows) : 0;
+    if (gRows && gCount) {
+      html += detailCollapsibleHTML(`node-gantt-${id}`, t('gantt.title_node'), renderGanttSVG(gRows), { sub: `${gCount}`, open: false });
+    }
+  }
   html += '</div>';
 
   expandDetailRow('nodes', id, 'nodes-list', html, () => {
@@ -1291,7 +1300,7 @@ function showSegmentDetail(segId) {
   let html = `<div class="detail-panel">
     <h3>${esc(nodeName(seg.nodeA))} — ${esc(nodeName(seg.nodeB))} ${seg.refCode ? `<span class="mono text-dim" style="font-size:12px;margin-left:4px">[${esc(seg.refCode)}]</span>` : ''}
     ${road ? '<span class="chip" style="font-size:10px;background:#3d2a1f;color:#e0a860;margin-left:8px">ROAD</span>' : ''}
-    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('segments', id) : ''}
+    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('segments', segId) : ''}
     <button class="close-detail" onclick="event.stopPropagation();closeSegmentDetail()">✕</button></h3>
     ${seg.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(seg.description)}</p>` : ''}
     <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
@@ -1366,6 +1375,15 @@ function showSegmentDetail(segId) {
     html += detailCollapsibleHTML(`seg-trains-${segId}`, 'Trains on this segment', trainsTable, { sub: `${trains.length}`, open: trains.length <= 10 });
   } else {
     html += `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Trains on this segment</strong><div class="text-dim mt-8" style="font-size:13px">No trains scheduled.</div>`;
+  }
+
+  // Track occupancy Gantt
+  {
+    const gRows = (typeof ganttForSegment === 'function') ? ganttForSegment(segId) : null;
+    const gCount = gRows ? ganttBarCount(gRows) : 0;
+    if (gRows && gCount) {
+      html += detailCollapsibleHTML(`seg-gantt-${segId}`, t('gantt.title_segment'), renderGanttSVG(gRows), { sub: `${gCount}`, open: false });
+    }
   }
   html += '</div>';
 
@@ -2533,7 +2551,7 @@ function showServiceDetail(svcId) {
     ${stock ? `<span class="chip" style="margin-left:4px">${stock.traction==='electric'?'⚡':stock.traction==='diesel'?'⛽':'⚡⛽'} ${esc(stock.code||stock.name)}</span>` : ''}
     ${grp ? `<span class="chip clickable" style="margin-left:4px;cursor:pointer" onclick="event.stopPropagation();switchTab('lines');showLineDetail('${grp.id}')"><span class="dot" style="background:${grp.color||'var(--text-muted)'}"></span>${esc(grp.name)}</span>` : ''}
     <span class="chip" style="margin-left:4px;font-size:11px">${esc(describePattern(svc.schedulePattern))}</span>
-    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('services', id) : ''}
+    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('services', svcId) : ''}
     <button class="close-detail" onclick="event.stopPropagation();closeServiceDetail()">✕</button></h3>`;
 
   // Map
