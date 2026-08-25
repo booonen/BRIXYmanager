@@ -62,8 +62,8 @@ Major overhaul of the segment model across 7 sessions. OGF way geometry for real
 
 ---
 
-### Phase 17 — Infrastructure Import
-Bulk infrastructure creation from OGF relations and CSV files. Reuses Phase 16's snap-and-slice primitives.
+### Phase 17 — Infrastructure Import ✅ Complete (v0.17.1.0 → v0.17.4.1)
+Bulk infrastructure creation from OGF relations and CSV files. Reuses Phase 16's snap-and-slice primitives. v0.17.4.x added Node Split & Merge (restored in v0.19.5.0 after the June upload clobbered the PR) plus relation importer enhancements: multi-relation batch import, optional service creation, cross-relation + proximity dedup, verified segments, divergence detection upgrades.
 
 - **OGF relation import:** Fetch route relation, filter way/stop members, stitch ways, snap stations to polyline, generate segments between consecutive stops. Maxspeed parsing with optional waypoint splitting at speed boundaries.
 - **CSV import:** Upload CSV, map columns to BRIXY fields (nodes and segments separately), preview, bulk-create. Segments reference nodes by name or ref code.
@@ -74,23 +74,25 @@ Infra only — services, lines, and schedules remain manual.
 
 ---
 
-### Phase 18 — Animated Map
-Animated visualization of trains moving through the network over time.
+### Phase 18 — Animated Map ✅ Complete (v0.18.1.0 → v0.18.4.3)
+Animated visualization of trains moving through the network over time. New "Animated" tab with sim clock (live/fast/paused), deterministic position interpolation, vehicle markers, Geo (Leaflet) + Schem (renderSchematic) views, busyness heatmap scrubber, vehicle popups with live ETA, route highlight. THI hoisted to a first-class core helper during this phase. **Deferred:** GIF/WebM export (rendering pipeline was unsatisfying).
 
 ---
 
-### Phase 19 — Light Tools & QoL
+### Phase 19 — Light Tools & QoL 🔨 In progress (v0.19.1.0 → )
 A grab-bag phase of small, high-value additions and tools. Sketched during the v0.17.3.1 / 0.17.3.2 polish work. Sessions are independent; can be reordered or trimmed freely.
+
+**Done so far:** Session 1 legacy cleanup (v0.19.1.0), Session 2 Ctrl+K command palette (v0.19.2.0), Session 3 detail-into-table accordion (v0.19.3.0), Session 4 keyboard nav in entity tables (v0.19.4.0), Session 5 restoration of the lost PR work (v0.19.5.0). Struck-through items below are done.
 
 **Top bar / navigation**
 - Recent + pinned entities, surfaced near the saves dropdown
 - Recent saves with last-opened time on the dropdown
 
 **Search & navigation**
-- Cmd+K command palette
+- ~~Cmd+K command palette~~ ✅ v0.19.2.0
 - Broader keyboard shortcuts (catalogue current ones, fill gaps)
-- Keyboard arrow nav in entity tables
-- Detail-view-into-table — long-standing wishlist item: collapsible inline detail row instead of a separate panel below
+- ~~Keyboard arrow nav in entity tables~~ ✅ v0.19.4.0
+- ~~Detail-view-into-table~~ ✅ v0.19.3.0
 - Search predicates: `category:`, `line:`, `stops:>N`, etc., applied across all searchable tables
 
 **Bulk operations**
@@ -105,9 +107,8 @@ A grab-bag phase of small, high-value additions and tools. Sketched during the v
 - Additional checks as discovered during use
 
 **Legacy cleanup**
-- Strip `data.lines` Phase 10 leftover code if still firing on load
-- Audit `schemMigrateData()` for Beckmap v1/v1.5/v2 paths that no longer trigger
-- TODO/FIXME sweep across all modules
+- ~~Strip `data.lines` / audit `schemMigrateData()` / TODO-FIXME sweep~~ ✅ v0.19.1.0
+- Fix hardcoded strings + missing `t()` keys found in the v0.19.5.x review (palette l10n, ~7 broken key references, `lang/hs.js` catch-up)
 
 Probably 6–8 sessions if all in scope. Trim freely.
 

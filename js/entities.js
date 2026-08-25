@@ -327,7 +327,7 @@ const _nodePrefixMap = {
   name: n => n.name,
   ref: n => n.refCode,
   type: n => n.type,
-  platforms: n => isPassengerStop(n) ? (n.platforms || []).length : null,
+  platforms: n => n.type === 'station' ? (n.platforms || []).length : null,
   desc: n => n.description,
   address: n => n.address,
   ogf: n => !!n.ogfNode,
@@ -353,7 +353,7 @@ function _nodeFreeText(n, q) {
 }
 const _nodeSortDefs = {
   name: n => n.name, ref: n => n.refCode || '', type: n => n.type,
-  platforms: n => isPassengerStop(n) ? (n.platforms || []).length : null,
+  platforms: n => n.type === 'station' ? (n.platforms || []).length : null,
   connections: n => connectedNodes(n.id).length,
   thi: n => isPassengerStop(n) ? (typeof thiForNode === 'function' ? thiForNode(n.id) : 0) : null
 };
@@ -385,7 +385,7 @@ function renderNodes() {
       <td><strong>${esc(n.name)}</strong>${n.description ? `<div class="text-dim" style="font-size:11px;margin-top:1px">${esc(n.description)}</div>` : ''}</td>
       <td class="mono text-dim" style="font-size:11px">${esc(n.refCode || '—')}</td>
       <td><span class="type-badge type-${n.type}">${t('type.'+n.type)}</span></td>
-      <td class="mono">${isPassengerStop(n) ? (n.platforms||[]).length : '—'}</td>
+      <td class="mono">${n.type === 'station' ? (n.platforms||[]).length : '—'}</td>
       <td class="mono">${conns}</td>
       <td class="mono">${isPassengerStop(n) ? (thi > 0 ? thi.toFixed(2) : '0') : '—'}</td>
       <td style="text-align:center">${hasOgf ? '<span title="OGF node linked" style="color:var(--success)">✓</span>' : '<span class="text-muted">—</span>'}</td>
@@ -434,7 +434,7 @@ function showNodeDetail(id) {
   // Connected segments (track + interchange)
   const conns = connectedNodes(id);
   const allConns = allConnectedSegments(id);
-  const ichConns = allConns.filter(c => c.interchange);
+  const ichConns = allConns.filter(c => c.interchange === 'osi' || c.interchange === 'isi');
 
   // THI badge — passenger stops only, hover for component breakdown.
   let thiBadge = '';
@@ -461,9 +461,11 @@ function showNodeDetail(id) {
   if (infoParts) html += `<p class="text-dim mb-8" style="font-size:13px">${infoParts}</p>`;
   if (node.description) html += `<p class="text-dim mb-8" style="font-size:13px">${esc(node.description)}</p>`;
 
-  // Link to departure board
+  // Link to departure board + Split/Merge
   if (isPassengerStop(node)) {
-    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">▤ ${t('node_detail.view_departure_board')}</button></div>`;
+    const _canSplit = nodeCanSplit(id);
+    const _mergeCands = nodeMergeCandidates(id);
+    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">\u25A4 ${t('node_detail.view_departure_board')}</button> <button class="btn btn-sm" ${_canSplit ? '' : 'disabled title="' + esc(t('split.btn_disabled_tooltip')) + '"'} onclick="openSplitModal('${id}')">\u2702 ${t('split.btn')}</button>${_mergeCands.length ? ` <button class="btn btn-sm" onclick="openMergeChooser('${id}')">\u21C4 ${t('merge.btn')}</button>` : ''}</div>`;
   }
 
   // Detail map
@@ -480,7 +482,13 @@ function showNodeDetail(id) {
     html += `<div class="mt-8">`;
     html += conns.map(c => {
       const seg = getSeg(c.segId);
-      return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;background:var(--accent-glow);border-color:var(--accent);color:var(--accent)" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))} · ${seg.distance}km · ${seg.maxSpeed}km/h</span>`;
+      const road = isRoad(seg);
+      const info = road ? `${seg.distance}km · ${seg.maxSpeed}km/h` : `${seg.distance}km · ${seg.maxSpeed}km/h`;
+      const style = road
+        ? 'background:#1a2a1a;border-color:#6cc070;color:#6cc070'
+        : 'background:var(--accent-glow);border-color:var(--accent);color:var(--accent)';
+      const typeLabel = road ? ' · Road' : '';
+      return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;${style}" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))}${typeLabel} · ${seg.distance}km · ${seg.maxSpeed}km/h</span>`;
     }).join('');
     html += ichConns.map(c => {
       const seg = data.segments.find(s => s.id === c.segId);
@@ -489,7 +497,7 @@ function showNodeDetail(id) {
       return `<span class="chip clickable" style="margin:0 4px 4px 0;cursor:pointer;background:${seg?.interchangeType==='osi'?'#2a1f3d':'#1f2a2a'};border-color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'};color:${seg?.interchangeType==='osi'?'#b08ae0':'#7ec8c8'}" onclick="switchTab('segments');showSegmentDetail('${c.segId}')">${esc(nodeName(c.nodeId))} · ${label} · ${walkMins} min</span>`;
     }).join('');
     html += '</div>';
-  } else html += '<div class="text-dim mt-8" style="font-size:13px">No segments.</div>';
+  } else html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_segments')}</div>`;
   html += '</div>';
 
   html += '<div class="detail-map-clear"></div>';
@@ -633,7 +641,7 @@ function openNodeModal(id, hField) {
     </div>
     <div class="form-row">
       <div class="form-group"><label>${t('field.type')}</label>
-        <select id="f-type" onchange="document.getElementById('plat-sec').style.display=(this.value==='station'||this.value==='bus_stop')?'':'none'">
+        <select id="f-type" onchange="document.getElementById('plat-sec').style.display=(this.value==='station')?'':'none'">
           ${['station','bus_stop','junction','waypoint','depot','freight_yard'].map(tp =>
             `<option value="${tp}" ${(n ? n.type : _lastNodeType)===tp?'selected':''}>${t('type.'+tp)}</option>`).join('')}
         </select></div>
@@ -641,20 +649,20 @@ function openNodeModal(id, hField) {
     </div>
     <div class="form-group"><label>${t('field.address')}</label><input type="text" id="f-addr" value="${esc(n?.address||'')}"></div>
     <div class="form-group"><label>${t('field.description')}</label><input type="text" id="f-ndesc" value="${esc(n?.description||'')}" placeholder="${t('placeholder.eg_description')}"></div>
-    <div id="plat-sec" style="${(n ? isPassengerStop(n) : (_lastNodeType==='station'||_lastNodeType==='bus_stop'))?'':'display:none'}">
+    <div id="plat-sec" style="${(n ? n.type === 'station' : _lastNodeType==='station')?'':'display:none'}">
       <div class="form-group"><label>${t('field.platforms')}</label><div id="plat-list">${plats}</div>
         <button class="btn btn-sm mt-8" onclick="addPlatRow()">${t('btn.add_platform')}</button></div>
       ${n && n.type === 'station' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.station_schematic")}</label>
-        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
+        <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
         ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
       </div>` : ''}
     </div>
     ${n && n.type === 'junction' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.junction_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}
     ${n && n.type === 'waypoint' && connectedNodes(n.id).length > 0 ? `<div class="form-group mt-8"><label>${t("label.waypoint_schematic")}</label>
-      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? 'Edit Schematic' : '+ Create Schematic'}</button>
+      <button class="btn btn-sm" onclick="closeModal();setTimeout(()=>openSchematicEditor('${n.id}'),100)">${n.schematic?.tracks?.length ? t('btn.edit_schematic') : t('btn.create_schematic')}</button>
       ${n.schematic?.tracks?.length ? `<span class="text-dim" style="font-size:12px;margin-left:8px">${n.schematic.tracks.length} track${n.schematic.tracks.length!==1?'s':''} defined</span>` : ''}
     </div>` : ''}`,
     `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
@@ -677,7 +685,7 @@ function saveNode() {
   const refCode = document.getElementById('f-ref').value.trim();
   const description = document.getElementById('f-ndesc').value.trim();
   let platforms = [];
-  if (type === 'station' || type === 'bus_stop') {
+  if (type === 'station') {
     document.querySelectorAll('#plat-list .plat-name').forEach(inp => {
       const pn = inp.value.trim(); if (pn) platforms.push({ id: uid(), name: pn });
     });
@@ -1420,7 +1428,6 @@ function openSegmentModal(id, hField) {
   const s = id ? getSeg(id) : null;
   // Determine type for the dropdown
   const segTypeVal = s ? (s.interchangeType || '') : _lastSegType;
-  const isInterchange = s ? (s.interchangeType || '') : _lastSegType;
   // Resolve defaults: editing uses segment values, new uses sticky per-type defaults
   const td = _lastSegDefaults.track;
   const rd = _lastSegDefaults.road;
@@ -1437,21 +1444,21 @@ function openSegmentModal(id, hField) {
   openModal(s ? t('modal.edit_segment') : t('modal.add_segment'), `
     <div class="form-group"><label>${t('field.segment_type')}</label>
       <select id="f-sType" onchange="segTypeChanged(this.value)">
-        <option value="" ${!isInterchange?'selected':''}>Track segment</option>
-        <option value="road" ${isInterchange==='road'?'selected':''}>Road segment</option>
-        <option value="osi" ${isInterchange==='osi'||isInterchange==='isi'?'selected':''}>Walking interchange</option>
+        <option value="" ${!segTypeVal?'selected':''}>${t('seg.track_segment')}</option>
+        <option value="road" ${segTypeVal==='road'?'selected':''}>${t('seg.road_segment')}</option>
+        <option value="osi" ${segTypeVal==='osi'||segTypeVal==='isi'?'selected':''}>${t('seg.walking_interchange')}</option>
       </select></div>
     <div class="form-row">
       <div class="form-group"><label>${t('field.from_node')}</label><div id="seg-node-a-picker"></div></div>
       <div class="form-group"><label>${t('field.to_node')}</label><div id="seg-node-b-picker"></div></div>
     </div>
-    <div id="seg-track-fields" style="${isInterchange==='osi'||isInterchange==='isi'?'display:none':''}">
+    <div id="seg-track-fields" style="${segTypeVal==='osi'||segTypeVal==='isi'?'display:none':''}">
       <div class="form-row">
         <div class="form-group"><label>${t('field.max_speed')}</label><input type="number" id="f-sSp" value="${defSpeed}" min="1"></div>
         <div class="form-group"><label>${t('field.distance')}</label><input type="number" id="f-sDi" value="${s?.distance||''}" min="0.1" step="0.1"></div>
       </div>
       <div class="form-row">
-        <div class="form-group" id="seg-elec-group">
+        <div class="form-group" id="seg-elec-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
           <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
             <input type="checkbox" id="f-sEl" ${defElec?'checked':''}>${t('field.electrified_label')}</label>
         </div>
@@ -1476,24 +1483,24 @@ function openSegmentModal(id, hField) {
         }).join('')}</div>
         <p class="text-dim" style="font-size:11px;margin-top:4px">${t('field.allowed_modes_help')}</p>
       </div>` : ''}
-      <div class="form-group" id="seg-tracks-group">
+      <div class="form-group" id="seg-tracks-group" style="${segTypeVal === 'road' ? 'display:none' : ''}">
         <label>${t('field.tracks')}</label>
-        <div id="seg-track-list">${defTrackRows}</div>
+        <div id="seg-track-list">${segTypeVal === 'road' ? '' : defTrackRows}</div>
         <button type="button" class="btn btn-sm mt-4" onclick="addSegTrackRow()">+ ${t('btn.add_track')}</button>
       </div>
     </div>
-    <div id="seg-interchange-fields" style="${isInterchange==='osi'||isInterchange==='isi'?'':'display:none'}">
+    <div id="seg-interchange-fields" style="${segTypeVal==='osi'||segTypeVal==='isi'?'':'display:none'}">
       <div class="form-group"><label>${t('field.interchange_type')}</label>
         <div class="flex gap-4">
-          <button class="btn btn-sm" id="btn-ich-osi" onclick="document.getElementById('f-sIchType').value='osi';document.getElementById('btn-ich-osi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-isi').style.cssText=''" style="${!isInterchange||isInterchange==='osi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('seg.osi')}</button>
-          <button class="btn btn-sm" id="btn-ich-isi" onclick="document.getElementById('f-sIchType').value='isi';document.getElementById('btn-ich-isi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-osi').style.cssText=''" style="${isInterchange==='isi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('seg.isi')}</button>
+          <button class="btn btn-sm" id="btn-ich-osi" onclick="document.getElementById('f-sIchType').value='osi';document.getElementById('btn-ich-osi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-isi').style.cssText=''" style="${!segTypeVal||segTypeVal==='osi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('seg.osi')}</button>
+          <button class="btn btn-sm" id="btn-ich-isi" onclick="document.getElementById('f-sIchType').value='isi';document.getElementById('btn-ich-isi').style.cssText='background:var(--accent);border-color:var(--accent);color:#fff';document.getElementById('btn-ich-osi').style.cssText=''" style="${segTypeVal==='isi'?'background:var(--accent);border-color:var(--accent);color:#fff':''}">${t('seg.isi')}</button>
         </div>
         <input type="hidden" id="f-sIchType" value="${s?.interchangeType || defIchType}">
       </div>
-      <div class="form-group"><label>${t('field.walk_distance')}</label><input type="number" id="f-sIDi" value="${isInterchange ? (s?.distance||'') : ''}" min="0.01" step="0.01" placeholder="${t('placeholder.eg_walk_dist')}"></div>
+      <div class="form-group"><label>${t('field.walk_distance')}</label><input type="number" id="f-sIDi" value="${segTypeVal ? (s?.distance||'') : ''}" min="0.01" step="0.01" placeholder="${t('placeholder.eg_walk_dist')}"></div>
       <p class="text-dim" style="font-size:12px;margin-top:4px">Walking time: <strong id="walk-time-label">—</strong></p>
     </div>
-    <div class="form-group"><label>${t('field.description')}</label><input type="text" id="f-sDesc" value="${esc(s?.description||'')}" placeholder="${isInterchange ? 'e.g. Underground passage between stations' : 'e.g. Double-track mainline through river valley'}"></div>`,
+    <div class="form-group"><label>${t('field.description')}</label><input type="text" id="f-sDesc" value="${esc(s?.description||'')}" placeholder="${segTypeVal ? 'e.g. Underground passage between stations' : 'e.g. Double-track mainline through river valley'}"></div>`,
     `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
      <button class="btn btn-primary" onclick="saveSegment()">${s?t('btn.save'):t('btn.add_segment')}</button>`);
   if (hField) highlightField(hField);
@@ -1625,7 +1632,7 @@ async function saveSegment() {
     _lastSegDefaults.road.maxSpeed = maxSpeed;
     _lastSegDefaults.road.refCode = refCode;
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
-    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
+    const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
     const obj = { nodeA, nodeB, tracks: [], maxSpeed, distance, electrification: false, refCode, description, interchangeType: 'road', ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
@@ -1647,7 +1654,7 @@ async function saveSegment() {
     const refCode = document.getElementById('f-sRef').value.trim();
     _lastSegDefaults.track = { trackCount: tracks.length, maxSpeed, electrification, refCode };
     const ogfWayIds = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '').split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
-    const wayGeometry = ogfWayIds.length ? (window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null) : null;
+    const wayGeometry = window._segWayGeometry || (editingId ? getSeg(editingId)?.wayGeometry : null) || null;
     const obj = { nodeA, nodeB, tracks, maxSpeed, distance, electrification, refCode, description, interchangeType: null, ogfWayIds, wayGeometry, allowedModes };
     if (editingId) { Object.assign(getSeg(editingId), obj); toast(t('toast.segment_updated'), 'success'); }
     else { data.segments.push({ id: uid(), ...obj }); toast(t('toast.segment_added'), 'success'); }
@@ -1827,7 +1834,7 @@ function renderLines() {
   }
 
   if (!list.length) {
-    el.innerHTML = `<div class="text-dim mt-16">No lines matching "${esc(q)}".</div>`;
+    el.innerHTML = `<div class="text-dim mt-16">${t('empty.no_lines_match', { q })}</div>`;
     return;
   }
 
@@ -1887,7 +1894,7 @@ function showLineDetail(id) {
       }).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">No services assigned to this line yet.</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_services')}</div>`;
   }
   html += `</div>`;
 
@@ -1899,7 +1906,7 @@ function showLineDetail(id) {
       ${segs.map(s => `<span class="chip clickable" onclick="event.stopPropagation();switchTab('segments');showSegmentDetail('${s.id}')">${esc(nodeName(s.nodeA))} — ${esc(nodeName(s.nodeB))} <span class="text-muted" style="font-size:11px">${s.distance}km</span></span>`).join('')}
     </div>`;
   } else {
-    html += `<div class="text-dim mt-8" style="font-size:13px">No segments covered — add services with routes to this line.</div>`;
+    html += `<div class="text-dim mt-8" style="font-size:13px">${t('empty.no_line_segments')}</div>`;
   }
   html += `<div class="detail-map-clear"></div></div></div>`;
 
@@ -2751,7 +2758,7 @@ function renderRouteBuilder() {
   if (prependContainer) prependContainer.innerHTML = '';
 
   if (!stops.length) {
-    container.innerHTML = '<div class="text-dim" style="font-size:13px">No stops yet. Pick a starting node below.</div>';
+    container.innerHTML = `<div class="text-dim" style="font-size:13px">${t('empty.no_stops')}</div>`;
     const sorted = [...data.nodes].sort((a, b) => a.name.localeCompare(b.name));
     addContainer.innerHTML = `<div class="form-group"><label>${t('field.starting_node')}</label>
       <select onchange="addRouteStop(this.value);this.value='';">
@@ -2858,7 +2865,7 @@ function renderRouteBuilder() {
       ${_routeTrackOptions(connected)}
     </select>`;
   } else {
-    addContainer.innerHTML = '<div class="text-dim" style="font-size:12px">No further connections from this node.</div>';
+    addContainer.innerHTML = `<div class="text-dim" style="font-size:12px">${t('empty.no_further_connections')}</div>`;
   }
 }
 

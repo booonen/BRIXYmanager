@@ -25,7 +25,7 @@ function openScheduleModal(svcId) {
     </div>
     <div class="form-group" style="margin-bottom:8px">
       <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-weight:400;font-size:13px;color:var(--text);">
-        <input type="checkbox" id="sh-clear" checked onchange="refreshScheduleModal()">Clear existing departures for this service first</label></div>
+        <input type="checkbox" id="sh-clear" checked onchange="refreshScheduleModal()">${t('label.clear_existing')}</label></div>
     <div id="helper-timeline"></div>
     <div class="htabs">
       <div class="htab active" id="htab-freq" onclick="switchScheduleTab('freq')">${t('sch.frequency')}</div>
@@ -81,7 +81,7 @@ function refreshScheduleModal() {
   const freeCount = slots.filter(s => s.free).length;
 
   // Timeline bar
-  let timelineHtml = '<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Availability Timeline (24h)</strong>';
+  let timelineHtml = `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('label.availability_timeline')}</strong>`;
   timelineHtml += '<div style="display:flex;height:24px;border-radius:4px;overflow:hidden;border:1px solid var(--border);margin:12px 0">';
   for (let block = 0; block < 96; block++) {
     const startM = block * 15;
@@ -145,14 +145,15 @@ function updateHelperSuggestions(svcId) {
   if (!el) return;
 
   const clearExisting = document.getElementById('sh-clear')?.checked ?? true;
+  const customFreqVal = document.getElementById('sh-custom-freq')?.value || '';
   const freqs = [10, 15, 20, 30, 60];
-  let html = '<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">Suggested Schedules</strong>';
-  html += '<table class="schedule-table mt-8"><thead><tr><th>Freq.</th><th>Deps.</th><th>Best Start</th><th>Conflicts</th><th></th></tr></thead><tbody>';
+  let html = `<strong style="font-size:12px;text-transform:uppercase;color:var(--text-muted);letter-spacing:0.04em">${t('sch.suggested_schedules')}</strong>`;
+  html += `<table class="schedule-table mt-8"><thead><tr><th>${t('th.frequency')}</th><th>${t('th.deps')}</th><th>${t('th.best_start')}</th><th>${t('th.conflicts')}</th><th></th></tr></thead><tbody>`;
 
   // Handle cross-midnight: if end < start, treat end as next day
   const effectiveEnd = wEnd <= wStart ? wEnd + 1440 : wEnd;
 
-  for (const freq of freqs) {
+  function _evalFreq(freq) {
     let bestOffset = 0, bestConflicts = Infinity, bestCount = 0;
     for (let offset = 0; offset < freq; offset++) {
       let conflicts = 0, count = 0;
@@ -164,19 +165,42 @@ function updateHelperSuggestions(svcId) {
         bestConflicts = conflicts; bestOffset = offset; bestCount = count;
       }
     }
+    return { bestOffset, bestConflicts, bestCount };
+  }
 
+  for (const freq of freqs) {
+    const { bestOffset, bestConflicts, bestCount } = _evalFreq(freq);
     const firstDep = wStart + bestOffset;
     const statusColor = bestConflicts === 0 ? 'var(--success)' : (bestConflicts <= 2 ? 'var(--warn)' : 'var(--danger)');
-    const statusText = bestConflicts === 0 ? '✓ Clear' : `${bestConflicts} conflict${bestConflicts!==1?'s':''}`;
+    const statusText = bestConflicts === 0 ? `✓ ${t('sch.clear')}` : (bestConflicts === 1 ? t('sch.conflicts_n_one') : t('sch.conflicts_n_other', { n: bestConflicts }));
 
     html += `<tr>
-      <td class="mono" style="font-weight:500">Every ${freq}m</td>
+      <td class="mono" style="font-weight:500">${t('sch.every_n_min', { n: freq })}</td>
       <td class="mono">${bestCount}</td>
       <td class="mono" style="color:var(--warn)">${toTime(firstDep)}</td>
       <td style="color:${statusColor};font-weight:500">${statusText}</td>
       <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="applyFrequencySchedule('${svcId}',${firstDep},${effectiveEnd},${freq})">${t('btn.apply')}</button></td>
     </tr>`;
   }
+
+  // Custom frequency row — input inline in the table
+  const customFreq = parseInt(customFreqVal);
+  const hasCustom = customFreq > 0 && customFreq <= 1440 && !freqs.includes(customFreq);
+  html += `<tr style="border-top:1px solid var(--border)">
+    <td><input type="number" id="sh-custom-freq" min="1" max="1440" value="${esc(customFreqVal)}" placeholder="${t('sch.custom_freq_placeholder')}" onchange="refreshScheduleModal()" style="width:60px;font-size:12px;font-family:var(--font-mono)">m</td>`;
+  if (hasCustom) {
+    const { bestOffset, bestConflicts, bestCount } = _evalFreq(customFreq);
+    const firstDep = wStart + bestOffset;
+    const statusColor = bestConflicts === 0 ? 'var(--success)' : (bestConflicts <= 2 ? 'var(--warn)' : 'var(--danger)');
+    const statusText = bestConflicts === 0 ? `✓ ${t('sch.clear')}` : (bestConflicts === 1 ? t('sch.conflicts_n_one') : t('sch.conflicts_n_other', { n: bestConflicts }));
+    html += `<td class="mono">${bestCount}</td>
+      <td class="mono" style="color:var(--warn)">${toTime(firstDep)}</td>
+      <td style="color:${statusColor};font-weight:500">${statusText}</td>
+      <td class="actions-cell"><button class="btn btn-sm btn-primary" onclick="applyFrequencySchedule('${svcId}',${firstDep},${effectiveEnd},${customFreq})">${t('btn.apply')}</button></td>`;
+  } else {
+    html += `<td colspan="4" class="text-dim" style="font-size:11px"></td>`;
+  }
+  html += '</tr>';
 
   html += '</tbody></table>';
   el.innerHTML = html;
@@ -602,13 +626,13 @@ function openDepEditModal(depId) {
   const overrides = dep.platformOverrides || {};
   const manualDwells = (dep.manualOverrides || {}).dwell || {};
 
-  let stopsHtml = dep.times.map((t, i) => {
+  let stopsHtml = dep.times.map((tm, i) => {
     const stop = svc.stops[i];
-    const nname = nodeDisplayName(t.nodeId);
-    const node = getNode(t.nodeId);
+    const nname = nodeDisplayName(tm.nodeId);
+    const node = getNode(tm.nodeId);
     const isFirst = i === 0, isLast = i === dep.times.length - 1;
     const isStation = isPassengerStop(node);
-    const dwellMin = (t.arrive != null && t.depart != null) ? (t.depart - t.arrive) : 0;
+    const dwellMin = (tm.arrive != null && tm.depart != null) ? (tm.depart - tm.arrive) : 0;
     const dwellSec = Math.round(dwellMin * 60);
     const isManualDwell = (i in manualDwells);
 
@@ -622,8 +646,8 @@ function openDepEditModal(depId) {
     return `<div style="display:grid;grid-template-columns:24px 1fr 90px 90px 100px 80px 50px;align-items:center;gap:4px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px" data-dep-idx="${i}">
       <span class="mono text-muted" style="text-align:center">${i+1}</span>
       <span><strong>${esc(nname)}</strong>${stop?.passThrough?' <span class="text-muted" style="font-size:11px">(pass)</span>':''}</span>
-      <div class="mono text-dim" style="font-size:12px;text-align:right">${t.arrive!=null?toTime(t.arrive):'—'}</div>
-      <div class="mono" style="font-size:12px;text-align:right;color:var(--warn)">${t.depart!=null?toTime(t.depart):'—'}</div>
+      <div class="mono text-dim" style="font-size:12px;text-align:right">${tm.arrive!=null?toTime(tm.arrive):'—'}</div>
+      <div class="mono" style="font-size:12px;text-align:right;color:var(--warn)">${tm.depart!=null?toTime(tm.depart):'—'}</div>
       <div>${isStation && !stop?.passThrough ? `<select class="dep-plat-sel" data-idx="${i}" style="font-size:11px;padding:3px 6px;width:95px;${isManualPlat?'border-color:var(--warn)':''}" title="${isManualPlat?'Overridden for this departure — preserved on recalculate':'Using service default'}"><option value="">—</option>${platOpts}</select>` : ''}</div>
       <div>${(!isFirst && !isLast && (!stop?.passThrough || node?.type === 'waypoint')) ? `<input type="number" class="dep-dwell-input" value="${dwellSec}" min="0" style="width:70px;font-size:12px;padding:3px 6px;${isManualDwell?'border-color:var(--warn)':''}" data-idx="${i}" title="${isManualDwell?'Manually overridden — preserved on recalculate':'Default dwell time'}">` : `<span class="text-muted" style="font-size:11px">${isFirst?t('sch.stop_origin'):isLast?t('sch.stop_terminus'):t('sch.stop_pass')}</span>`}</div>
       <div>${(!isFirst && !isLast && isStation) ? `<label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:3px;cursor:pointer" title="Skip this stop (creates variant service)">
@@ -796,24 +820,24 @@ function saveDepEdit(depId) {
   }
 
   // Recalculate all times from the first departure using stock
-  let t = dep.times[0].depart;
+  let tm = dep.times[0].depart;
   for (let i = 0; i < dep.times.length; i++) {
     const stop = svc.stops[i];
     if (i === 0) {
       dep.times[i].arrive = null;
-      dep.times[i].depart = t;
+      dep.times[i].depart = tm;
     } else if (i === dep.times.length - 1) {
-      dep.times[i].arrive = t;
+      dep.times[i].arrive = tm;
       dep.times[i].depart = null;
     } else {
-      dep.times[i].arrive = t;
+      dep.times[i].arrive = tm;
       const dwellSec = (i in dwellMap) ? dwellMap[i] : (stop.passThrough ? (stop.dwell || 0) : (stop.dwell ?? defDwell));
       const dwellMin = dwellSec / 60;
-      dep.times[i].depart = t + dwellMin;
-      t += dwellMin;
+      dep.times[i].depart = tm + dwellMin;
+      tm += dwellMin;
     }
     if (i < dep.times.length - 1) {
-      t += travelTimeInContext(svc.stops, i, stock);
+      tm += travelTimeInContext(svc.stops, i, stock);
     }
   }
 

@@ -4,7 +4,7 @@
 
 BRIXYmanager is a multi-file HTML/JS application for managing fictional railway networks, particularly aimed at those set in the OpenGeofiction (OGF) world. It is a personal tool built by Wib for their OGF project. It covers network topology, service scheduling, journey planning, departure boards, and schematic map visualization.
 
-The app is split across `railmanager.html`, `styles.css`, 13 JS modules in `js/`, and language files in `lang/` (English + optional translations). Loaded with plain `<script>` tags — no build tools.
+The app is split across `railmanager.html`, `styles.css`, 14 JS modules in `js/`, and language files in `lang/` (English + optional translations). Loaded with plain `<script>` tags — no build tools.
 
 ## Tech stack
 
@@ -30,7 +30,7 @@ The app is split across `railmanager.html`, `styles.css`, 13 JS modules in `js/`
 1. Update the version string in the sidebar footer of `railmanager.html` (search for `<div style="padding:8px 16px;font-size:10px;` near the `</nav>` tag)
 2. Prepend a new entry to `VERSION HISTORY.md` (newest entries at top)
 
-**Current version:** 0.19.4.0
+**Current version:** 0.19.5.1
 
 ## Validation workflow
 
@@ -83,6 +83,7 @@ The app is split across these files, loaded by `railmanager.html` via plain `<sc
 | `js/scheduling.js` | Schedule generation (frequency/explicit), recalculation, conflict detection, departure editing, schedule view |
 | `js/departures.js` | Departure/arrival board |
 | `js/journey.js` | Journey planner (CSA algorithm) + JP map |
+| `js/node_ops.js` | Node split & merge (sticky segment groups, per-side platform editing, optional ISI creation, merge chooser/preview, beckmap + station group migration) |
 | `js/import.js` | CSV parsing, OGF relation import engine, fuzzy node matching, polyline similarity/overlap detection, divergence point detection, overlap auto-resolution |
 | `js/views.js` | Settings panel, issue detection (~35 issue types), geomap (Leaflet + OGF tiles), dashboard, Import/Export tab + CSV/relation import wizards |
 | `js/beckmap.js` | Railmap SVG schematic |
