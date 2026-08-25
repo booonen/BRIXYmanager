@@ -27,9 +27,12 @@
 // both maps coexist behind the Railmap style toggle.
 
 const BMC_CELL = 24;
-const BMC_LINEW = 5;
-const BMC_GAP = 7;          // strand-to-strand spacing (perpendicular)
-const BMC_CORNER = 11;      // corner rounding radius
+const BMC_LINEW = 4.5;      // original lineSW at zoom 1
+const BMC_GAP = 4.5;        // spacing == stroke width -> snug corridors, zero white
+const BMC_CORNER = 9;       // corner rounding radius
+const BMC_MARK_SW = 3.5;    // station mark stroke (original sw)
+const BMC_BLOB_R = 6;       // single blob radius (original r)
+const BMC_FONT = 7.5;       // label font size (original fontSize)
 
 const _bmcState = {
   active: false,
@@ -486,16 +489,14 @@ function bmcRender() {
   const svg = document.getElementById('bmc-svg');
   if (!svg) return;
   const layout = bmcComputeLayout();
-  const d = bmcData();
   const groupColor = (gid) => getGroup(gid)?.color || '#888';
 
   let out = '';
-  // world-space group with view transform
   out += `<g transform="translate(${_bmcState.viewX},${_bmcState.viewY}) scale(${_bmcState.zoom})">`;
 
   // grid dots (light)
   if (_bmcState.zoom > 0.45) {
-    const wrap = document.getElementById('bmc-canvas-wrap');
+    const wrap = document.getElementById('schem-canvas-wrap');
     const W = wrap ? wrap.clientWidth : 1200, H = wrap ? wrap.clientHeight : 800;
     const x0 = Math.floor((-_bmcState.viewX / _bmcState.zoom) / BMC_CELL) - 1;
     const y0 = Math.floor((-_bmcState.viewY / _bmcState.zoom) / BMC_CELL) - 1;
@@ -504,7 +505,23 @@ function bmcRender() {
     if ((x1 - x0) * (y1 - y0) < 12000) {
       for (let gx = x0; gx <= x1; gx++)
         for (let gy = y0; gy <= y1; gy++)
-          out += `<circle cx="${gx * BMC_CELL}" cy="${gy * BMC_CELL}" r="0.8" fill="#dfe4ea"/>`;
+          out += `<circle cx="${gx * BMC_CELL}" cy="${gy * BMC_CELL}" r="0.8" fill="#e4e8ee"/>`;
+    }
+  }
+
+  // grey infrastructure edges (no-line segments between placed stations),
+  // matching v1's placeholder rendering; honours the v3 infra setting
+  if (data.settings?.beckShowInfra) {
+    const d = bmcData();
+    for (const seg of data.segments) {
+      if (isInterchange(seg)) continue;
+      const sa = d.stations[seg.nodeA], sb = d.stations[seg.nodeB];
+      if (!sa || !sb) continue;
+      const carried = layout.edges.some(e => e.path.includes(seg.id));
+      if (carried) continue;
+      const cells = bmcRouteLeg(sa.gx, sa.gy, sb.gx, sb.gy);
+      const pts = _bmcCompressPts(cells.map(c => ({ x: c.gx * BMC_CELL, y: c.gy * BMC_CELL })));
+      out += `<path d="${_bmcRoundedPath(pts, BMC_CORNER)}" fill="none" stroke="#d4d9df" stroke-width="${BMC_LINEW * 0.8}" stroke-linecap="round"/>`;
     }
   }
 
@@ -520,7 +537,6 @@ function bmcRender() {
     const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
     for (const conn of info.connectors) {
       const { from, to, gid } = conn;
-      // direction of each strand's end segment, pointing INTO the node zone
       const d1 = { x: from.P.x - from.Q.x, y: from.P.y - from.Q.y };
       const d2 = { x: to.P.x - to.Q.x, y: to.P.y - to.Q.y };
       const X = _bmcLineIntersect(from.P, d1, to.P, d2);
@@ -530,7 +546,6 @@ function bmcRender() {
           (X.x - to.P.x) * d2.x + (X.y - to.P.y) * d2.y > -0.01) {
         path = _bmcRoundedPath([from.P, X, to.P], BMC_CORNER);
       } else {
-        // gentle curve through the node zone
         const mx = (from.P.x + to.P.x) / 2, my = (from.P.y + to.P.y) / 2;
         const cx2 = mx + (c.x - mx) * 0.3, cy2 = my + (c.y - my) * 0.3;
         path = `M${from.P.x.toFixed(1)},${from.P.y.toFixed(1)} Q${cx2.toFixed(1)},${cy2.toFixed(1)} ${to.P.x.toFixed(1)},${to.P.y.toFixed(1)}`;
@@ -539,13 +554,33 @@ function bmcRender() {
     }
   }
 
-  // marks + labels
-  const labelBoxes = [];
+  // marks: blob groups (capsules) first, then ticks/termini, then labels
+  const blobGroups = _bmcBlobGroups(layout);
+  const inBlobGroup = new Set();
+  for (const bg of blobGroups) for (const m of bg.members) inBlobGroup.add(m.id);
+
+  for (const bg of blobGroups) out += _bmcDrawCapsule(bg);
+
   for (const info of layout.nodeInfos.values()) {
-    out += _bmcDrawMark(info, layout, labelBoxes);
+    if (!info.placed || inBlobGroup.has(info.id)) continue;
+    out += _bmcDrawMark(info, layout);
   }
 
-  // debug overlay
+  // labels (blob-group members labelled once per shared display name)
+  const labelledNames = new Set();
+  for (const info of layout.nodeInfos.values()) {
+    if (!info.placed) continue;
+    const kind = inBlobGroup.has(info.id) ? 'blob' : _bmcMarkKind(info, layout);
+    if (kind === 'none') continue;
+    if (inBlobGroup.has(info.id)) {
+      const dn = nodeDisplayName(info.id);
+      if (labelledNames.has(dn)) continue;
+      const bg = blobGroups.find(b => b.members.some(m => m.id === info.id));
+      if (bg && bg.members.length > 1 && bg.sharedName) labelledNames.add(dn);
+    }
+    out += _bmcDrawLabel(info, kind, layout);
+  }
+
   if (_bmcState.debug) out += _bmcDebugOverlay(layout);
 
   out += '</g>';
@@ -554,7 +589,7 @@ function bmcRender() {
 }
 
 function _bmcMarkKind(info, layout) {
-  if (!info.placed) return 'none'; // auto-positioned fork points are invisible
+  if (!info.placed) return 'none';
   const deg = info.edges.length;
   const union = new Set();
   for (const e of info.edges) for (const g of e.lines) union.add(g);
@@ -563,139 +598,310 @@ function _bmcMarkKind(info, layout) {
   return 'blob';
 }
 
-function _bmcDrawMark(info, layout, labelBoxes) {
-  const kind = _bmcMarkKind(info, layout);
-  if (kind === 'none') return '';
-  const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
-  let out = '';
-  const union = new Set();
-  for (const e of info.edges) for (const g of e.lines) union.add(g);
-  const kmax = Math.max(...info.edges.map(e => e.orderedLines.length));
-  const halfSpan = ((kmax - 1) / 2) * BMC_GAP + BMC_LINEW / 2;
-
-  if (kind === 'blob') {
-    const r = Math.min(halfSpan + 5.5, BMC_CELL * 0.95);
-    out += `<circle cx="${c.x}" cy="${c.y}" r="${r}" fill="#fff" stroke="#0f1a3c" stroke-width="2.6" data-bmc-node="${info.id}" style="cursor:grab"/>`;
-  } else if (kind === 'terminus') {
-    // T-bar perpendicular to the single edge's end direction
-    const e = info.edges[0];
-    const gid = e.orderedLines[0];
-    const end = info.ends.get(e.key + '|' + gid);
-    if (end) {
-      const dx = end.P.x - end.Q.x, dy = end.P.y - end.Q.y;
-      const len = Math.sqrt(dx * dx + dy * dy) || 1;
-      const nx = -dy / len, ny = dx / len;
-      const half = halfSpan + 5;
-      out += `<line x1="${(c.x - nx * half).toFixed(1)}" y1="${(c.y - ny * half).toFixed(1)}" x2="${(c.x + nx * half).toFixed(1)}" y2="${(c.y + ny * half).toFixed(1)}" stroke="${getGroup(gid)?.color || '#888'}" stroke-width="${BMC_LINEW + 1}" stroke-linecap="butt" data-bmc-node="${info.id}" style="cursor:grab"/>`;
-      // invisible grab target
-      out += `<circle cx="${c.x}" cy="${c.y}" r="10" fill="transparent" data-bmc-node="${info.id}" style="cursor:grab"/>`;
-    }
-  } else if (kind === 'tick') {
-    // ticks only for lines that actually stop here, drawn from the
-    // line's strand position outward (postmortem decision #4)
-    const e = info.edges[0];
-    const k = e.orderedLines.length;
-    let drewAny = false;
-    e.orderedLines.forEach((gid, i) => {
-      const stopsHere = layout.stopMap.get(gid)?.has(info.id);
-      if (!stopsHere) return;
-      const end = info.ends.get(e.key + '|' + gid);
-      if (!end) return;
-      const dx = end.P.x - end.Q.x, dy = end.P.y - end.Q.y;
-      const len = Math.sqrt(dx * dx + dy * dy) || 1;
-      let nx = -dy / len, ny = dx / len; // perpendicular
-      // outward = away from corridor centre; centre line goes "left" (negative side)
-      const off = (i - (k - 1) / 2);
-      const sgn = off > 0 ? 1 : (off < 0 ? -1 : -1);
-      // determine which perpendicular side is outward relative to centreline
-      const toCentre = { x: c.x - end.P.x, y: c.y - end.P.y };
-      if ((nx * toCentre.x + ny * toCentre.y) * sgn > 0 === (off !== 0)) { /* keep */ }
-      if (off !== 0) {
-        // outward = direction from centreline to this strand
-        const ox = end.P.x - c.x, oy = end.P.y - c.y;
-        const olen = Math.sqrt(ox * ox + oy * oy) || 1;
-        nx = ox / olen; ny = oy / olen;
-      } else {
-        nx = -Math.abs(nx) || -0.0001; ny = ny; // centre strand: pick left-ish consistently
-      }
-      const t1 = { x: end.P.x + nx * (BMC_LINEW / 2), y: end.P.y + ny * (BMC_LINEW / 2) };
-      const t2 = { x: end.P.x + nx * (BMC_LINEW / 2 + BMC_GAP * 0.9), y: end.P.y + ny * (BMC_LINEW / 2 + BMC_GAP * 0.9) };
-      out += `<line x1="${t1.x.toFixed(1)}" y1="${t1.y.toFixed(1)}" x2="${t2.x.toFixed(1)}" y2="${t2.y.toFixed(1)}" stroke="${getGroup(gid)?.color || '#888'}" stroke-width="${BMC_LINEW - 1}" data-bmc-node="${info.id}"/>`;
-      drewAny = true;
-    });
-    // grab target regardless
-    out += `<circle cx="${c.x}" cy="${c.y}" r="10" fill="transparent" data-bmc-node="${info.id}" style="cursor:grab"/>`;
-    if (!drewAny) {
-      // no line stops here — tiny hollow dot so the station stays findable
-      out += `<circle cx="${c.x}" cy="${c.y}" r="2.4" fill="#fff" stroke="#9aa4b0" stroke-width="1.2" data-bmc-node="${info.id}" style="cursor:grab"/>`;
-    }
+// Unit directions of each edge's route pointing AWAY from the node,
+// taken from the centreline route's first sub-segment (original logic).
+function _bmcNodeEdgeDirs(info) {
+  const dirs = [];
+  for (const e of info.edges) {
+    const atA = e.a === info.id;
+    const pts = e.pts;
+    if (!pts || pts.length < 2) continue;
+    const P = atA ? pts[0] : pts[pts.length - 1];
+    const Q = atA ? pts[1] : pts[pts.length - 2];
+    const dx = Q.x - P.x, dy = Q.y - P.y;
+    const l = Math.sqrt(dx * dx + dy * dy) || 1;
+    dirs.push({ x: dx / l, y: dy / l, edge: e });
   }
-
-  // label
-  if (info.placed && info.node) {
-    out += _bmcDrawLabel(info, kind, labelBoxes);
-  }
-  return out;
+  return dirs;
 }
 
-const _BMC_LABEL_DIRS = [
-  { dx: 1, dy: 0, anchor: 'start', vy: 0.35 },   // E
-  { dx: 1, dy: 1, anchor: 'start', vy: 0.9 },    // SE
-  { dx: 0, dy: 1, anchor: 'middle', vy: 1.1 },   // S
-  { dx: -1, dy: 1, anchor: 'end', vy: 0.9 },     // SW
-  { dx: -1, dy: 0, anchor: 'end', vy: 0.35 },    // W
-  { dx: -1, dy: -1, anchor: 'end', vy: -0.3 },   // NW
-  { dx: 0, dy: -1, anchor: 'middle', vy: -0.6 }, // N
-  { dx: 1, dy: -1, anchor: 'start', vy: -0.3 },  // NE
-];
+// Perpendicular + 135°-corner tick offset, per the original schemDrawNode
+function _bmcPerpFor(dirs) {
+  let perp = { x: 0, y: -1 };
+  let tickOffset = { x: 0, y: 0 };
+  if (dirs.length === 1) {
+    perp = { x: -dirs[0].y, y: dirs[0].x };
+  } else if (dirs.length >= 2) {
+    const d0 = dirs[0], d1 = dirs[1];
+    const dot = d0.x * d1.x + d0.y * d1.y;
+    if (dot < -0.9) {
+      perp = { x: -d0.y, y: d0.x };
+    } else if (dot < -0.3) {
+      // 135° bend: align tick with the orthogonal edge, offset toward it
+      const isOrtho0 = Math.abs(d0.x) < 0.01 || Math.abs(d0.y) < 0.01;
+      const o = isOrtho0 ? d0 : d1;
+      perp = { x: -o.y, y: o.x };
+      tickOffset = { x: o.x * BMC_CELL * 0.25, y: o.y * BMC_CELL * 0.25 };
+    } else {
+      const bx = d0.x + d1.x, by = d0.y + d1.y;
+      const bl = Math.sqrt(bx * bx + by * by);
+      perp = bl > 0.01 ? { x: -by / bl, y: bx / bl } : { x: -d0.y, y: d0.x };
+    }
+  }
+  return { perp, tickOffset };
+}
 
-function _bmcDrawLabel(info, kind, labelBoxes) {
-  const name = nodeDisplayName(info.id);
-  if (!name) return '';
-  const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
-  const d = bmcData();
-  const override = d.labelDir[info.id];
-  const layout = _bmcState.layout;
-
-  // score candidate directions by how many route cells sit where the
-  // label would go (any edge's route, not just this station's)
+// Congestion score for a direction from a node: route cells in the way
+function _bmcDirCongestion(layout, info, dx, dy, fromDist) {
   const cellSet = layout._cellSet || (layout._cellSet = (() => {
     const s = new Set();
     for (const e of layout.edges) for (const cc of e.cells) s.add(cc.gx + ',' + cc.gy);
     return s;
   })());
-  const kmax2 = Math.max(...info.edges.map(e => e.orderedLines.length));
-  const spanCells = Math.ceil(((kmax2 - 1) / 2 * BMC_GAP + 14) / BMC_CELL);
-  const scoreDir = (i) => {
-    const di2 = _BMC_LABEL_DIRS[i];
-    let s = 0;
-    for (let step = 1; step <= 3; step++) {
-      const gx = info.pos.gx + di2.dx * (spanCells + step - 1);
-      const gy = info.pos.gy + di2.dy * (spanCells + step - 1);
-      for (let ox = -1; ox <= 1; ox++)
-        if (cellSet.has((gx + (di2.dx === 0 ? ox : 0)) + ',' + (gy + (di2.dy === 0 ? ox : 0)))) s += (4 - step);
-      if (cellSet.has(gx + ',' + gy)) s += (4 - step);
-    }
-    return s;
-  };
-  const prefs = [0, 4, 2, 6, 1, 7, 3, 5];
-  const dirOrder = override != null && override !== 'auto' ? [override] :
-    prefs.slice().sort((x, y) => scoreDir(x) - scoreDir(y) || prefs.indexOf(x) - prefs.indexOf(y));
-  const di = _BMC_LABEL_DIRS[dirOrder[0]];
-  const halfSpanPx = (kmax2 - 1) / 2 * BMC_GAP;
-  const gap = (kind === 'blob' ? BMC_CELL * 0.55 : BMC_CELL * 0.35) + halfSpanPx + 5;
-  const lx = c.x + di.dx * gap;
-  const ly = c.y + di.dy * gap + di.vy * 8;
-  const weight = kind === 'blob' ? '700' : '400';
-  const esc2 = (s) => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
-  // naive two-line wrap for long names
-  const words = name.split(' ');
-  if (name.length > 14 && words.length > 1) {
-    let l1 = '', l2 = '';
-    for (const w of words) { if ((l1 + ' ' + w).trim().length <= Math.ceil(name.length / 2)) l1 = (l1 + ' ' + w).trim(); else l2 = (l2 + ' ' + w).trim(); }
-    return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${di.anchor}" font-family="'Hammersmith One',sans-serif" font-size="11" font-weight="${weight}" fill="#0f1a3c" pointer-events="none"><tspan x="${lx.toFixed(1)}" dy="0">${esc2(l1)}</tspan><tspan x="${lx.toFixed(1)}" dy="11">${esc2(l2)}</tspan></text>`;
+  let score = 0;
+  for (let step = 1; step <= 3; step++) {
+    const gx = Math.round(info.pos.gx + dx * (fromDist + step - 1));
+    const gy = Math.round(info.pos.gy + dy * (fromDist + step - 1));
+    if (cellSet.has(gx + ',' + gy)) score += (4 - step);
   }
-  return `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${di.anchor}" font-family="'Hammersmith One',sans-serif" font-size="11" font-weight="${weight}" fill="#0f1a3c" pointer-events="none">${esc2(name)}</text>`;
+  return score;
+}
+
+function _bmcDrawMark(info, layout) {
+  const kind = _bmcMarkKind(info, layout);
+  if (kind === 'none' || kind === 'blob') return kind === 'blob' ? _bmcDrawCapsule({ members: [info], sharedName: false }) : '';
+  const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
+  const dirs = _bmcNodeEdgeDirs(info);
+  const pf = _bmcPerpFor(dirs);
+  let out = '';
+  const tickSW = Math.max(2, BMC_MARK_SW * 0.85);
+  const tickH = BMC_LINEW * 1.2;
+
+  // label side: perp sign with less congestion (stored for the label pass)
+  let sgn = 1;
+  const cA = _bmcDirCongestion(layout, info, pf.perp.x, pf.perp.y, 1);
+  const cB = _bmcDirCongestion(layout, info, -pf.perp.x, -pf.perp.y, 1);
+  if (cB < cA) sgn = -1;
+  else if (cA === cB && (pf.perp.y * sgn > 0)) sgn = -1; // prefer upward on ties
+  info._labelDir = { x: pf.perp.x * sgn, y: pf.perp.y * sgn };
+  info._tickOffset = pf.tickOffset;
+
+  if (kind === 'terminus') {
+    const e = info.edges[0];
+    const gid = e.orderedLines[0];
+    const color = getGroup(gid)?.color || '#000';
+    const stem = dirs.length ? dirs[0] : { x: 0, y: 1 };
+    const bar = { x: -stem.y, y: stem.x };
+    const barLen = BMC_BLOB_R * 1.2;
+    const stemPx = BMC_BLOB_R * 1.0;
+    // white mask erases the strand overshoot behind the bar (original)
+    out += `<line x1="${c.x}" y1="${c.y}" x2="${(c.x - stem.x * BMC_LINEW * 0.8).toFixed(1)}" y2="${(c.y - stem.y * BMC_LINEW * 0.8).toFixed(1)}" stroke="#fff" stroke-width="${BMC_LINEW + 2}" stroke-linecap="butt"/>`;
+    out += `<g data-bmc-node="${info.id}" style="cursor:grab">`;
+    out += `<rect x="${c.x - BMC_BLOB_R * 2}" y="${c.y - BMC_BLOB_R * 2}" width="${BMC_BLOB_R * 4}" height="${BMC_BLOB_R * 4}" fill="transparent"/>`;
+    out += `<line x1="${(c.x - bar.x * barLen).toFixed(1)}" y1="${(c.y - bar.y * barLen).toFixed(1)}" x2="${(c.x + bar.x * barLen).toFixed(1)}" y2="${(c.y + bar.y * barLen).toFixed(1)}" stroke="${color}" stroke-width="${tickSW}" stroke-linecap="butt"/>`;
+    out += `<line x1="${c.x}" y1="${c.y}" x2="${(c.x + stem.x * stemPx).toFixed(1)}" y2="${(c.y + stem.y * stemPx).toFixed(1)}" stroke="${color}" stroke-width="${tickSW}" stroke-linecap="butt"/>`;
+    out += `</g>`;
+    info._labelDir = { x: bar.x * sgn, y: bar.y * sgn };
+  } else if (kind === 'tick') {
+    // per stopping line: tick starts at its strand position, extends toward
+    // the label side; farthest-from-label first so nearer ticks sit on top
+    const e = info.edges[0];
+    const tx = c.x + pf.tickOffset.x, ty = c.y + pf.tickOffset.y;
+    const ld = info._labelDir;
+    const entries = [];
+    for (const gid of e.orderedLines) {
+      const stopsHere = layout.stopMap.get(gid)?.has(info.id);
+      if (!stopsHere) continue;
+      const end = info.ends.get(e.key + '|' + gid);
+      if (!end) continue;
+      const off = { x: end.P.x - c.x, y: end.P.y - c.y };
+      entries.push({ gid, off, along: off.x * ld.x + off.y * ld.y });
+    }
+    entries.sort((a, b) => a.along - b.along);
+    out += `<g data-bmc-node="${info.id}" style="cursor:grab">`;
+    out += `<rect x="${tx - tickH - BMC_LINEW * 2}" y="${ty - tickH - BMC_LINEW * 2}" width="${(tickH + BMC_LINEW * 2) * 2}" height="${(tickH + BMC_LINEW * 2) * 2}" fill="transparent"/>`;
+    for (const en of entries) {
+      const x1 = tx + en.off.x, y1 = ty + en.off.y;
+      out += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${(x1 + ld.x * tickH).toFixed(1)}" y2="${(y1 + ld.y * tickH).toFixed(1)}" stroke="${getGroup(en.gid)?.color || '#000'}" stroke-width="${tickSW}" stroke-linecap="butt"/>`;
+    }
+    if (!entries.length) {
+      out += `<circle cx="${tx}" cy="${ty}" r="2" fill="#fff" stroke="#9aa4b0" stroke-width="1"/>`;
+    }
+    out += `</g>`;
+  }
+  return out;
+}
+
+// ---- Euston engine: capsule blobs over strand extents, mergeable ----
+
+// Group blob stations that belong together visually: connected by ISI/OSI
+// or sharing a display name, both placed, within reach of each other.
+function _bmcBlobGroups(layout) {
+  const blobs = [...layout.nodeInfos.values()].filter(i => i.placed && _bmcMarkKind(i, layout) === 'blob');
+  const byId = new Map(blobs.map(b => [b.id, b]));
+  const parent = new Map(blobs.map(b => [b.id, b.id]));
+  const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
+  const uni = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb); };
+  const near = (a, b) => Math.abs(a.pos.gx - b.pos.gx) <= 4 && Math.abs(a.pos.gy - b.pos.gy) <= 4;
+
+  // ISI/OSI links
+  for (const seg of data.segments) {
+    if (!isInterchange(seg) || isRoad(seg)) continue;
+    const a = byId.get(seg.nodeA), b = byId.get(seg.nodeB);
+    if (a && b && near(a, b)) uni(a.id, b.id);
+  }
+  // same display name
+  const byName = new Map();
+  for (const b of blobs) {
+    const dn = nodeDisplayName(b.id);
+    if (!byName.has(dn)) byName.set(dn, []);
+    byName.get(dn).push(b);
+  }
+  for (const arr of byName.values()) {
+    for (let i = 1; i < arr.length; i++) if (near(arr[0], arr[i])) uni(arr[0].id, arr[i].id);
+  }
+
+  const groups = new Map();
+  for (const b of blobs) {
+    const r = find(b.id);
+    if (!groups.has(r)) groups.set(r, []);
+    groups.get(r).push(b);
+  }
+  return [...groups.values()].map(members => ({
+    members,
+    sharedName: members.length > 1 && members.every(m => nodeDisplayName(m.id) === nodeDisplayName(members[0].id)),
+  }));
+}
+
+// Fit a stadium (rounded-rect capsule) over all strand endpoints + centres
+// of the group's members. Single-strand nodes degrade to the classic circle.
+function _bmcDrawCapsule(bg) {
+  const pts = [];
+  for (const m of bg.members) {
+    pts.push({ x: m.pos.gx * BMC_CELL, y: m.pos.gy * BMC_CELL });
+    for (const end of m.ends.values()) pts.push({ x: end.P.x, y: end.P.y });
+  }
+  if (!pts.length) return '';
+  const hit = bg.members.map(m => `data-bmc-node="${m.id}"`);
+
+  // dominant axis: the farthest pair, snapped to 45°
+  let best = [pts[0], pts[0]], bd = 0;
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++) {
+      const dd = _bmcDist(pts[i], pts[j]);
+      if (dd > bd) { bd = dd; best = [pts[i], pts[j]]; }
+    }
+  const pad = BMC_LINEW * 0.9 + 1.5;
+  if (bd <= BMC_GAP * 2.3) {
+    // compact (up to a ~3-strand cross-section): classic circle
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    const r = Math.max(BMC_BLOB_R, bd / 2 + pad * 0.7);
+    for (const m of bg.members) m._blobShape = { type: 'circle', cx, cy, r };
+    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" stroke="#000" stroke-width="${BMC_MARK_SW}" ${hit[0]} style="cursor:grab"/>`;
+  }
+  let ang = Math.atan2(best[1].y - best[0].y, best[1].x - best[0].x);
+  ang = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
+  const u = { x: Math.cos(ang), y: Math.sin(ang) };
+  const v = { x: -u.y, y: u.x };
+  const c0 = { x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length };
+  let sMin = Infinity, sMax = -Infinity, tMin = Infinity, tMax = -Infinity;
+  for (const p of pts) {
+    const s = (p.x - c0.x) * u.x + (p.y - c0.y) * u.y;
+    const t = (p.x - c0.x) * v.x + (p.y - c0.y) * v.y;
+    if (s < sMin) sMin = s; if (s > sMax) sMax = s;
+    if (t < tMin) tMin = t; if (t > tMax) tMax = t;
+  }
+  const len = (sMax - sMin) + pad * 2;
+  const wid = Math.max((tMax - tMin) + pad * 2, BMC_BLOB_R * 2);
+  const cx = c0.x + u.x * (sMax + sMin) / 2 + v.x * (tMax + tMin) / 2;
+  const cy = c0.y + u.y * (sMax + sMin) / 2 + v.y * (tMax + tMin) / 2;
+  const deg = (ang * 180 / Math.PI).toFixed(1);
+  for (const m of bg.members) m._blobShape = { type: 'pill', cx, cy, u, len, wid };
+  return `<g transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${deg})">
+    <rect x="${(-len / 2).toFixed(1)}" y="${(-wid / 2).toFixed(1)}" width="${len.toFixed(1)}" height="${wid.toFixed(1)}" rx="${(wid / 2).toFixed(1)}" fill="#fff" stroke="#000" stroke-width="${BMC_MARK_SW}" ${hit[0]} style="cursor:grab"/>
+  </g>`;
+}
+
+const _BMC_LABEL_DIRS = [
+  { dx: 1, dy: 0 }, { dx: 1, dy: 1 }, { dx: 0, dy: 1 }, { dx: -1, dy: 1 },
+  { dx: -1, dy: 0 }, { dx: -1, dy: -1 }, { dx: 0, dy: -1 }, { dx: 1, dy: -1 },
+];
+
+function _bmcDrawLabel(info, kind, layout) {
+  const name = nodeDisplayName(info.id);
+  if (!name) return '';
+  const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
+  const d = bmcData();
+  const esc2 = (s) => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+  // label direction: mark pass stored one for ticks/termini; blobs pick by congestion
+  let ld = info._labelDir;
+  const override = d.labelDir[info.id];
+  if (override != null && override !== 'auto') {
+    const o = _BMC_LABEL_DIRS[override];
+    const l = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
+    ld = { x: o.dx / l, y: o.dy / l };
+  } else if (!ld) {
+    let bi = 0, bs = Infinity;
+    const prefs = [0, 4, 6, 2, 7, 5, 1, 3];
+    for (const i of prefs) {
+      const o = _BMC_LABEL_DIRS[i];
+      const l = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
+      const s = _bmcDirCongestion(layout, info, o.dx / l, o.dy / l, 1);
+      if (s < bs) { bs = s; bi = i; if (s === 0) break; }
+    }
+    const o = _BMC_LABEL_DIRS[bi];
+    const l = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
+    ld = { x: o.dx / l, y: o.dy / l };
+  }
+
+  // word wrap per the original: 1 word = 1 line, 2 words = 2 lines,
+  // 3+ words = balanced two-line split
+  const words = name.split(/\s+/);
+  let linesArr;
+  if (words.length <= 1) linesArr = [name];
+  else if (words.length === 2) linesArr = words;
+  else {
+    let bestSplit = [name], bestDiff = Infinity;
+    for (let i = 1; i < words.length; i++) {
+      const top = words.slice(0, i).join(' ');
+      const bot = words.slice(i).join(' ');
+      const diff = Math.abs(top.length - bot.length);
+      if (diff < bestDiff) { bestDiff = diff; bestSplit = [top, bot]; }
+    }
+    linesArr = bestSplit;
+  }
+
+  // distance: mark size + font margin (+ corridor spread for line marks)
+  const kmax = Math.max(...info.edges.map(e => e.orderedLines.length));
+  const spread = ((kmax - 1) / 2) * BMC_GAP;
+  let baseX = c.x + (info._tickOffset ? info._tickOffset.x : 0);
+  let baseY = c.y + (info._tickOffset ? info._tickOffset.y : 0);
+  let labelDist;
+  if (kind === 'blob' && info._blobShape) {
+    // support distance of the blob shape along the label direction
+    const sh = info._blobShape;
+    baseX = sh.cx; baseY = sh.cy;
+    if (sh.type === 'circle') labelDist = sh.r + BMC_FONT * 0.5 + 1;
+    else {
+      const a = (sh.len - sh.wid) / 2;
+      const along = Math.abs(ld.x * sh.u.x + ld.y * sh.u.y);
+      labelDist = a * along + sh.wid / 2 + BMC_FONT * 0.5 + 1;
+    }
+  } else if (kind === 'blob') {
+    labelDist = BMC_BLOB_R + 2 + BMC_FONT * 0.5 + spread;
+  } else if (kind === 'terminus') {
+    labelDist = BMC_BLOB_R * 1.2 + BMC_FONT * 0.5 + spread;
+  } else {
+    labelDist = BMC_LINEW * 1.2 + BMC_FONT * 0.5 + spread;
+  }
+  const lx = baseX + ld.x * labelDist;
+  let lyC = baseY + ld.y * labelDist;
+  const lineH = BMC_FONT * 1.15;
+  let anchor = 'start';
+  if (ld.x < -0.3) anchor = 'end';
+  else if (Math.abs(ld.x) <= 0.3) anchor = 'middle';
+  if (ld.y < -0.3) lyC -= (linesArr.length - 1) * lineH * 0.5;
+  else if (ld.y > 0.3) lyC += (linesArr.length - 1) * lineH * 0.5;
+  const yStart = lyC - ((linesArr.length - 1) * lineH) / 2 + BMC_FONT * 0.35;
+
+  let out = `<text data-bmc-node="${info.id}" font-family="'Hammersmith One',sans-serif" font-size="${BMC_FONT}" fill="#003082" font-weight="700" text-anchor="${anchor}" style="cursor:grab">`;
+  for (let i = 0; i < linesArr.length; i++) {
+    out += `<tspan x="${lx.toFixed(1)}" y="${(yStart + i * lineH).toFixed(1)}">${esc2(linesArr[i])}</tspan>`;
+  }
+  out += `</text>`;
+  return out;
 }
 
 function _bmcDebugOverlay(layout) {
@@ -703,14 +909,14 @@ function _bmcDebugOverlay(layout) {
   for (const e of layout.edges) {
     const mid = e.pts[Math.floor(e.pts.length / 2)];
     const names = e.orderedLines.map(g => getGroup(g)?.name || '?').join(' | ');
-    out += `<text x="${mid.x}" y="${mid.y - 10}" font-size="8" fill="#c0392f" text-anchor="middle" pointer-events="none">${names}</text>`;
+    out += `<text x="${mid.x}" y="${mid.y - 8}" font-size="6" fill="#c0392f" text-anchor="middle" pointer-events="none">${names}</text>`;
   }
   for (const info of layout.nodeInfos.values()) {
     const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
-    out += `<text x="${c.x + 4}" y="${c.y - 14}" font-size="7" fill="#2e7dd1" pointer-events="none">${info.pos.gx},${info.pos.gy}${info.pos.auto ? ' (auto)' : ''} d${info.edges.length}</text>`;
+    out += `<text x="${c.x + 4}" y="${c.y - 10}" font-size="5" fill="#2e7dd1" pointer-events="none">${info.pos.gx},${info.pos.gy}${info.pos.auto ? ' (auto)' : ''} d${info.edges.length}</text>`;
     for (const conn of info.connectors) {
-      out += `<circle cx="${conn.from.P.x}" cy="${conn.from.P.y}" r="2" fill="none" stroke="#c0392f" stroke-width="0.8"/>`;
-      out += `<circle cx="${conn.to.P.x}" cy="${conn.to.P.y}" r="2" fill="none" stroke="#c0392f" stroke-width="0.8"/>`;
+      out += `<circle cx="${conn.from.P.x}" cy="${conn.from.P.y}" r="1.5" fill="none" stroke="#c0392f" stroke-width="0.6"/>`;
+      out += `<circle cx="${conn.to.P.x}" cy="${conn.to.P.y}" r="1.5" fill="none" stroke="#c0392f" stroke-width="0.6"/>`;
     }
   }
   return out;
@@ -874,7 +1080,7 @@ function bmcFitAll() {
   const pts = [];
   for (const n of layout.nodes.values()) if (n.pos) pts.push(n.pos);
   if (!pts.length) return;
-  const wrap = document.getElementById('bmc-canvas-wrap');
+  const wrap = document.getElementById('schem-canvas-wrap');
   const W = wrap ? wrap.clientWidth : 1200, H = wrap ? wrap.clientHeight : 800;
   const xs = pts.map(p => p.gx * BMC_CELL), ys = pts.map(p => p.gy * BMC_CELL);
   const minX = Math.min(...xs) - 80, maxX = Math.max(...xs) + 80;
@@ -887,7 +1093,7 @@ function bmcFitAll() {
 }
 
 function bmcZoom(f) {
-  const wrap = document.getElementById('bmc-canvas-wrap');
+  const wrap = document.getElementById('schem-canvas-wrap');
   const W = wrap ? wrap.clientWidth : 1200, H = wrap ? wrap.clientHeight : 800;
   const nz = Math.max(0.15, Math.min(4, _bmcState.zoom * f));
   _bmcState.viewX = W / 2 - (W / 2 - _bmcState.viewX) * (nz / _bmcState.zoom);
