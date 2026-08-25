@@ -1,5 +1,20 @@
 # BRIXYmanager — Version History
 
+## v0.19.8.0 — Phase 19 Session 8: Network reach
+The Journey Planner tab gets a second mode: **Network reach** — "everything I can get to from here within N minutes", riding the existing CSA machinery.
+
+**UI.** A Journey / Network reach tab switcher above the JP form. In reach mode the To picker and swap button hide and a "Within (min)" input (default 60, clamped 5–720) appears; From, Date, and Depart-after are shared with journey mode. Search dispatches by mode via `jpGo()`.
+
+**Algorithm.** `jpReachAll(originIds, startTime, maxMin, searchContext)` — a one-to-all variant of `jpCSASearch`: same `jpBuildConnections` array (so schedule-pattern filtering by the chosen date applies), same transfer semantics (5-min minimum, same-platform exempt, stay-on-trip via `tripReachable`), same ISI/OSI walk propagation, but no destination and a hard cutoff at `startTime + maxMin` (the connection scan also early-exits once departures pass the cutoff). Returns earliest arrival per node. Origin expands to its station group.
+
+**Results.** Aggregated per display name (station-group best arrival), split into four equal time bands (e.g. ≤15 / ≤30 / ≤45 / ≤60 for a 60-min window) with a green→red band palette:
+- Summary line ("X of Y stations reachable within N min from Origin") + band legend.
+- **Reach map** (Leaflet + OGF tiles): banded circle markers for reached stations with arrival tooltips, small grey dots for unreached stations, an accent-ringed origin marker, auto-fit bounds. Honors the `jpMapTiles` setting.
+- **Band sections** below the map: clickable station chips (arrival time + "+Nm") that jump to the node detail via `gotoEntity`.
+- Reached stations without coordinates are counted in a footnote and appear in the list only.
+
+Reachability is schedule-based by design — a connected segment with no service on it does not make a station reachable (verified in the smoke test).
+
 ## v0.19.7.0 — Phase 19 Session 7: Bulk edit on services
 Multi-select + bulk operations on the Services table.
 

@@ -973,3 +973,214 @@ function jpRenderMapRoute(jIdx) {
   doFit();
   if (_jpMaps[jIdx]) _jpMaps[jIdx].fitFn = doFit;
 }
+
+// ============================================================
+// NETWORK REACH — N-minute isochrone from one station
+// ============================================================
+// One-to-all variant of the CSA above: same connection array, same
+// transfer + interchange-walk semantics, no destination, hard cutoff
+// at startTime + maxMin. Returns { nodeId: earliestArrivalMinutes }.
+
+let _jpMode = 'journey';
+let _reachMap = null;
+
+function jpSetMode(m) {
+  _jpMode = m;
+  document.getElementById('jp-mode-journey')?.classList.toggle('active', m === 'journey');
+  document.getElementById('jp-mode-reach')?.classList.toggle('active', m === 'reach');
+  const destG = document.getElementById('jp-dest-group');
+  const swapB = document.getElementById('jp-swap-btn');
+  const reachG = document.getElementById('jp-reach-group');
+  if (destG) destG.style.display = m === 'reach' ? 'none' : '';
+  if (swapB) swapB.style.display = m === 'reach' ? 'none' : '';
+  if (reachG) reachG.style.display = m === 'reach' ? '' : 'none';
+  const res = document.getElementById('jp-results');
+  if (res) res.innerHTML = '';
+  _reachDestroyMap();
+}
+
+function jpGo() { if (_jpMode === 'reach') jpReachSearch(); else jpSearch(); }
+
+function _reachDestroyMap() {
+  if (_reachMap) { try { _reachMap.remove(); } catch(e) {} _reachMap = null; }
+}
+
+function jpReachAll(originIds, startTime, maxMin, searchContext) {
+  const connections = jpBuildConnections(searchContext);
+  const cutoff = startTime + maxMin;
+  const earliestArrival = {}, inConnection = {}, tripReachable = {};
+
+  const ichByNode = {};
+  for (const seg of data.segments) {
+    if (!isInterchange(seg)) continue;
+    const walkMins = seg.distance / WALKING_SPEED() * 60;
+    (ichByNode[seg.nodeA] = ichByNode[seg.nodeA] || []).push({ toNodeId: seg.nodeB, walkMins });
+    (ichByNode[seg.nodeB] = ichByNode[seg.nodeB] || []).push({ toNodeId: seg.nodeA, walkMins });
+  }
+  function propagate(nodeId) {
+    const links = ichByNode[nodeId]; if (!links) return;
+    for (const ich of links) {
+      const arr = earliestArrival[nodeId] + ich.walkMins;
+      if (arr <= cutoff && (earliestArrival[ich.toNodeId] == null || arr < earliestArrival[ich.toNodeId])) {
+        earliestArrival[ich.toNodeId] = arr;
+        inConnection[ich.toNodeId] = { isWalk: true, toPlatId: null, depId: '__walk' };
+        propagate(ich.toNodeId);
+      }
+    }
+  }
+  for (const oid of originIds) { earliestArrival[oid] = startTime; propagate(oid); }
+
+  let lo = 0, hi = connections.length;
+  while (lo < hi) { const mid = (lo + hi) >> 1; if (connections[mid].depart < startTime) lo = mid + 1; else hi = mid; }
+
+  for (let ci = lo; ci < connections.length; ci++) {
+    const conn = connections[ci];
+    if (conn.depart > cutoff) break;
+    if (conn.arrive > cutoff) continue;
+
+    let canBoard = false;
+    if (tripReachable[conn.depId]) {
+      canBoard = true;
+    } else {
+      const arrivalAtFrom = earliestArrival[conn.fromNodeId];
+      if (arrivalAtFrom != null && arrivalAtFrom <= conn.depart) {
+        const via = inConnection[conn.fromNodeId];
+        if (!via || via.depId === conn.depId || via.isWalk) {
+          canBoard = true;
+        } else {
+          const samePlat = via.toPlatId && via.toPlatId === conn.fromPlatId;
+          canBoard = (arrivalAtFrom + (samePlat ? 0 : JP_TRANSFER_MIN_()) <= conn.depart);
+        }
+      }
+    }
+    if (!canBoard) continue;
+    tripReachable[conn.depId] = true;
+
+    if (earliestArrival[conn.toNodeId] == null || conn.arrive < earliestArrival[conn.toNodeId]) {
+      earliestArrival[conn.toNodeId] = conn.arrive;
+      inConnection[conn.toNodeId] = conn;
+      propagate(conn.toNodeId);
+    }
+  }
+  return earliestArrival;
+}
+
+const _REACH_BAND_COLORS = ['#2e9e5b', '#c9a227', '#d97f30', '#c0392f'];
+function _reachBand(mins, maxMin) {
+  return Math.min(3, Math.floor((mins / maxMin) * 4));
+}
+
+function jpReachSearch() {
+  _reachDestroyMap();
+  const originId = nodePickerGetValue('np-jpOrigin');
+  if (!originId) { toast(t('toast.select_origin'), 'error'); return; }
+  const maxMin = Math.max(5, Math.min(720, parseInt(document.getElementById('jp-reach-min')?.value) || 60));
+  const timeStr = document.getElementById('jp-time').value || '08:00';
+  const startTime = toMin(timeStr);
+  const el = document.getElementById('jp-results');
+  el.innerHTML = `<div class="text-dim" style="padding:20px;text-align:center">${t('jp.searching')}</div>`;
+  setTimeout(() => {
+    const jpDateStr = document.getElementById('jp-date')?.value || '';
+    const searchContext = { dayOfWeek: jpDateStr ? isoWeekday(jpDateStr) : null, date: jpDateStr || null };
+    const originGroup = stationGroup(originId);
+    const earliest = jpReachAll(originGroup, startTime, maxMin, searchContext);
+    _reachRender(originId, startTime, maxMin, earliest);
+  }, 30);
+}
+
+function _reachRender(originId, startTime, maxMin, earliest) {
+  const el = document.getElementById('jp-results');
+  const originDn = nodeDisplayName(originId);
+
+  // Aggregate per display name (station group) — best arrival wins
+  const byDn = new Map();
+  for (const [nid, arr] of Object.entries(earliest)) {
+    const node = getNode(nid);
+    if (!node || !isPassengerStop(node)) continue;
+    const dn = nodeDisplayName(nid);
+    if (dn === originDn) continue;
+    const cur = byDn.get(dn);
+    if (!cur || arr < cur.arrive) byDn.set(dn, { arrive: arr, nodeId: nid, node });
+  }
+  const results = [...byDn.entries()]
+    .map(([dn, r]) => ({ dn, mins: Math.round(r.arrive - startTime), arrive: r.arrive, nodeId: r.nodeId, node: r.node }))
+    .sort((a, b) => a.mins - b.mins || a.dn.localeCompare(b.dn));
+
+  const totalStations = new Set(data.nodes.filter(n => isPassengerStop(n)).map(n => nodeDisplayName(n.id))).size - 1;
+
+  if (!results.length) {
+    el.innerHTML = `<div class="text-dim" style="padding:20px;text-align:center">${t('jp.reach_none', { n: maxMin })}</div>`;
+    return;
+  }
+
+  const bandStep = maxMin / 4;
+  let html = `<div class="mt-16" style="max-width:900px">
+    <p style="font-size:14px;margin-bottom:8px">${t('jp.reach_summary', { reached: results.length, total: Math.max(totalStations, results.length), n: maxMin, origin: esc(originDn) })}</p>
+    <div class="flex gap-8 mb-8" style="flex-wrap:wrap;font-size:11px">
+      ${[0,1,2,3].map(b => `<span class="chip"><span class="dot" style="background:${_REACH_BAND_COLORS[b]}"></span>${t('jp.reach_band', { n: Math.round(bandStep * (b + 1)) })}</span>`).join('')}
+    </div>
+    <div id="reach-map" style="width:100%;height:420px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg)"></div>`;
+
+  for (let b = 0; b < 4; b++) {
+    const band = results.filter(r => _reachBand(r.mins, maxMin) === b);
+    if (!band.length) continue;
+    html += `<div class="mt-16"><strong style="font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:${_REACH_BAND_COLORS[b]}">${t('jp.reach_band', { n: Math.round(bandStep * (b + 1)) })} · ${band.length}</strong>
+      <div class="flex gap-8 mt-8" style="flex-wrap:wrap">
+      ${band.map(r => `<span class="chip clickable" style="cursor:pointer" onclick="gotoEntity('nodes','${r.nodeId}')">
+        <span class="dot" style="background:${_REACH_BAND_COLORS[b]}"></span>${esc(r.dn)}
+        <span class="mono text-muted" style="margin-left:4px">${toTime(Math.round(r.arrive))} · +${r.mins}m</span></span>`).join('')}
+      </div></div>`;
+  }
+
+  const noCoords = results.filter(r => r.node.lat == null && !stationGroup(r.nodeId).some(id => getNode(id)?.lat != null)).length;
+  if (noCoords) html += `<p class="text-dim mt-8" style="font-size:12px">${t('jp.reach_no_coords', { n: noCoords })}</p>`;
+  html += '</div>';
+  el.innerHTML = html;
+
+  _reachInitMap('reach-map', results, originId, maxMin);
+}
+
+function _reachInitMap(containerId, results, originId, maxMin) {
+  const container = document.getElementById(containerId);
+  if (!container || typeof L === 'undefined') return;
+  const map = L.map(container, { zoomControl: true, attributionControl: false }).setView([0, 0], 3);
+  if (data.settings?.jpMapTiles !== false) {
+    L.tileLayer('https://tile.opengeofiction.net/ogf-carto/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+  }
+  _reachMap = map;
+
+  const coordOf = (nodeId) => {
+    const n = getNode(nodeId);
+    if (n?.lat != null) return [n.lat, n.lon];
+    const alt = stationGroup(nodeId).map(getNode).find(x => x?.lat != null);
+    return alt ? [alt.lat, alt.lon] : null;
+  };
+
+  const reachedDn = new Set(results.map(r => r.dn));
+  const originDn = nodeDisplayName(originId);
+  for (const n of data.nodes) {
+    if (!isPassengerStop(n) || n.lat == null) continue;
+    const dn = nodeDisplayName(n.id);
+    if (reachedDn.has(dn) || dn === originDn) continue;
+    L.circleMarker([n.lat, n.lon], { radius: 3, color: '#888', weight: 1, fillColor: '#888', fillOpacity: 0.35, opacity: 0.4 }).addTo(map);
+  }
+
+  const pts = [];
+  for (const r of results) {
+    const c = coordOf(r.nodeId);
+    if (!c) continue;
+    const col = _REACH_BAND_COLORS[_reachBand(r.mins, maxMin)];
+    L.circleMarker(c, { radius: 6, color: '#fff', weight: 1.5, fillColor: col, fillOpacity: 0.95 })
+      .bindTooltip(`${r.dn} · ${toTime(Math.round(r.arrive))} · +${r.mins}m`)
+      .addTo(map);
+    pts.push(c);
+  }
+  const oc = coordOf(originId);
+  if (oc) {
+    L.circleMarker(oc, { radius: 9, color: '#fff', weight: 2.5, fillColor: '#5b8af5', fillOpacity: 1 })
+      .bindTooltip(originDn).addTo(map);
+    pts.push(oc);
+  }
+  if (pts.length) map.fitBounds(pts, { padding: [30, 30] });
+  setTimeout(() => { try { map.invalidateSize(); } catch(e) {} }, 100);
+}

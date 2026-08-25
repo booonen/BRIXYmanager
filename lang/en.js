@@ -263,6 +263,7 @@ registerLanguage('en', 'English', {
     "replace_schedule": "Replace schedule"
   },
   "label": {
+    "reach_within": "Within (min)",
     "station": "Station",
     "time": "Time",
     "date": "Date",
@@ -431,6 +432,7 @@ registerLanguage('en', 'English', {
     "theme_coming": "Light and system themes coming in a future update",
     "no_coords": "No nodes have coordinates",
     "select_origin_dest": "Select both origin and destination",
+    "select_origin": "Select an origin station",
     "origin_dest_differ": "Origin and destination must be different",
     "split_done": "Split into \"{name}\"",
     "merge_done": "Merged into \"{name}\"",
@@ -704,7 +706,13 @@ registerLanguage('en', 'English', {
     "later": "Later departures \u2192",
     "showing_results": "Showing {start}\u2013{end}",
     "terminus": "Terminus",
-    "searching": "Searching..."
+    "searching": "Searching...",
+    "mode_journey": "Journey",
+    "mode_reach": "Network reach",
+    "reach_summary": "{reached} of {total} stations reachable within {n} min from {origin}",
+    "reach_none": "Nothing reachable within {n} min — try a longer window or a different departure time.",
+    "reach_band": "≤ {n} min",
+    "reach_no_coords": "{n} reached station(s) have no coordinates and appear only in the list."
   },
   "issue": {
     "no_issues": "No issues detected",

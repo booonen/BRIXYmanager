@@ -30,7 +30,7 @@ The app is split across `railmanager.html`, `styles.css`, 14 JS modules in `js/`
 1. Update the version string in the sidebar footer of `railmanager.html` (search for `<div style="padding:8px 16px;font-size:10px;` near the `</nav>` tag)
 2. Prepend a new entry to `VERSION HISTORY.md` (newest entries at top)
 
-**Current version:** 0.19.7.0
+**Current version:** 0.19.8.0
 
 ## Validation workflow
 

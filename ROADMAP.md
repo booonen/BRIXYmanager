@@ -99,7 +99,7 @@ A grab-bag phase of small, high-value additions and tools. Sketched during the v
 - ~~Multi-select + bulk-edit on services~~ ✅ v0.19.7.0 (segments/nodes deferred; pattern is reusable)
 
 **Visualization**
-- Network reach analysis — N-minute travel-time isochrone from a query station, leveraging existing CSA
+- ~~Network reach analysis~~ ✅ v0.19.8.0 (Reach mode in the Journey Planner: one-to-all CSA, banded map + station chips)
 - Gantt-style time visualization for segment / node usage (one row per track or platform, X-axis = time of day)
 - Timetable book export (HTML / PDF per-line departure tables)
 
