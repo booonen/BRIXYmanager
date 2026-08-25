@@ -626,13 +626,13 @@ function openDepEditModal(depId) {
   const overrides = dep.platformOverrides || {};
   const manualDwells = (dep.manualOverrides || {}).dwell || {};
 
-  let stopsHtml = dep.times.map((t, i) => {
+  let stopsHtml = dep.times.map((tm, i) => {
     const stop = svc.stops[i];
-    const nname = nodeDisplayName(t.nodeId);
-    const node = getNode(t.nodeId);
+    const nname = nodeDisplayName(tm.nodeId);
+    const node = getNode(tm.nodeId);
     const isFirst = i === 0, isLast = i === dep.times.length - 1;
     const isStation = isPassengerStop(node);
-    const dwellMin = (t.arrive != null && t.depart != null) ? (t.depart - t.arrive) : 0;
+    const dwellMin = (tm.arrive != null && tm.depart != null) ? (tm.depart - tm.arrive) : 0;
     const dwellSec = Math.round(dwellMin * 60);
     const isManualDwell = (i in manualDwells);
 
@@ -646,8 +646,8 @@ function openDepEditModal(depId) {
     return `<div style="display:grid;grid-template-columns:24px 1fr 90px 90px 100px 80px 50px;align-items:center;gap:4px;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px" data-dep-idx="${i}">
       <span class="mono text-muted" style="text-align:center">${i+1}</span>
       <span><strong>${esc(nname)}</strong>${stop?.passThrough?' <span class="text-muted" style="font-size:11px">(pass)</span>':''}</span>
-      <div class="mono text-dim" style="font-size:12px;text-align:right">${t.arrive!=null?toTime(t.arrive):'—'}</div>
-      <div class="mono" style="font-size:12px;text-align:right;color:var(--warn)">${t.depart!=null?toTime(t.depart):'—'}</div>
+      <div class="mono text-dim" style="font-size:12px;text-align:right">${tm.arrive!=null?toTime(tm.arrive):'—'}</div>
+      <div class="mono" style="font-size:12px;text-align:right;color:var(--warn)">${tm.depart!=null?toTime(tm.depart):'—'}</div>
       <div>${isStation && !stop?.passThrough ? `<select class="dep-plat-sel" data-idx="${i}" style="font-size:11px;padding:3px 6px;width:95px;${isManualPlat?'border-color:var(--warn)':''}" title="${isManualPlat?'Overridden for this departure — preserved on recalculate':'Using service default'}"><option value="">—</option>${platOpts}</select>` : ''}</div>
       <div>${(!isFirst && !isLast && (!stop?.passThrough || node?.type === 'waypoint')) ? `<input type="number" class="dep-dwell-input" value="${dwellSec}" min="0" style="width:70px;font-size:12px;padding:3px 6px;${isManualDwell?'border-color:var(--warn)':''}" data-idx="${i}" title="${isManualDwell?'Manually overridden — preserved on recalculate':'Default dwell time'}">` : `<span class="text-muted" style="font-size:11px">${isFirst?t('sch.stop_origin'):isLast?t('sch.stop_terminus'):t('sch.stop_pass')}</span>`}</div>
       <div>${(!isFirst && !isLast && isStation) ? `<label style="font-size:11px;color:var(--text-dim);display:flex;align-items:center;gap:3px;cursor:pointer" title="Skip this stop (creates variant service)">
@@ -820,24 +820,24 @@ function saveDepEdit(depId) {
   }
 
   // Recalculate all times from the first departure using stock
-  let t = dep.times[0].depart;
+  let tm = dep.times[0].depart;
   for (let i = 0; i < dep.times.length; i++) {
     const stop = svc.stops[i];
     if (i === 0) {
       dep.times[i].arrive = null;
-      dep.times[i].depart = t;
+      dep.times[i].depart = tm;
     } else if (i === dep.times.length - 1) {
-      dep.times[i].arrive = t;
+      dep.times[i].arrive = tm;
       dep.times[i].depart = null;
     } else {
-      dep.times[i].arrive = t;
+      dep.times[i].arrive = tm;
       const dwellSec = (i in dwellMap) ? dwellMap[i] : (stop.passThrough ? (stop.dwell || 0) : (stop.dwell ?? defDwell));
       const dwellMin = dwellSec / 60;
-      dep.times[i].depart = t + dwellMin;
-      t += dwellMin;
+      dep.times[i].depart = tm + dwellMin;
+      tm += dwellMin;
     }
     if (i < dep.times.length - 1) {
-      t += travelTimeInContext(svc.stops, i, stock);
+      tm += travelTimeInContext(svc.stops, i, stock);
     }
   }
 

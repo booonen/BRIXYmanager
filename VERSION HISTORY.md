@@ -1,5 +1,13 @@
 # BRIXYmanager — Version History
 
+## v0.19.5.1 — Fix: departure edit modal crashed on open (`t` shadowing)
+Two locals named `t` shadowed the global `t()` translation function in [js/scheduling.js](js/scheduling.js):
+
+- `openDepEditModal`'s stop-row builder was `dep.times.map((t, i) => …)`, so the `t('sch.stop_origin')` / `t('sch.stop_terminus')` / `t('sch.stop_pass')` / `t('dep_edit.col_skip')` calls inside the template called the *time entry object* as a function. The first stop always hits the origin label, so the modal threw a `TypeError` before `openModal()` ran — **the "Edit times" button (train schedule + schedule view) has been dead since these labels were localized.** Param renamed to `tm`.
+- `saveDepEdit`'s time-cascade accumulator was `let t = dep.times[0].depart`, so the success toast at the end (`toast(t('toast.dep_updated'))`) threw after saving — data was persisted, but the user got a console error instead of confirmation. Renamed to `tm`.
+
+Verified in-browser: modal opens with all stop rows, save completes with its toast, no console errors. Note for the future: locals named `t` anywhere in these modules are a trap — several more exist that currently contain no `t()` calls (e.g. [js/departures.js](js/departures.js), [js/journey.js](js/journey.js) map callbacks).
+
 ## v0.19.5.0 — Phase 19 Session 5: Restore work lost in the June 3rd upload
 **What happened.** The 2026-06-03 "Add files via upload" commit synced the local working copy (v0.19.4.2) over the GitHub repo — but the local copy never contained the two April PRs that were merged on GitHub (#2: relation importer enhancements, #3: v0.17.4 Node Split & Merge). The upload silently reverted all of their changes. `js/node_ops.js` survived on disk only because uploads don't delete files; its `<script>` tag, its UI entry points, and its 47 `split.*`/`merge.*` translation keys were all gone, and `js/import.js` was reverted byte-for-byte to its pre-PR state.
 
