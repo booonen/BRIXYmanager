@@ -400,25 +400,29 @@ async function fetchRelationFull(relationId) {
     else if (e.type === 'node') nodeEls[String(e.id)] = e;
   }
 
-  // Walk the relation member list to get ordered ways and stop nodes
-  // Only keep ways with NO role — by convention, these are the track ways.
-  // Ways with any role (stop, platform, etc.) are non-track members.
+  // Walk the relation member list to get ordered ways and stop nodes.
+  // Route ways may carry roles (forward/backward, route variants, hail_and_ride…)
+  // so a way member counts as track unless its role marks it as a platform or
+  // stop area — the railway=*/highway=* tag filter below does the rest.
+  const _nonTrackWayRole = r => r.includes('platform') || r === 'stop' || r === 'stop_entry_only' || r === 'stop_exit_only';
   const wayMembers = [], stopMembers = [];
   for (const m of (rel.members || [])) {
-    const role = (m.role || '').trim();
-    if (m.type === 'way' && !role) wayMembers.push(String(m.ref));
+    const role = (m.role || '').trim().toLowerCase();
+    if (m.type === 'way' && !_nonTrackWayRole(role)) wayMembers.push(String(m.ref));
     else if (m.type === 'node' && (role === 'stop' || role === 'stop_entry_only' || role === 'stop_exit_only')) {
       stopMembers.push({ ref: String(m.ref), role });
     }
   }
 
-  // Resolve ways: keep only those tagged railway=* or highway=*
+  // Resolve ways: keep only those tagged railway=* or highway=* — and never
+  // platform geometries, whatever their role said.
   const ways = [];
   for (const wayId of wayMembers) {
     const w = wayEls[wayId];
     if (!w) continue;
     const tags = w.tags || {};
     if (!tags.railway && !tags.highway) continue;
+    if (tags.highway === 'platform' || tags.railway === 'platform' || tags.public_transport === 'platform') continue;
     const coords = (w.geometry || []).map(p => [
       Math.round(p.lat * 1e5) / 1e5,
       Math.round(p.lon * 1e5) / 1e5

@@ -994,6 +994,8 @@ function jpSetMode(m) {
   if (destG) destG.style.display = m === 'reach' ? 'none' : '';
   if (swapB) swapB.style.display = m === 'reach' ? 'none' : '';
   if (reachG) reachG.style.display = m === 'reach' ? '' : 'none';
+  const timeEl = document.getElementById('jp-time');
+  if (timeEl) timeEl.disabled = (m === 'reach') && !!document.getElementById('jp-reach-best')?.checked;
   const res = document.getElementById('jp-results');
   if (res) res.innerHTML = '';
   _reachDestroyMap();
@@ -1005,8 +1007,8 @@ function _reachDestroyMap() {
   if (_reachMap) { try { _reachMap.remove(); } catch(e) {} _reachMap = null; }
 }
 
-function jpReachAll(originIds, startTime, maxMin, searchContext) {
-  const connections = jpBuildConnections(searchContext);
+function jpReachAll(originIds, startTime, maxMin, searchContext, prebuiltConnections) {
+  const connections = prebuiltConnections || jpBuildConnections(searchContext);
   const cutoff = startTime + maxMin;
   const earliestArrival = {}, inConnection = {}, tripReachable = {};
 
@@ -1070,11 +1072,32 @@ function _reachBand(mins, maxMin) {
   return Math.min(3, Math.floor((mins / maxMin) * 4));
 }
 
+// Best case over all departures: for each station, the minimal elapsed time
+// achievable from ANY departure at the origin. One cutoff-bounded scan per
+// distinct origin departure time — each scan only walks connections inside
+// its [start, start+maxMin] window, so this stays cheap.
+function jpReachBestCase(originIds, maxMin, searchContext) {
+  const connections = jpBuildConnections(searchContext);
+  const originSet = new Set(originIds);
+  const startTimes = [...new Set(connections.filter(c => originSet.has(c.fromNodeId)).map(c => c.depart))];
+  const best = {};
+  for (const st of startTimes) {
+    const earliest = jpReachAll(originIds, st, maxMin, searchContext, connections);
+    for (const nid in earliest) {
+      const el = earliest[nid] - st;
+      if (el <= 0) continue;
+      if (!best[nid] || el < best[nid].elapsed) best[nid] = { elapsed: el, depart: st, arrive: earliest[nid] };
+    }
+  }
+  return best;
+}
+
 function jpReachSearch() {
   _reachDestroyMap();
   const originId = nodePickerGetValue('np-jpOrigin');
   if (!originId) { toast(t('toast.select_origin'), 'error'); return; }
   const maxMin = Math.max(5, Math.min(720, parseInt(document.getElementById('jp-reach-min')?.value) || 60));
+  const bestCase = !!document.getElementById('jp-reach-best')?.checked;
   const timeStr = document.getElementById('jp-time').value || '08:00';
   const startTime = toMin(timeStr);
   const el = document.getElementById('jp-results');
@@ -1083,29 +1106,43 @@ function jpReachSearch() {
     const jpDateStr = document.getElementById('jp-date')?.value || '';
     const searchContext = { dayOfWeek: jpDateStr ? isoWeekday(jpDateStr) : null, date: jpDateStr || null };
     const originGroup = stationGroup(originId);
-    const earliest = jpReachAll(originGroup, startTime, maxMin, searchContext);
-    _reachRender(originId, startTime, maxMin, earliest);
+    const originDn = nodeDisplayName(originId);
+
+    // Normalize both modes into { dn, mins, arrive, depart, nodeId, node } rows,
+    // best arrival per display name (station group).
+    const byDn = new Map();
+    const consider = (nid, mins, depart, arrive) => {
+      const node = getNode(nid);
+      if (!node || !isPassengerStop(node)) return;
+      const dn = nodeDisplayName(nid);
+      if (dn === originDn) return;
+      const cur = byDn.get(dn);
+      if (!cur || mins < cur.mins) byDn.set(dn, { mins, depart, arrive, nodeId: nid, node });
+    };
+    if (bestCase) {
+      const best = jpReachBestCase(originGroup, maxMin, searchContext);
+      for (const nid in best) consider(nid, Math.round(best[nid].elapsed), best[nid].depart, best[nid].arrive);
+    } else {
+      const earliest = jpReachAll(originGroup, startTime, maxMin, searchContext);
+      for (const nid in earliest) consider(nid, Math.round(earliest[nid] - startTime), startTime, earliest[nid]);
+    }
+    const results = [...byDn.entries()]
+      .map(([dn, r]) => ({ dn, ...r }))
+      .sort((a, b) => a.mins - b.mins || a.dn.localeCompare(b.dn));
+    _reachRender(originId, maxMin, results, bestCase);
   }, 30);
 }
 
-function _reachRender(originId, startTime, maxMin, earliest) {
+function _reachHasBeck() {
+  const ls = data.beckmap && data.beckmap.lineStations;
+  if (!ls) return false;
+  for (const gid in ls) { if (Object.keys(ls[gid]).length) return true; }
+  return false;
+}
+
+function _reachRender(originId, maxMin, results, bestCase) {
   const el = document.getElementById('jp-results');
   const originDn = nodeDisplayName(originId);
-
-  // Aggregate per display name (station group) — best arrival wins
-  const byDn = new Map();
-  for (const [nid, arr] of Object.entries(earliest)) {
-    const node = getNode(nid);
-    if (!node || !isPassengerStop(node)) continue;
-    const dn = nodeDisplayName(nid);
-    if (dn === originDn) continue;
-    const cur = byDn.get(dn);
-    if (!cur || arr < cur.arrive) byDn.set(dn, { arrive: arr, nodeId: nid, node });
-  }
-  const results = [...byDn.entries()]
-    .map(([dn, r]) => ({ dn, mins: Math.round(r.arrive - startTime), arrive: r.arrive, nodeId: r.nodeId, node: r.node }))
-    .sort((a, b) => a.mins - b.mins || a.dn.localeCompare(b.dn));
-
   const totalStations = new Set(data.nodes.filter(n => isPassengerStop(n)).map(n => nodeDisplayName(n.id))).size - 1;
 
   if (!results.length) {
@@ -1113,13 +1150,21 @@ function _reachRender(originId, startTime, maxMin, earliest) {
     return;
   }
 
+  const summaryKey = bestCase ? 'jp.reach_summary_best' : 'jp.reach_summary';
+  const hasBeck = _reachHasBeck();
+  const pref = data.settings?.defaultDetailMap === 'beck' && hasBeck ? 'beck' : 'geo';
   const bandStep = maxMin / 4;
   let html = `<div class="mt-16" style="max-width:900px">
-    <p style="font-size:14px;margin-bottom:8px">${t('jp.reach_summary', { reached: results.length, total: Math.max(totalStations, results.length), n: maxMin, origin: esc(originDn) })}</p>
+    <p style="font-size:14px;margin-bottom:8px">${t(summaryKey, { reached: results.length, total: Math.max(totalStations, results.length), n: maxMin, origin: esc(originDn) })}</p>
     <div class="flex gap-8 mb-8" style="flex-wrap:wrap;font-size:11px">
       ${[0,1,2,3].map(b => `<span class="chip"><span class="dot" style="background:${_REACH_BAND_COLORS[b]}"></span>${t('jp.reach_band', { n: Math.round(bandStep * (b + 1)) })}</span>`).join('')}
     </div>
-    <div id="reach-map" style="width:100%;height:420px;border-radius:var(--radius);border:1px solid var(--border);background:var(--bg)"></div>`;
+    ${hasBeck ? `<div class="detail-map-tabs">
+      <button id="reach-tab-geo" class="${pref === 'geo' ? 'active' : ''}" onclick="_reachMapToggle('geo')">${t('nav.geomap')}</button>
+      <button id="reach-tab-beck" class="${pref === 'beck' ? 'active' : ''}" onclick="_reachMapToggle('beck')">${t('nav.railmap')}</button>
+    </div>` : ''}
+    <div id="reach-map" style="width:100%;height:420px;${pref === 'geo' ? '' : 'display:none;'}border-radius:${hasBeck ? '0 0 var(--radius) var(--radius)' : 'var(--radius)'};border:1px solid var(--border);${hasBeck ? 'border-top:0;' : ''}background:var(--bg)"></div>
+    ${hasBeck ? `<svg id="reach-beck" style="width:100%;height:420px;${pref === 'beck' ? '' : 'display:none;'}border-radius:0 0 var(--radius) var(--radius);border:1px solid var(--border);border-top:0;background:#fff"></svg>` : ''}`;
 
   for (let b = 0; b < 4; b++) {
     const band = results.filter(r => _reachBand(r.mins, maxMin) === b);
@@ -1128,16 +1173,76 @@ function _reachRender(originId, startTime, maxMin, earliest) {
       <div class="flex gap-8 mt-8" style="flex-wrap:wrap">
       ${band.map(r => `<span class="chip clickable" style="cursor:pointer" onclick="gotoEntity('nodes','${r.nodeId}')">
         <span class="dot" style="background:${_REACH_BAND_COLORS[b]}"></span>${esc(r.dn)}
-        <span class="mono text-muted" style="margin-left:4px">${toTime(Math.round(r.arrive))} · +${r.mins}m</span></span>`).join('')}
+        <span class="mono text-muted" style="margin-left:4px">${bestCase ? `+${r.mins}m · ${toTime(Math.round(r.depart))}→${toTime(Math.round(r.arrive))}` : `${toTime(Math.round(r.arrive))} · +${r.mins}m`}</span></span>`).join('')}
       </div></div>`;
   }
 
+  if (bestCase) html += `<p class="text-dim mt-8" style="font-size:12px">${t('jp.reach_best_note')}</p>`;
   const noCoords = results.filter(r => r.node.lat == null && !stationGroup(r.nodeId).some(id => getNode(id)?.lat != null)).length;
   if (noCoords) html += `<p class="text-dim mt-8" style="font-size:12px">${t('jp.reach_no_coords', { n: noCoords })}</p>`;
   html += '</div>';
   el.innerHTML = html;
 
-  _reachInitMap('reach-map', results, originId, maxMin);
+  window._reachLast = { originId, maxMin, results };
+  if (pref === 'geo') _reachInitMap('reach-map', results, originId, maxMin);
+  else _reachRenderBeck();
+}
+
+function _reachMapToggle(which) {
+  const geo = document.getElementById('reach-map');
+  const beck = document.getElementById('reach-beck');
+  document.getElementById('reach-tab-geo')?.classList.toggle('active', which === 'geo');
+  document.getElementById('reach-tab-beck')?.classList.toggle('active', which === 'beck');
+  if (geo) geo.style.display = which === 'geo' ? '' : 'none';
+  if (beck) beck.style.display = which === 'beck' ? '' : 'none';
+  const st = window._reachLast;
+  if (!st) return;
+  if (which === 'geo' && !_reachMap) _reachInitMap('reach-map', st.results, st.originId, st.maxMin);
+  if (which === 'geo' && _reachMap) setTimeout(() => { try { _reachMap.invalidateSize(); } catch(e) {} }, 50);
+  if (which === 'beck') _reachRenderBeck();
+}
+
+// Railmap view: mini-beck clone zoomed to the reach area, with band-colored
+// circles overlaid on every placed line-station of each reached display name.
+function _reachRenderBeck() {
+  const st = window._reachLast;
+  const svgEl = document.getElementById('reach-beck');
+  if (!st || !svgEl || !_reachHasBeck()) return;
+  const { originId, maxMin, results } = st;
+  const originDn = nodeDisplayName(originId);
+  const bandByDn = new Map(results.map(r => [r.dn, _reachBand(r.mins, maxMin)]));
+
+  const allPos = typeof schemAllPlacedPositions === 'function' ? schemAllPlacedPositions() : [];
+  const focusNodeIds = new Set();
+  for (const p of allPos) {
+    const dn = nodeDisplayName(p.nodeId);
+    if (bandByDn.has(dn) || dn === originDn) focusNodeIds.add(p.nodeId);
+  }
+  renderMiniBeck(svgEl, { focusNodeIds, mode: 'reach' });
+
+  // Overlay band circles in the same screen-space coordinates renderMiniBeck used
+  const z = _schemState.zoom, vx = _schemState.viewX, vy = _schemState.viewY;
+  const NS = 'http://www.w3.org/2000/svg';
+  const overlay = document.createElementNS(NS, 'g');
+  for (const p of allPos) {
+    const dn = nodeDisplayName(p.nodeId);
+    const isOrigin = dn === originDn;
+    if (!isOrigin && !bandByDn.has(dn)) continue;
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', vx + p.gx * SCHEM_CELL * z);
+    c.setAttribute('cy', vy + p.gy * SCHEM_CELL * z);
+    c.setAttribute('r', (isOrigin ? 8 : 6) * z);
+    c.setAttribute('fill', isOrigin ? '#5b8af5' : _REACH_BAND_COLORS[bandByDn.get(dn)]);
+    c.setAttribute('stroke', '#fff');
+    c.setAttribute('stroke-width', 2 * z);
+    c.setAttribute('opacity', '0.92');
+    const r = results.find(x => x.dn === dn);
+    const title = document.createElementNS(NS, 'title');
+    title.textContent = isOrigin ? originDn : `${dn} · +${r.mins}m`;
+    c.appendChild(title);
+    overlay.appendChild(c);
+  }
+  svgEl.appendChild(overlay);
 }
 
 function _reachInitMap(containerId, results, originId, maxMin) {

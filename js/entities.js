@@ -463,11 +463,11 @@ function showNodeDetail(id) {
   if (infoParts) html += `<p class="text-dim mb-8" style="font-size:13px">${infoParts}</p>`;
   if (node.description) html += `<p class="text-dim mb-8" style="font-size:13px">${esc(node.description)}</p>`;
 
-  // Link to departure board + Split/Merge
+  // Link to departure board + Split/Merge (both only shown when applicable)
   if (isPassengerStop(node)) {
     const _canSplit = nodeCanSplit(id);
     const _mergeCands = nodeMergeCandidates(id);
-    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">\u25A4 ${t('node_detail.view_departure_board')}</button> <button class="btn btn-sm" ${_canSplit ? '' : 'disabled title="' + esc(t('split.btn_disabled_tooltip')) + '"'} onclick="openSplitModal('${id}')">\u2702 ${t('split.btn')}</button>${_mergeCands.length ? ` <button class="btn btn-sm" onclick="openMergeChooser('${id}')">\u21C4 ${t('merge.btn')}</button>` : ''}</div>`;
+    html += `<div class="mb-16"><button class="btn btn-sm" onclick="_departureStationId='${node.id}';setBoardMode('departures');switchTab('departures');document.querySelector('.content').scrollTop=0">\u25A4 ${t('node_detail.view_departure_board')}</button>${_canSplit ? ` <button class="btn btn-sm" onclick="openSplitModal('${id}')">\u2702 ${t('split.btn')}</button>` : ''}${_mergeCands.length ? ` <button class="btn btn-sm" onclick="openMergeChooser('${id}')">\u21C4 ${t('merge.btn')}</button>` : ''}</div>`;
   }
 
   // Detail map

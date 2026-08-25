@@ -183,11 +183,14 @@ function updateHelperSuggestions(svcId) {
     </tr>`;
   }
 
-  // Custom frequency row — input inline in the table
+  // Custom frequency row — the input sits inside the "Every {n}m" pattern so it
+  // reads like the preset rows. Preset-duplicate values still evaluate (blanking
+  // the row when the value matched a preset was confusing).
   const customFreq = parseInt(customFreqVal);
-  const hasCustom = customFreq > 0 && customFreq <= 1440 && !freqs.includes(customFreq);
+  const hasCustom = customFreq > 0 && customFreq <= 1440;
+  const customInput = `<input type="number" id="sh-custom-freq" min="1" max="1440" value="${esc(customFreqVal)}" onchange="refreshScheduleModal()" style="width:52px;font-size:12px;font-family:var(--font-mono);padding:3px 6px;text-align:right">`;
   html += `<tr style="border-top:1px solid var(--border)">
-    <td><input type="number" id="sh-custom-freq" min="1" max="1440" value="${esc(customFreqVal)}" placeholder="${t('sch.custom_freq_placeholder')}" onchange="refreshScheduleModal()" style="width:60px;font-size:12px;font-family:var(--font-mono)">m</td>`;
+    <td class="mono" style="font-weight:500;white-space:nowrap">${t('sch.every_n_min', { n: customInput })}</td>`;
   if (hasCustom) {
     const { bestOffset, bestConflicts, bestCount } = _evalFreq(customFreq);
     const firstDep = wStart + bestOffset;
@@ -946,7 +949,7 @@ function ganttForSegment(segId) {
   const tracks = Array.isArray(seg.tracks) ? seg.tracks : [];
   const rows = [], rowByTrack = {};
   for (const tk of tracks) { const r = { name: platDisplayName(tk.name), bars: [] }; rows.push(r); rowByTrack[tk.id] = r; }
-  const unassigned = { name: t('gantt.unassigned'), bars: [] };
+  const unassigned = { name: t('gantt.unassigned'), bars: [], noConflict: true };
 
   for (const dep of data.departures) {
     const svc = getSvc(dep.serviceId);
@@ -972,6 +975,9 @@ function ganttForNode(nodeId) {
   if (!node || !(node.platforms || []).length) return null;
   const rows = [], byPlat = {};
   for (const p of node.platforms) { const r = { name: platDisplayName(p.name), bars: [] }; rows.push(r); byPlat[p.id] = r; }
+  // Calls with no (or stale) platform assignment are shown too, in their own
+  // row — overlap there is expected, so it carries no conflict cue.
+  const noPlat = { name: t('gantt.no_platform'), bars: [], noConflict: true };
 
   for (const dep of data.departures) {
     const svc = getSvc(dep.serviceId); if (!svc) continue;
@@ -980,13 +986,14 @@ function ganttForNode(nodeId) {
       const tt = dep.times[i];
       if (tt.nodeId !== nodeId) continue;
       if (svc.stops[i]?.passThrough) continue;
-      const plat = depPlatId(dep, svc, i);
-      if (!plat || !byPlat[plat]) continue;
       const arr = tt.arrive ?? tt.depart, dept = tt.depart ?? tt.arrive;
       if (arr == null || dept == null) continue;
-      byPlat[plat].bars.push({ start: arr, end: Math.max(dept, arr + 1), svcId: svc.id, label: svc.name, color });
+      const plat = depPlatId(dep, svc, i);
+      const bar = { start: arr, end: Math.max(dept, arr + 1), svcId: svc.id, label: svc.name, color };
+      ((plat && byPlat[plat]) ? byPlat[plat] : noPlat).bars.push(bar);
     }
   }
+  if (noPlat.bars.length) rows.push(noPlat);
   return rows;
 }
 
@@ -1020,11 +1027,14 @@ function renderGanttSVG(rows) {
     svg += `<text x="${LABEL_W - 8}" y="${y + ROW_H / 2 + 3}" text-anchor="end" font-size="10" fill="var(--text-dim)">${esc(label)}</text>`;
 
     const pieces = row.bars.flatMap(_ganttPieces).sort((a, b) => a.start - b.start);
-    // Flag overlapping occupations within the row (visual conflict cue)
-    for (let i = 0; i < pieces.length; i++) {
-      pieces[i]._conflict = pieces[i]._conflict || false;
-      for (let j = i + 1; j < pieces.length && pieces[j].start < pieces[i].end; j++) {
-        pieces[i]._conflict = pieces[j]._conflict = true;
+    // Flag overlapping occupations within the row (visual conflict cue) —
+    // skipped on unassigned rows, where overlap is expected.
+    if (!row.noConflict) {
+      for (let i = 0; i < pieces.length; i++) {
+        pieces[i]._conflict = pieces[i]._conflict || false;
+        for (let j = i + 1; j < pieces.length && pieces[j].start < pieces[i].end; j++) {
+          pieces[i]._conflict = pieces[j]._conflict = true;
+        }
       }
     }
     for (const p of pieces) {
