@@ -30,7 +30,7 @@ The app is split across `railmanager.html`, `styles.css`, 14 JS modules in `js/`
 1. Update the version string in the sidebar footer of `railmanager.html` (search for `<div style="padding:8px 16px;font-size:10px;` near the `</nav>` tag)
 2. Prepend a new entry to `VERSION HISTORY.md` (newest entries at top)
 
-**Current version:** 0.19.10.0
+**Current version:** 0.19.11.0
 
 ## Validation workflow
 
@@ -88,7 +88,7 @@ The app is split across these files, loaded by `railmanager.html` via plain `<sc
 | `js/views.js` | Settings panel, issue detection (~35 issue types), geomap (Leaflet + OGF tiles), dashboard, Import/Export tab + CSV/relation import wizards |
 | `js/beckmap.js` | Railmap SVG schematic |
 | `js/animate.js` | Animated tab — sim clock, geo + schem views, vehicle interaction, busyness heatmap, route highlight |
-| `js/palette.js` | Ctrl+K command palette — actions, tab nav, fuzzy entity search across lines/services/stations/nodes/segments |
+| `js/palette.js` | Ctrl+K command palette — actions, tab nav, fuzzy entity search across lines/services/stations/nodes/segments; pinned + recent sections on empty query; fully localized (`pal.*` keys) |
 
 ### Station importance (THI)
 
@@ -141,8 +141,10 @@ See `ROADMAP.md` for the full human-readable roadmap. Summary below for quick re
 - **Phase 17 — Infrastructure Import:** Complete. Import/Export tab with saves dropdown. CSV node/segment import (headerless column assignment, fuzzy/OGF node matching, dedup review with disambiguation). OGF relation import (Overpass API, way stitching, station snapping, maxspeed waypoints). Suspicious segment + segment overlap detection with auto-fix (junction insertion + service rerouting). Batch way geometry fetching. Reverse service track/platform assignment. Route builder track reassignment.
 - **Phase 18 — Animated Map:** Complete. New "Animated" tab with sim clock (live/fast/paused), per-frame deterministic position interpolation along `dep.times[]`, vehicle markers (triangle when moving, circle when dwelling, line color, white outline). Two views toggled in the header: **Geo** (Leaflet, faded segments, top-THI landmarks) and **Schem** (renderSchematic-powered, full editor styling — segment styles, ticks/termini, blobs, ISI/OSI, labels — independent pan/zoom, route highlight on click). Shared controls: HH:MM scrubber with 5-min red→green busyness heatmap (filtered by `simDate`'s schedulePattern, including yesterday-wrap), date picker, 1×/10×/60×/300× speed, ⏸/▶ pause-resume, "Now" snap-to-live, fit-to-bounds. Vehicle interaction: click → popup (service + line + origin→terminus + current state with live ETA + stock + next 5 stops + terminus, refreshed at 4 Hz, follows the marker as it moves) AND highlight of the service's full route on the active view; hover → tooltip (next stop ETA). Junctions/waypoints/pass-throughs are handled by walking `dep.times[]` to surrounding placed stations and interpolating the schem position in time-space across the placed leg. THI was hoisted to a first-class core helper during this phase (formula `0.5·log10(1+traffic) + 2·lines + 1.5·max(0,degree-2) + 3.5·terminus + spatial`, with lateral-inhibition spatial competition); adopted by geomap labels, departure-board "via" rank, beckmap most-wanted tiebreaker, and the new sortable Nodes column. **Deferred** (re-visit later): GIF/WebM export (rendering pipeline was unsatisfying).
 
+### Completed (continued 2)
+- **Phase 19 — Light Tools & QoL:** Complete (v0.19.1.0 → v0.19.11.0). Legacy cleanup, Ctrl+K command palette (localized, pinned/recent sections), detail-into-table accordion, keyboard table nav (+ `?` shortcuts help, `/` focus search), restoration of the June-upload-clobbered PR work (node split & merge, relation importer upgrades), recent + pinned entities (localStorage per slot, topbar dropdown), bulk edit on services, network reach isochrone (one-to-all CSA in the JP tab), per-track/platform occupancy Gantt in detail views, printable timetable book export. Search predicates were found already shipped.
+
 ### Upcoming
-- **Phase 19 — Light Tools & QoL** (sketched: Cmd+K, recent/pinned, network reach, timetable book export, Gantt time viz, bulk-edit, search predicates, legacy cleanup — see ROADMAP.md)
 - **Phase 20 — Undo/Redo**
 - **Phase 21 — Time & Operators** (historical dates, closed stations, Marey diagram, operators + ticketing)
 - **DLC — Disruptions** (always last)

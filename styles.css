@@ -761,6 +761,14 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
 .recent-item .pin-btn { flex-shrink: 0; opacity: 0; }
 .recent-item:hover .pin-btn, .recent-item .pin-btn.pinned { opacity: 1; }
 
+/* Generic kbd chips (shortcuts help modal etc.) */
+.modal kbd, #app-confirm-overlay kbd {
+  display: inline-block; padding: 2px 7px; font-size: 11px;
+  font-family: var(--font-mono); color: var(--text-dim);
+  background: var(--bg-input); border: 1px solid var(--border);
+  border-bottom-width: 2px; border-radius: 4px;
+}
+
 /* Bulk edit bar (services table) */
 .bulk-bar {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;

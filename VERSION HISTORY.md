@@ -1,5 +1,21 @@
 # BRIXYmanager — Version History
 
+## v0.19.11.0 — Phase 19 Session 11: Wrap-up — palette l10n, broken keys, shortcuts help. **Phase 19 complete.**
+The close-out session for Phase 19 (Light Tools & QoL).
+
+**Command palette fully localized.** All ~43 hardcoded strings now go through `t()` under a new `pal.*` namespace: action labels, "Go to" tab entries (labels resolve lazily from the `nav.*` keys, so a language switch is picked up), category headers (including the v0.19.6.0 Pinned/Recent), secondaries (service/platform counts with proper one/other plurals, segment kind labels), empty states, the search placeholder, and the footer hint chips (now `data-t` spans in the HTML).
+
+**Seven broken `t()` references fixed** — keys that were called but never defined, rendering as raw dot-paths: `dashboard.welcome_desc` (the first thing a new user reads!), `th.platform` (node detail schedule header), and the five route-builder tooltips (`tooltip.insert_waypoint`, `tooltip.clear_route`, `tooltip.remove_start`, `tooltip.remove_end`, `tooltip.mark_pass_through`). A full sweep confirms every `t()` call in every module now resolves against `lang/en.js` (1104 keys).
+
+**Keyboard shortcuts catalogued + two gaps filled.**
+- **`?`** opens a Keyboard Shortcuts help modal listing everything: Ctrl+K palette, ↑/↓ row nav, ↵ expand, Esc close, and the two new ones. No-ops while typing or while a modal/palette is open.
+- **`/`** focuses the active entity tab's search field — search-first workflows never need the mouse: `/` type ↓ ↓ ↵.
+- Generic `kbd` chip styling added for modal contexts (the palette footer had its own).
+
+**Still open from the wrap-up list (not phase-gating):** `lang/hs.js` catch-up (~390 keys behind now — translation content, not wiring) and "additional issue checks as discovered" (ongoing by nature; candidates are catalogued in the v0.19.5.x review).
+
+**Phase 19 (Light Tools & QoL) is complete:** legacy cleanup (S1), Ctrl+K palette (S2), detail accordion (S3), keyboard table nav (S4), lost-PR restoration (S5), recent + pinned (S6), bulk edit (S7), network reach (S8), occupancy Gantt (S9), timetable book (S10), wrap-up (S11). Search predicates turned out to be already shipped. Next up: Phase 20 — Undo/Redo.
+
 ## v0.19.10.0 — Phase 19 Session 10: Timetable Book export
 Printable per-line timetable book, exported from a new **Timetable Book** card on the Import/Export tab.
 

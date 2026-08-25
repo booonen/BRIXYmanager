@@ -787,3 +787,39 @@ document.addEventListener('click', (e) => {
   const dd = document.getElementById('recent-dropdown');
   if (dd && !dd.contains(e.target)) closeRecentDropdown();
 });
+
+// ============================================================
+// GLOBAL KEYBOARD SHORTCUTS — ? help overlay, / focus search
+// ============================================================
+
+const _SEARCH_BY_TAB = { nodes: 'node-search', segments: 'segment-search', lines: 'line-search', services: 'service-search' };
+
+document.addEventListener('keydown', (e) => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const el = document.activeElement;
+  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable)) return;
+  const pal = document.getElementById('palette-overlay');
+  if (pal && pal.classList.contains('open')) return;
+  if (e.key === '?') {
+    e.preventDefault();
+    openShortcutsHelp();
+  } else if (e.key === '/') {
+    const active = document.querySelector('.nav-item.active')?.dataset.tab;
+    const sid = _SEARCH_BY_TAB[active];
+    if (sid) { e.preventDefault(); document.getElementById(sid)?.focus(); }
+  }
+});
+
+function openShortcutsHelp() {
+  if (document.querySelector('.modal-overlay.open, #app-confirm-overlay')) return;
+  const row = (keys, desc) => `<tr><td style="white-space:nowrap;padding:6px 20px 6px 0">${keys.map(k => `<kbd>${k}</kbd>`).join('<span style="opacity:0.5;margin:0 2px">+</span>')}</td><td class="text-dim" style="font-size:13px;padding:6px 0">${desc}</td></tr>`;
+  openModal(t('kb.title'), `<table style="border-collapse:collapse">
+    ${row(['Ctrl', 'K'], t('kb.palette'))}
+    <tr><td style="white-space:nowrap;padding:6px 20px 6px 0"><kbd>↑</kbd> <kbd>↓</kbd></td><td class="text-dim" style="font-size:13px;padding:6px 0">${t('kb.rows')}</td></tr>
+    ${row(['↵'], t('kb.expand'))}
+    ${row(['Esc'], t('kb.close'))}
+    ${row(['/'], t('kb.search'))}
+    ${row(['?'], t('kb.help'))}
+  </table>`,
+  `<button class="btn" onclick="closeModal()">${t('btn.close')}</button>`);
+}

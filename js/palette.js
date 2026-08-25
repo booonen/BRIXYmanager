@@ -16,34 +16,34 @@ const _palette = {
 const _PALETTE_CAT_ORDER = ['pinned', 'recent', 'action', 'tab', 'line', 'service', 'station', 'node', 'segment'];
 
 const _PALETTE_TABS = [
-  { id: 'dashboard', icon: '◫', label: 'Dashboard' },
-  { id: 'nodes', icon: '◉', label: 'Nodes' },
-  { id: 'segments', icon: '─', label: 'Segments' },
-  { id: 'modes', icon: '◆', label: 'Modes' },
-  { id: 'lines', icon: '≡', label: 'Lines' },
-  { id: 'services', icon: '▷', label: 'Services' },
-  { id: 'schedule', icon: '◷', label: 'Schedule' },
-  { id: 'stock', icon: '🚃', label: 'Rolling Stock' },
-  { id: 'map', icon: '🗺', label: 'Geomap' },
-  { id: 'schematic', icon: '⬡', label: 'Railmap' },
-  { id: 'animated', icon: '▶', label: 'Animated' },
-  { id: 'departures', icon: '▤', label: 'Departures' },
-  { id: 'journey', icon: '⇄', label: 'Journey Planner' },
-  { id: 'issues', icon: '⚠', label: 'Issues' },
-  { id: 'settings', icon: '⚙', label: 'Settings' },
-  { id: 'import-export', icon: '⇅', label: 'Import / Export' },
+  { id: 'dashboard', icon: '◫', key: 'nav.dashboard' },
+  { id: 'nodes', icon: '◉', key: 'nav.nodes' },
+  { id: 'segments', icon: '─', key: 'nav.segments' },
+  { id: 'modes', icon: '◆', key: 'nav.modes' },
+  { id: 'lines', icon: '≡', key: 'nav.lines' },
+  { id: 'services', icon: '▷', key: 'nav.services' },
+  { id: 'schedule', icon: '◷', key: 'nav.schedule' },
+  { id: 'stock', icon: '🚃', key: 'nav.stock' },
+  { id: 'map', icon: '🗺', key: 'nav.geomap' },
+  { id: 'schematic', icon: '⬡', key: 'nav.railmap' },
+  { id: 'animated', icon: '▶', key: 'nav.animated' },
+  { id: 'departures', icon: '▤', key: 'nav.departures' },
+  { id: 'journey', icon: '⇄', key: 'nav.journey' },
+  { id: 'issues', icon: '⚠', key: 'nav.issues' },
+  { id: 'settings', icon: '⚙', key: 'nav.settings' },
+  { id: 'import-export', icon: '⇅', key: 'nav.import_export' },
 ];
 
 function _paletteActions() {
   return [
-    { id: 'new-node', icon: '+', label: 'Create new node', run: () => { switchTab('nodes'); openNodeModal(); } },
-    { id: 'new-segment', icon: '+', label: 'Create new segment', run: () => { switchTab('segments'); openSegmentModal(); } },
-    { id: 'new-service', icon: '+', label: 'Create new service', run: () => { switchTab('services'); openServiceModal(); } },
-    { id: 'new-line', icon: '+', label: 'Create new line', run: () => { switchTab('lines'); openLineModal(); } },
-    { id: 'new-mode', icon: '+', label: 'Create new mode', run: () => { switchTab('modes'); openCategoryModal(); } },
-    { id: 'new-stock', icon: '+', label: 'Create new rolling stock', run: () => { switchTab('stock'); openStockModal(); } },
-    { id: 'save', icon: '💾', label: 'Save current system', run: () => { flushSave(); toast('Saved', 'success'); } },
-    { id: 'new-system', icon: '✦', label: 'New system', run: () => { newSystem(); } },
+    { id: 'new-node', icon: '+', label: t('pal.new_node'), run: () => { switchTab('nodes'); openNodeModal(); } },
+    { id: 'new-segment', icon: '+', label: t('pal.new_segment'), run: () => { switchTab('segments'); openSegmentModal(); } },
+    { id: 'new-service', icon: '+', label: t('pal.new_service'), run: () => { switchTab('services'); openServiceModal(); } },
+    { id: 'new-line', icon: '+', label: t('pal.new_line'), run: () => { switchTab('lines'); openLineModal(); } },
+    { id: 'new-mode', icon: '+', label: t('pal.new_mode'), run: () => { switchTab('modes'); openCategoryModal(); } },
+    { id: 'new-stock', icon: '+', label: t('pal.new_stock'), run: () => { switchTab('stock'); openStockModal(); } },
+    { id: 'save', icon: '💾', label: t('pal.save'), run: () => { flushSave(); toast(t('pal.saved'), 'success'); } },
+    { id: 'new-system', icon: '✦', label: t('pal.new_system'), run: () => { newSystem(); } },
   ];
 }
 
@@ -115,9 +115,10 @@ function _paletteBuild(q) {
 
   // Tabs
   for (const tab of _PALETTE_TABS) {
-    const sc = _paletteScore('Go to ' + tab.label, q);
+    const lbl = t('pal.goto_prefix') + t(tab.key);
+    const sc = _paletteScore(lbl, q);
     if (sc.score > 0) {
-      out.push({ cat: 'tab', icon: tab.icon, label: 'Go to ' + tab.label, secondary: '', score: sc.score, hits: sc.hits, run: () => switchTab(tab.id) });
+      out.push({ cat: 'tab', icon: tab.icon, label: lbl, secondary: '', score: sc.score, hits: sc.hits, run: () => switchTab(tab.id) });
     }
   }
 
@@ -128,7 +129,7 @@ function _paletteBuild(q) {
       const svcCount = (data.services || []).filter(s => s.groupId === g.id).length;
       out.push({
         cat: 'line', icon: '', label: g.name,
-        secondary: `${svcCount} service${svcCount === 1 ? '' : 's'}`,
+        secondary: svcCount === 1 ? t('pal.services_one') : t('pal.services_other', { n: svcCount }),
         color: g.color,
         score: sc.score, hits: sc.hits,
         run: () => { switchTab('lines'); showLineDetail(g.id); },
@@ -158,7 +159,7 @@ function _paletteBuild(q) {
     if (sc.score > 0) {
       out.push({
         cat: 'station', icon: n.type === 'bus_stop' ? '◎' : '◉', label: n.name,
-        secondary: (n.platforms || []).length ? `${(n.platforms || []).length} platform${(n.platforms || []).length === 1 ? '' : 's'}` : (t('type.' + n.type) || n.type),
+        secondary: (n.platforms || []).length ? ((n.platforms || []).length === 1 ? t('pal.platforms_one') : t('pal.platforms_other', { n: (n.platforms || []).length })) : (t('type.' + n.type) || n.type),
         score: sc.score, hits: sc.hits,
         run: () => { switchTab('nodes'); showNodeDetail(n.id); },
       });
@@ -187,7 +188,7 @@ function _paletteBuild(q) {
     const segLabel = `${a.name} – ${b.name}`;
     const sc = _paletteScore(segLabel, q);
     if (sc.score > 0) {
-      const kind = isInterchange(seg) ? (seg.interchangeType || 'interchange') : (isRoad(seg) ? 'road' : 'track');
+      const kind = isInterchange(seg) ? (seg.interchangeType ? seg.interchangeType.toUpperCase() : t('pal.kind_interchange')) : (isRoad(seg) ? t('pal.kind_road') : t('pal.kind_track'));
       out.push({
         cat: 'segment', icon: isInterchange(seg) ? '⇆' : (isRoad(seg) ? '═' : '─'),
         label: segLabel,
@@ -213,9 +214,9 @@ function _paletteBuild(q) {
 // ---- Render ----
 
 const _PALETTE_CAT_LABELS = {
-  pinned: 'Pinned', recent: 'Recent',
-  action: 'Actions', tab: 'Go to', line: 'Lines',
-  service: 'Services', station: 'Stations', node: 'Nodes', segment: 'Segments',
+  pinned: 'pal.cat_pinned', recent: 'pal.cat_recent',
+  action: 'pal.cat_action', tab: 'pal.cat_tab', line: 'pal.cat_line',
+  service: 'pal.cat_service', station: 'pal.cat_station', node: 'pal.cat_node', segment: 'pal.cat_segment',
 };
 
 function _paletteEscapeHtml(s) {
@@ -242,14 +243,14 @@ function _paletteRenderResults() {
   if (!list) return;
   const r = _palette.results;
   if (!r.length) {
-    list.innerHTML = `<div class="palette-empty">${_palette.query ? 'No results' : 'Type to search · ↑↓ Enter Esc'}</div>`;
+    list.innerHTML = `<div class="palette-empty">${_palette.query ? t('pal.no_results') : t('pal.empty_hint')}</div>`;
     return;
   }
   let html = '';
   let lastCat = null;
   r.forEach((row, i) => {
     if (row.cat !== lastCat) {
-      html += `<div class="palette-section">${_PALETTE_CAT_LABELS[row.cat] || row.cat}</div>`;
+      html += `<div class="palette-section">${_PALETTE_CAT_LABELS[row.cat] ? t(_PALETTE_CAT_LABELS[row.cat]) : row.cat}</div>`;
       lastCat = row.cat;
     }
     const colorChip = row.color ? `<span class="palette-color" style="background:${row.color}"></span>` : '';
