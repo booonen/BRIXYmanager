@@ -1154,7 +1154,10 @@ registerLanguage('en', 'English', {
     "toggle_to_classic": "Switch to Classic railmap",
     "now_classic": "Classic railmap — shared corridors, automatic parallel lines",
     "now_v3": "Railmap v3 — per-line placement",
-    "unplaced_toast": "{name} unplaced"
+    "unplaced_toast": "{name} unplaced",
+    "export": "Export SVG",
+    "export_done": "Railmap exported",
+    "export_empty": "Nothing to export — place some stations first"
   },
   "pal": {
     "placeholder": "Search actions, tabs, lines, services, stations…",

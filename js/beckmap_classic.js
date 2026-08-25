@@ -495,7 +495,7 @@ function bmcRender() {
   out += `<g transform="translate(${_bmcState.viewX},${_bmcState.viewY}) scale(${_bmcState.zoom})">`;
 
   // grid dots (light)
-  if (_bmcState.zoom > 0.45) {
+  if (_bmcState.zoom > 0.45 && !_bmcState.exporting) {
     const wrap = document.getElementById('schem-canvas-wrap');
     const W = wrap ? wrap.clientWidth : 1200, H = wrap ? wrap.clientHeight : 800;
     const x0 = Math.floor((-_bmcState.viewX / _bmcState.zoom) / BMC_CELL) - 1;
@@ -566,6 +566,17 @@ function bmcRender() {
     out += _bmcDrawMark(info, layout);
   }
 
+  // fork-node handles: junctions and unplaced diverging stops are invisible
+  // but grabbable — drag pins them to a cell, right-click unpins
+  if (!_bmcState.exporting) {
+    for (const info of layout.nodeInfos.values()) {
+      if (info.node && isPassengerStop(info.node) && info.placed) continue;
+      const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
+      const attr = info.placed ? `data-bmc-node="${info.id}"` : `data-bmc-auto="${info.id}"`;
+      out += `<circle class="bmc-autonode" cx="${c.x}" cy="${c.y}" r="6.5" fill="transparent" ${attr} style="cursor:grab"/>`;
+    }
+  }
+
   // labels (blob-group members labelled once per shared display name)
   const labelledNames = new Set();
   for (const info of layout.nodeInfos.values()) {
@@ -581,7 +592,7 @@ function bmcRender() {
     out += _bmcDrawLabel(info, kind, layout);
   }
 
-  if (_bmcState.debug) out += _bmcDebugOverlay(layout);
+  if (_bmcState.debug && !_bmcState.exporting) out += _bmcDebugOverlay(layout);
 
   out += '</g>';
   svg.innerHTML = out;
@@ -590,6 +601,7 @@ function bmcRender() {
 
 function _bmcMarkKind(info, layout) {
   if (!info.placed) return 'none';
+  if (!info.node || !isPassengerStop(info.node)) return 'none'; // junctions stay invisible even when pinned
   const deg = info.edges.length;
   const union = new Set();
   for (const e of info.edges) for (const g of e.lines) union.add(g);
@@ -985,6 +997,18 @@ function _bmcAttachEvents() {
         return;
       }
     }
+    const autoEl = ev.target.closest && ev.target.closest('[data-bmc-auto]');
+    if (autoEl && ev.button === 0) {
+      const nid = autoEl.getAttribute('data-bmc-auto');
+      const info = _bmcState.layout && _bmcState.layout.nodeInfos.get(nid);
+      if (info && info.pos) {
+        bmcData().stations[nid] = { gx: info.pos.gx, gy: info.pos.gy }; // pin
+        _bmcState.nodeDrag = { nodeId: nid, gx: info.pos.gx, gy: info.pos.gy };
+        svg.setPointerCapture(ev.pointerId);
+        ev.preventDefault();
+        return;
+      }
+    }
     if (ev.button === 0) {
       _bmcState.panning = { startX: ev.clientX, startY: ev.clientY, vx: _bmcState.viewX, vy: _bmcState.viewY };
       svg.setPointerCapture(ev.pointerId);
@@ -1129,6 +1153,7 @@ function bmcEnsureDom() {
     <button class="schem-btn" onclick="bmcZoom(0.8)" title="${t('bmc.zoom_out')}">−</button>
     <button class="schem-btn" onclick="bmcFitAll()" title="${t('bmc.fit')}">⊞</button>
     <button class="schem-btn" onclick="_bmcState.debug=!_bmcState.debug;bmcRender()" title="${t('bmc.debug')}" style="font-size:9px">DBG</button>
+    <button class="schem-btn" onclick="bmcExportSVG()" title="${t('bmc.export')}" style="font-size:9px">SVG</button>
     <button class="schem-btn" onclick="bmcToggleStyle()" title="${t('bmc.toggle_to_v3')}" style="font-size:8px">V3</button>`;
   wrap.appendChild(hud);
   // toggle button in the v3 HUD
@@ -1188,6 +1213,41 @@ function bmcToggleStyle() {
   if (next === 'classic') bmcActivate();
   else { bmcDeactivate(); if (typeof renderSchemSidebar === 'function') renderSchemSidebar(); if (typeof renderSchematic === 'function') renderSchematic(); }
   toast(next === 'classic' ? t('bmc.now_classic') : t('bmc.now_v3'), 'info');
+}
+
+function bmcExportSVG() {
+  const layout = _bmcState.layout || bmcComputeLayout();
+  const pts = [];
+  for (const n of layout.nodes.values()) if (n.pos) pts.push(n.pos);
+  if (!pts.length) { toast(t('bmc.export_empty'), 'error'); return; }
+  const xs = pts.map(p => p.gx * BMC_CELL), ys = pts.map(p => p.gy * BMC_CELL);
+  const PAD = 90;
+  const minX = Math.min(...xs) - PAD, maxX = Math.max(...xs) + PAD;
+  const minY = Math.min(...ys) - PAD, maxY = Math.max(...ys) + PAD;
+
+  // re-render in export mode with an identity view, capture, restore
+  const saved = { viewX: _bmcState.viewX, viewY: _bmcState.viewY, zoom: _bmcState.zoom };
+  _bmcState.exporting = true;
+  _bmcState.viewX = 0; _bmcState.viewY = 0; _bmcState.zoom = 1;
+  bmcRender();
+  const content = document.getElementById('bmc-svg').innerHTML;
+  _bmcState.exporting = false;
+  Object.assign(_bmcState, saved);
+  bmcRender();
+
+  const svgDoc = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${maxX - minX} ${maxY - minY}" width="${(maxX - minX) * 2}" height="${(maxY - minY) * 2}" font-family="'Hammersmith One',sans-serif">
+<style>@import url('https://fonts.googleapis.com/css2?family=Hammersmith+One&amp;display=swap');</style>
+<rect x="${minX}" y="${minY}" width="${maxX - minX}" height="${maxY - minY}" fill="#ffffff"/>
+${content}
+</svg>`;
+  const blob = new Blob([svgDoc], { type: 'image/svg+xml' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = (data.settings?.systemName || 'railmap') + '-classic.svg';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast(t('bmc.export_done'), 'success');
 }
 
 // Hook: called from switchTab when the schematic tab is shown

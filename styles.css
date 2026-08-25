@@ -960,3 +960,7 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
 }
 .leaflet-tooltip.anim-vehicle-tooltip::before { border-top-color: var(--border) !important; }
 #animated-map .leaflet-interactive { cursor: pointer; }
+
+
+/* Beckmap Classic fork-node handles: invisible until hovered */
+.bmc-autonode:hover { fill: rgba(91, 138, 245, 0.25); stroke: #5b8af5; stroke-width: 1.2; }
