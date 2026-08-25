@@ -2259,17 +2259,88 @@ const _svcSortDefs = {
   departures: s => data.departures.filter(d => d.serviceId === s.id).length
 };
 
-function renderServices() {
-  initSearchHints('service-search', 'services');
+function _svcFilteredList() {
   const q = (document.getElementById('service-search')?.value || '');
   const parsed = parseSearchQuery(q);
-  const list = data.services.filter(s =>
+  return data.services.filter(s =>
     applySearchQuery(s, parsed, _svcPrefixMap, (s, ft) => {
       const qn = stripDiacritics(ft);
       const gn = groupName(s.groupId).toLowerCase();
       return stripDiacritics(s.name.toLowerCase()).includes(qn) || stripDiacritics(gn).includes(qn);
     })
   );
+}
+
+// ---- Bulk selection + bulk edit (services) ----
+const _bulkSel = new Set();
+
+function bulkSvcIds() { return [..._bulkSel].filter(id => getSvc(id)); }
+
+function bulkToggleSvc(id, on) {
+  if (on) _bulkSel.add(id); else _bulkSel.delete(id);
+  _bulkRefreshBar();
+}
+
+function bulkToggleAllSvc(on) {
+  for (const s of _svcFilteredList()) { if (on) _bulkSel.add(s.id); else _bulkSel.delete(s.id); }
+  renderServices();
+}
+
+function bulkClearSvc() { _bulkSel.clear(); renderServices(); }
+
+function _bulkBarHTML() {
+  const ids = bulkSvcIds();
+  if (!ids.length) return '';
+  const lineOpts = `<option value="">${t('bulk.set_line')}</option><option value="__none__">${t('bulk.no_line')}</option>`
+    + data.serviceGroups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  const modeOpts = `<option value="">${t('bulk.set_mode')}</option>`
+    + data.categories.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+  const stockOpts = `<option value="">${t('bulk.set_stock')}</option><option value="__none__">${t('bulk.no_stock')}</option>`
+    + data.rollingStock.map(st => `<option value="${st.id}">${esc(st.name)}</option>`).join('');
+  return `<div class="bulk-bar">
+    <strong>${t('bulk.selected', { n: ids.length })}</strong>
+    <select onchange="if(this.value)bulkSetSvcField('groupId',this.value)">${lineOpts}</select>
+    <select onchange="if(this.value)bulkSetSvcField('categoryId',this.value)">${modeOpts}</select>
+    <select onchange="if(this.value)bulkSetSvcField('stockId',this.value)">${stockOpts}</select>
+    <button class="btn btn-sm btn-danger" onclick="bulkDeleteSvc()">✕ ${t('bulk.delete')}</button>
+    <button class="btn btn-sm" onclick="bulkClearSvc()">${t('bulk.clear')}</button>
+  </div>`;
+}
+
+function _bulkRefreshBar() {
+  const el = document.getElementById('svc-bulk-bar');
+  if (el) el.innerHTML = _bulkBarHTML();
+  const all = document.getElementById('svc-bulk-all');
+  if (all) {
+    const list = _svcFilteredList();
+    all.checked = list.length > 0 && list.every(s => _bulkSel.has(s.id));
+  }
+}
+
+function bulkSetSvcField(field, value) {
+  const ids = bulkSvcIds(); if (!ids.length) return;
+  const v = value === '__none__' ? null : value;
+  for (const id of ids) getSvc(id)[field] = v;
+  save(); renderServices(); updateBadges();
+  toast(t('bulk.applied', { n: ids.length }), 'success');
+}
+
+function bulkDeleteSvc() {
+  const ids = bulkSvcIds(); if (!ids.length) return;
+  const idSet = new Set(ids);
+  const depCount = data.departures.filter(d => idSet.has(d.serviceId)).length;
+  appConfirm(t('confirm.bulk_delete_services', { n: ids.length, deps: depCount }), () => {
+    data.services = data.services.filter(s => !idSet.has(s.id));
+    data.departures = data.departures.filter(d => !idSet.has(d.serviceId));
+    _bulkSel.clear();
+    save(); renderServices(); updateBadges();
+    toast(t('bulk.deleted', { n: ids.length }), 'success');
+  });
+}
+
+function renderServices() {
+  initSearchHints('service-search', 'services');
+  const list = _svcFilteredList();
   const el = document.getElementById('services-list');
   detailMapDestroy('dm-svc');
 
@@ -2313,8 +2384,12 @@ function renderServices() {
       </div></div>`;
   }
 
+  // Bulk edit bar (visible when a selection exists)
+  html += `<div id="svc-bulk-bar">${_bulkBarHTML()}</div>`;
+
   // Build table
-  html += `<table class="data-table"><thead><tr>${sortableHeader('services','name',t('th.service'))}<th>${t("th.line")}</th><th>${t("th.mode")}</th><th>${t("th.stock")}</th>${sortableHeader('services','stops',t('th.stops'))}<th>${t("th.route")}</th>${sortableHeader('services','departures',t('th.departures'))}<th>${t('th.pattern')}</th><th></th></tr></thead><tbody>`;
+  const allSelected = list.length > 0 && list.every(s => _bulkSel.has(s.id));
+  html += `<table class="data-table"><thead><tr><th class="bulk-col"><input type="checkbox" id="svc-bulk-all" ${allSelected ? 'checked' : ''} onchange="bulkToggleAllSvc(this.checked)"></th>${sortableHeader('services','name',t('th.service'))}<th>${t("th.line")}</th><th>${t("th.mode")}</th><th>${t("th.stock")}</th>${sortableHeader('services','stops',t('th.stops'))}<th>${t("th.route")}</th>${sortableHeader('services','departures',t('th.departures'))}<th>${t('th.pattern')}</th><th></th></tr></thead><tbody>`;
 
   if (isSorted) {
     // Flat sorted list (no grouping)
@@ -2323,14 +2398,14 @@ function renderServices() {
     // Render grouped services with group headers
     for (const [gid, svcs] of Object.entries(grouped)) {
       const g = getGroup(gid);
-      html += `<tr><td colspan="9" style="background:var(--bg-input);padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-dim)">
+      html += `<tr><td colspan="10" style="background:var(--bg-input);padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-dim)">
         <span class="dot" style="background:${g?.color||'var(--text-muted)'};margin-right:6px"></span>${esc(g?.name || '?')} (${svcs.length} services)</td></tr>`;
       html += svcs.map(s => svcTableRow(s)).join('');
     }
 
     // Ungrouped
     if (ungrouped.length && Object.keys(grouped).length) {
-      html += `<tr><td colspan="9" style="background:var(--bg-input);padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-dim)">
+      html += `<tr><td colspan="10" style="background:var(--bg-input);padding:6px 12px;font-size:12px;font-weight:600;color:var(--text-dim)">
         Ungrouped (${ungrouped.length})</td></tr>`;
     }
     html += ungrouped.map(s => svcTableRow(s)).join('');
@@ -2351,6 +2426,7 @@ function svcTableRow(s) {
   const grp = getGroup(s.groupId);
   const desc = s.description ? `<div class="text-muted" style="font-size:11px;margin-top:2px">${esc(s.description)}</div>` : '';
   return `<tr data-id="${s.id}" class="row-clickable" onclick="if(_detailRowClickGuard(event)) showServiceDetail('${s.id}')">
+    <td class="bulk-col" onclick="event.stopPropagation()"><input type="checkbox" ${_bulkSel.has(s.id) ? 'checked' : ''} onchange="bulkToggleSvc('${s.id}', this.checked)"></td>
     <td><strong>${esc(s.name)}</strong>${desc}</td>
     <td class="text-dim" style="font-size:12px">${grp ? `<span class="chip clickable" onclick="event.stopPropagation();switchTab('lines');showLineDetail('${grp.id}')"><span class="dot" style="background:${grp.color||'var(--text-muted)'}"></span>${esc(grp.name)}</span>` : '—'}</td>
     <td>${cat ? `<span class="chip"><span class="dot" style="background:${svcLineColor(s)}"></span>${esc(cat.abbreviation||cat.name)}</span>` : '—'}</td>

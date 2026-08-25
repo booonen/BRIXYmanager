@@ -760,6 +760,17 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
 .recent-item .recent-ts { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); flex-shrink: 0; }
 .recent-item .pin-btn { flex-shrink: 0; opacity: 0; }
 .recent-item:hover .pin-btn, .recent-item .pin-btn.pinned { opacity: 1; }
+
+/* Bulk edit bar (services table) */
+.bulk-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 12px; margin-bottom: 12px;
+  background: var(--accent-glow); border: 1px solid var(--border);
+  border-radius: var(--radius); font-size: 13px;
+}
+.bulk-bar select { font-size: 12px; padding: 4px 8px; width: auto; }
+.data-table th.bulk-col, .data-table td.bulk-col { width: 30px; text-align: center; }
+.data-table td.bulk-col { cursor: default; }
 .saves-dropdown-item:hover { background: var(--bg-hover); }
 .saves-dropdown-item.active { background: var(--accent-glow); }
 .saves-dropdown-divider {

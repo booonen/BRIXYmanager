@@ -1,5 +1,16 @@
 # BRIXYmanager — Version History
 
+## v0.19.7.0 — Phase 19 Session 7: Bulk edit on services
+Multi-select + bulk operations on the Services table.
+
+- **Checkbox column** (new first column) on every service row; the header checkbox selects/deselects *the currently filtered list*, so search + select-all composes ("`mode:regional` → select all → set stock"). Selection lives in an in-memory `Set`, survives re-renders and searches, and silently drops ids that stop existing.
+- **Bulk bar** appears above the table whenever something is selected: "N selected", three apply-on-change dropdowns — **Set line** (incl. "— No line —"), **Set mode**, **Set stock** (incl. "— No stock —") — plus **Delete** and **Clear selection**. Field updates match single-edit semantics (departure times are not auto-recalculated on stock change — same as editing one service; use ↻ Recalculate as usual).
+- **Bulk delete** confirms once with both counts ("Delete N selected services? M departure(s) will be removed with them.") and cascades departures exactly like single delete.
+- Checkbox cells stop row-expansion clicks; the accordion, keyboard nav, and group-header rows all account for the new column (colspans bumped).
+- `renderServices`'s filter predicate was extracted to `_svcFilteredList()` so select-all and the table share one definition of "what's visible".
+
+Segments/nodes bulk edit deferred — the roadmap said "extends if scope allows"; services was the high-value one, and the pattern (checkbox column + `_bulkSel` + bar) is reusable if the need appears.
+
 ## v0.19.6.0 — Phase 19 Session 6: Recent + Pinned entities
 **Recent tracking.** Expanding any entity detail row (nodes, segments, lines, services) records it as recently viewed — hooked once in `expandDetailRow`, so clicks, palette jumps, and keyboard nav all count; silent restores after re-render don't. Stored in `localStorage` per save slot (`railmanager:recent:<saveId>`, capped at 12) — deliberately *not* in the save blob: it's a UI convenience, shouldn't churn saves, and stays off the save→re-render path.
 

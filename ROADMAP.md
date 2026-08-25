@@ -96,7 +96,7 @@ A grab-bag phase of small, high-value additions and tools. Sketched during the v
 - ~~Search predicates~~ ✅ already shipped pre-Phase-19 (`mode:`, `line:`, `stops:3+`, ranges, negation, OR groups on all four entity tables) — this sketch predated the implementation
 
 **Bulk operations**
-- Multi-select + bulk-edit on services (one session). Extends to segments / nodes if scope allows.
+- ~~Multi-select + bulk-edit on services~~ ✅ v0.19.7.0 (segments/nodes deferred; pattern is reusable)
 
 **Visualization**
 - Network reach analysis — N-minute travel-time isochrone from a query station, leveraging existing CSA

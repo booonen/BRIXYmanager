@@ -462,6 +462,7 @@ registerLanguage('en', 'English', {
     "delete_mode": "Remove mode \"{name}\"?",
     "delete_stock": "Remove stock type \"{name}\"?",
     "delete_service": "Remove service \"{name}\"?",
+    "bulk_delete_services": "Delete {n} selected services? {deps} departure(s) will be removed with them.",
     "delete_orphans": "Delete {n} orphaned departure(s)?",
     "recalc_all": "Recalculate all departures? Manual dwell overrides will be preserved, but all travel times will be re-derived from current segment and stock data.",
     "apply_schedule": "{action} for {name}: every {freq} min from {start} to {end}?"
@@ -1124,5 +1125,17 @@ registerLanguage('en', 'English', {
     "min_ago": "{n}m ago",
     "hour_ago": "{n}h ago",
     "day_ago": "{n}d ago"
+  },
+  "bulk": {
+    "selected": "{n} selected",
+    "set_line": "Set line…",
+    "set_mode": "Set mode…",
+    "set_stock": "Set stock…",
+    "no_line": "— No line —",
+    "no_stock": "— No stock —",
+    "delete": "Delete",
+    "clear": "Clear selection",
+    "applied": "Updated {n} services",
+    "deleted": "Deleted {n} services"
   }
 });
