@@ -1143,6 +1143,19 @@ registerLanguage('en', 'English', {
     "hour_ago": "{n}h ago",
     "day_ago": "{n}d ago"
   },
+  "bmc": {
+    "sidebar_hint": "Drag stations onto the canvas — Classic railmap",
+    "all_placed": "All stations placed.",
+    "zoom_in": "Zoom in",
+    "zoom_out": "Zoom out",
+    "fit": "Fit all",
+    "debug": "Toggle debug overlay",
+    "toggle_to_v3": "Switch to Railmap v3",
+    "toggle_to_classic": "Switch to Classic railmap",
+    "now_classic": "Classic railmap — shared corridors, automatic parallel lines",
+    "now_v3": "Railmap v3 — per-line placement",
+    "unplaced_toast": "{name} unplaced"
+  },
   "pal": {
     "placeholder": "Search actions, tabs, lines, services, stations…",
     "no_results": "No results",

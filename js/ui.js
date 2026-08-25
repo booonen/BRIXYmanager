@@ -434,7 +434,7 @@ function switchTab(tab) {
     schedule: renderSchedule,
     map: () => { if (!_map) initMap(); else { _map.invalidateSize(); renderMapContent(false); } },
     animated: () => { if (typeof initAnimatedMap === 'function') { if (!_animMap) initAnimatedMap(); else { _animMap.invalidateSize(); animOnTabShow(); } } },
-    schematic: () => { initSchematic(); renderSchematic(); },
+    schematic: () => { initSchematic(); renderSchematic(); if (typeof bmcOnTabShow === 'function') bmcOnTabShow(); },
     departures: () => { populateStationSelect(); renderDepartures(); },
     journey: initJourneyPlanner,
     issues: runIssueDetection,
