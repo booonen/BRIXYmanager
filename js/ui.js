@@ -658,3 +658,132 @@ function nodePickerGetValue(id) {
 function createNodePickerInline(containerId, pickerId, placeholder, filterFn, onSelect, showExtra) {
   createNodePicker({ containerId, pickerId, placeholder, filterFn, onSelect, showExtra });
 }
+
+// ============================================================
+// RECENT + PINNED ENTITIES
+// ============================================================
+// Stored in localStorage per save slot — UI convenience, not network data,
+// so it stays out of the save blob and off the save/re-render path.
+
+const _RECENT_CAP = 12, _PIN_CAP = 12;
+const _ENTITY_KINDS = {
+  nodes:    { tab: 'nodes',    search: 'node-search',    list: 'nodes-list',    icon: '◉', labelKey: 'recent.kind_node',
+              nameOf: id => getNode(id)?.name, show: id => showNodeDetail(id) },
+  segments: { tab: 'segments', search: 'segment-search', list: 'segments-list', icon: '─', labelKey: 'recent.kind_segment',
+              nameOf: id => { const s = getSeg(id); return s ? nodeName(s.nodeA) + ' — ' + nodeName(s.nodeB) : null; }, show: id => showSegmentDetail(id) },
+  lines:    { tab: 'lines',    search: 'line-search',    list: 'lines-list',    icon: '≡', labelKey: 'recent.kind_line',
+              nameOf: id => getGroup(id)?.name, show: id => showLineDetail(id) },
+  services: { tab: 'services', search: 'service-search', list: 'services-list', icon: '▷', labelKey: 'recent.kind_service',
+              nameOf: id => getSvc(id)?.name, show: id => showServiceDetail(id) }
+};
+
+function _recentStoreKey() { return 'railmanager:recent:' + (_activeSaveId || ''); }
+function _pinStoreKey() { return 'railmanager:pins:' + (_activeSaveId || ''); }
+function _lsReadList(key) { try { const v = JSON.parse(localStorage.getItem(key)); return Array.isArray(v) ? v : []; } catch(e) { return []; } }
+function _lsWriteList(key, list) { try { localStorage.setItem(key, JSON.stringify(list)); } catch(e) {} }
+
+function recentTouch(kind, id) {
+  if (!_ENTITY_KINDS[kind] || !_activeSaveId) return;
+  const list = _lsReadList(_recentStoreKey()).filter(r => !(r.kind === kind && r.id === id));
+  list.unshift({ kind, id, ts: Date.now() });
+  _lsWriteList(_recentStoreKey(), list.slice(0, _RECENT_CAP));
+}
+
+function _entityEntryValid(r) { return _ENTITY_KINDS[r.kind] && _ENTITY_KINDS[r.kind].nameOf(r.id) != null; }
+function recentList() { return _lsReadList(_recentStoreKey()).filter(_entityEntryValid); }
+function pinList() { return _lsReadList(_pinStoreKey()).filter(_entityEntryValid); }
+function isPinned(kind, id) { return _lsReadList(_pinStoreKey()).some(p => p.kind === kind && p.id === id); }
+
+function pinToggle(kind, id) {
+  let pins = _lsReadList(_pinStoreKey());
+  if (pins.some(p => p.kind === kind && p.id === id)) {
+    pins = pins.filter(p => !(p.kind === kind && p.id === id));
+  } else {
+    pins.unshift({ kind, id });
+    pins = pins.slice(0, _PIN_CAP);
+  }
+  _lsWriteList(_pinStoreKey(), pins);
+  // Refresh any visible stars for this entity + the dropdown if open
+  const on = isPinned(kind, id);
+  document.querySelectorAll(`.pin-btn[data-pin="${kind}:${id}"]`).forEach(b => {
+    b.textContent = on ? '★' : '☆';
+    b.classList.toggle('pinned', on);
+    b.title = on ? t('pin.unpin') : t('pin.pin');
+  });
+  const menu = document.getElementById('recent-dropdown-menu');
+  if (menu && menu.classList.contains('open')) renderRecentDropdown();
+}
+
+function pinBtnHTML(kind, id) {
+  const on = isPinned(kind, id);
+  return `<button class="pin-btn${on ? ' pinned' : ''}" data-pin="${kind}:${id}" title="${on ? t('pin.unpin') : t('pin.pin')}" onclick="event.stopPropagation();pinToggle('${kind}','${id}')">${on ? '★' : '☆'}</button>`;
+}
+
+// Navigate to an entity's detail row without toggling it closed if already open.
+function gotoEntity(kind, id) {
+  const k = _ENTITY_KINDS[kind]; if (!k) return;
+  if (typeof setSearchValue === 'function') setSearchValue(k.search, '');
+  switchTab(k.tab);
+  if (typeof _detailExpanded === 'undefined' || _detailExpanded[kind] !== id) {
+    k.show(id);
+  } else {
+    const row = document.querySelector(`#${k.list} tr[data-id="${CSS.escape(id)}"]`);
+    if (row) row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function relTime(ts) {
+  const d = typeof ts === 'string' ? new Date(ts).getTime() : ts;
+  if (!d || isNaN(d)) return '';
+  const mins = Math.floor((Date.now() - d) / 60000);
+  if (mins < 1) return t('time.just_now');
+  if (mins < 60) return t('time.min_ago', { n: mins });
+  const h = Math.floor(mins / 60);
+  if (h < 24) return t('time.hour_ago', { n: h });
+  return t('time.day_ago', { n: Math.floor(h / 24) });
+}
+
+function toggleRecentDropdown(e) {
+  if (e) e.stopPropagation();
+  const menu = document.getElementById('recent-dropdown-menu');
+  if (!menu) return;
+  if (menu.classList.contains('open')) { menu.classList.remove('open'); return; }
+  if (typeof closeSavesDropdown === 'function') closeSavesDropdown();
+  renderRecentDropdown();
+  menu.classList.add('open');
+}
+function closeRecentDropdown() {
+  const menu = document.getElementById('recent-dropdown-menu');
+  if (menu) menu.classList.remove('open');
+}
+
+function renderRecentDropdown() {
+  const menu = document.getElementById('recent-dropdown-menu'); if (!menu) return;
+  const pins = pinList();
+  const recents = recentList().filter(r => !pins.some(p => p.kind === r.kind && p.id === r.id));
+  const row = (r, ts) => {
+    const k = _ENTITY_KINDS[r.kind];
+    return `<div class="saves-dropdown-item recent-item" onclick="closeRecentDropdown();gotoEntity('${r.kind}','${r.id}')">
+      <span class="recent-icon">${k.icon}</span>
+      <span class="recent-name">${esc(k.nameOf(r.id) || '?')}</span>
+      ${ts ? `<span class="recent-ts">${relTime(ts)}</span>` : ''}
+      ${pinBtnHTML(r.kind, r.id)}
+    </div>`;
+  };
+  let html = '';
+  if (pins.length) {
+    html += `<div class="saves-dropdown-header">★ ${t('recent.pinned')}</div>`;
+    html += pins.map(p => row(p, null)).join('');
+  }
+  if (recents.length) {
+    html += `<div class="saves-dropdown-header">◴ ${t('recent.recent')}</div>`;
+    html += recents.map(r => row(r, r.ts)).join('');
+  }
+  if (!html) html = `<div class="saves-dropdown-item" style="cursor:default;color:var(--text-muted);font-size:12px">${t('recent.empty')}</div>`;
+  menu.innerHTML = html;
+}
+
+document.addEventListener('click', (e) => {
+  const dd = document.getElementById('recent-dropdown');
+  if (dd && !dd.contains(e.target)) closeRecentDropdown();
+});

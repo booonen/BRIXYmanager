@@ -201,6 +201,7 @@ registerLanguage('en', 'English', {
   },
   "btn": {
     "saves": "Saves",
+    "recent": "Recent",
     "update_coords": "Update Coords",
     "add_node": "+ Add Node",
     "add_segment": "+ Add Segment",
@@ -350,6 +351,7 @@ registerLanguage('en', 'English', {
     "active": "(active)",
     "storage": "Storage",
     "unnamed": "Unnamed System",
+    "opened": "opened",
     "confirm_delete": "Delete save \"{name}\"? This cannot be undone.",
     "confirm_new": "Create a new system? Your current system will remain in the save manager.",
     "prompt_rename": "New name:",
@@ -1103,5 +1105,24 @@ registerLanguage('en', 'English', {
     "beckmap_desc": "{n} line-station placements will be migrated.",
     "abort_self_loop": "Merge would create a self-loop track segment. Delete the direct segment first.",
     "apply_btn": "Merge Nodes"
+  },
+  "recent": {
+    "pinned": "Pinned",
+    "recent": "Recent",
+    "empty": "Nothing here yet — open a station, line, service or segment and it will show up.",
+    "kind_node": "Node",
+    "kind_segment": "Segment",
+    "kind_line": "Line",
+    "kind_service": "Service"
+  },
+  "pin": {
+    "pin": "Pin",
+    "unpin": "Unpin"
+  },
+  "time": {
+    "just_now": "just now",
+    "min_ago": "{n}m ago",
+    "hour_ago": "{n}h ago",
+    "day_ago": "{n}d ago"
   }
 });

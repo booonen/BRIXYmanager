@@ -520,6 +520,16 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
 }
 .detail-panel .close-detail:hover { color: var(--text); }
 
+/* Pin star — detail headers + recent dropdown rows */
+.pin-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text-muted); font-size: 15px; padding: 0 4px; line-height: 1;
+}
+.pin-btn:hover { color: var(--warn); }
+.pin-btn.pinned { color: var(--warn); }
+.detail-panel h3 .pin-btn { margin-left: auto; font-size: 16px; }
+.detail-panel h3 .pin-btn + .close-detail { margin-left: 4px; }
+
 /* ---------------- INLINE DETAIL ACCORDION ---------------- */
 /* Clickable data rows */
 .data-table tr.row-clickable { cursor: pointer; }
@@ -739,6 +749,17 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
   border-bottom: 1px solid var(--border);
 }
 .saves-dropdown-item:last-child { border-bottom: none; }
+.saves-dropdown-header {
+  padding: 6px 12px 4px; font-size: 10px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted);
+  border-bottom: 1px solid var(--border); background: var(--bg);
+}
+.recent-item { display: flex; align-items: center; gap: 8px; }
+.recent-item .recent-icon { color: var(--text-muted); font-size: 12px; flex-shrink: 0; width: 14px; text-align: center; }
+.recent-item .recent-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.recent-item .recent-ts { font-size: 10.5px; color: var(--text-muted); font-family: var(--font-mono); flex-shrink: 0; }
+.recent-item .pin-btn { flex-shrink: 0; opacity: 0; }
+.recent-item:hover .pin-btn, .recent-item .pin-btn.pinned { opacity: 1; }
 .saves-dropdown-item:hover { background: var(--bg-hover); }
 .saves-dropdown-item.active { background: var(--accent-glow); }
 .saves-dropdown-divider {

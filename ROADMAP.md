@@ -85,15 +85,15 @@ A grab-bag phase of small, high-value additions and tools. Sketched during the v
 **Done so far:** Session 1 legacy cleanup (v0.19.1.0), Session 2 Ctrl+K command palette (v0.19.2.0), Session 3 detail-into-table accordion (v0.19.3.0), Session 4 keyboard nav in entity tables (v0.19.4.0), Session 5 restoration of the lost PR work (v0.19.5.0). Struck-through items below are done.
 
 **Top bar / navigation**
-- Recent + pinned entities, surfaced near the saves dropdown
-- Recent saves with last-opened time on the dropdown
+- ~~Recent + pinned entities, surfaced near the saves dropdown~~ ✅ v0.19.6.0
+- ~~Recent saves with last-opened time on the dropdown~~ ✅ v0.19.6.0
 
 **Search & navigation**
 - ~~Cmd+K command palette~~ ✅ v0.19.2.0
 - Broader keyboard shortcuts (catalogue current ones, fill gaps)
 - ~~Keyboard arrow nav in entity tables~~ ✅ v0.19.4.0
 - ~~Detail-view-into-table~~ ✅ v0.19.3.0
-- Search predicates: `category:`, `line:`, `stops:>N`, etc., applied across all searchable tables
+- ~~Search predicates~~ ✅ already shipped pre-Phase-19 (`mode:`, `line:`, `stops:3+`, ranges, negation, OR groups on all four entity tables) — this sketch predated the implementation
 
 **Bulk operations**
 - Multi-select + bulk-edit on services (one session). Extends to segments / nodes if scope allows.

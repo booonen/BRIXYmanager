@@ -56,6 +56,7 @@ function expandDetailRow(kind, entityId, listId, html, afterRender) {
   targetRow.classList.add('expanded');
   targetRow.parentNode.insertBefore(detailRow, targetRow.nextSibling);
   _detailExpanded[kind] = entityId;
+  if (!_detailRestoring && typeof recentTouch === 'function') recentTouch(kind, entityId);
 
   // Sync keyboard-nav highlight with the newly-opened row
   if (typeof _kbNav !== 'undefined') {
@@ -453,6 +454,7 @@ function showNodeDetail(id) {
   let html = `<div class="detail-panel">
     <h3>${esc(node.name)} ${node.refCode ? `<span class="mono text-dim" style="font-size:12px;margin-left:4px">[${esc(node.refCode)}]</span>` : ''}
     <span class="type-badge type-${node.type}" style="font-size:10px">${t('type.'+node.type)}</span>${thiBadge}
+    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('nodes', id) : ''}
     <button class="close-detail" onclick="closeNodeDetail()">✕</button></h3>`;
 
   const ogfLink = node.ogfNode ? `<a href="https://opengeofiction.net/node/${esc(node.ogfNode)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none">OGF ↗</a>` : '';
@@ -1289,6 +1291,7 @@ function showSegmentDetail(segId) {
   let html = `<div class="detail-panel">
     <h3>${esc(nodeName(seg.nodeA))} — ${esc(nodeName(seg.nodeB))} ${seg.refCode ? `<span class="mono text-dim" style="font-size:12px;margin-left:4px">[${esc(seg.refCode)}]</span>` : ''}
     ${road ? '<span class="chip" style="font-size:10px;background:#3d2a1f;color:#e0a860;margin-left:8px">ROAD</span>' : ''}
+    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('segments', id) : ''}
     <button class="close-detail" onclick="event.stopPropagation();closeSegmentDetail()">✕</button></h3>
     ${seg.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(seg.description)}</p>` : ''}
     <div class="flex gap-8 mb-16" style="flex-wrap:wrap">
@@ -1870,6 +1873,7 @@ function showLineDetail(id) {
 
   let html = `<div class="detail-panel">
     <h3><span class="dot" style="background:${g.color||'var(--text-muted)'};width:12px;height:12px;display:inline-block;border-radius:50%;margin-right:8px"></span>${esc(g.name)}
+    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('lines', id) : ''}
     <button class="close-detail" onclick="event.stopPropagation();closeLineDetail()">✕</button></h3>
     ${g.description ? `<p class="text-dim mb-8" style="font-size:13px">${esc(g.description)}</p>` : ''}`;
 
@@ -2453,6 +2457,7 @@ function showServiceDetail(svcId) {
     ${stock ? `<span class="chip" style="margin-left:4px">${stock.traction==='electric'?'⚡':stock.traction==='diesel'?'⛽':'⚡⛽'} ${esc(stock.code||stock.name)}</span>` : ''}
     ${grp ? `<span class="chip clickable" style="margin-left:4px;cursor:pointer" onclick="event.stopPropagation();switchTab('lines');showLineDetail('${grp.id}')"><span class="dot" style="background:${grp.color||'var(--text-muted)'}"></span>${esc(grp.name)}</span>` : ''}
     <span class="chip" style="margin-left:4px;font-size:11px">${esc(describePattern(svc.schedulePattern))}</span>
+    ${typeof pinBtnHTML === 'function' ? pinBtnHTML('services', id) : ''}
     <button class="close-detail" onclick="event.stopPropagation();closeServiceDetail()">✕</button></h3>`;
 
   // Map

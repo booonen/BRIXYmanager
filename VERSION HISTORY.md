@@ -1,5 +1,19 @@
 # BRIXYmanager — Version History
 
+## v0.19.6.0 — Phase 19 Session 6: Recent + Pinned entities
+**Recent tracking.** Expanding any entity detail row (nodes, segments, lines, services) records it as recently viewed — hooked once in `expandDetailRow`, so clicks, palette jumps, and keyboard nav all count; silent restores after re-render don't. Stored in `localStorage` per save slot (`railmanager:recent:<saveId>`, capped at 12) — deliberately *not* in the save blob: it's a UI convenience, shouldn't churn saves, and stays off the save→re-render path.
+
+**Pinning.** Every detail header gets a ☆ star next to the close button; recent-dropdown rows get one on hover. Pinned entities (`railmanager:pins:<saveId>`, capped 12) surface above recents everywhere and never age out.
+
+**Surfaces.**
+- **Topbar "☆ Recent" dropdown** next to Saves: ★ Pinned section on top, ◴ Recent below with relative timestamps (`relTime` — just now / Nm / Nh / Nd ago). Rows navigate via the new `gotoEntity(kind, id)`.
+- **Ctrl+K palette:** on an empty query, Pinned and Recent sections now lead the list (before Actions/Go to), in true recency order. Typing anything switches to normal search — recents don't pollute query results.
+- **Saves dropdown:** each slot now shows "opened Xh ago" (timestamps in a `railmanager:opened` localStorage map, kept out of the registry so `flushSave`'s registry writes can't clobber them; stamped on boot, slot load, and new-system).
+
+**`gotoEntity(kind, id)`** ([js/ui.js](js/ui.js)) is the new shared navigate-to-detail helper: clears the tab's search (so the row exists), switches tab, and — unlike calling `showXxxDetail` directly — never toggles an already-open row closed (it scrolls to it instead). Grown for recents but reusable by the palette and issue actions later.
+
+**Roadmap note.** The other Session 6 candidate — search predicates (`mode:`, `line:`, `stops:3+` etc.) — turned out to be **already fully implemented** across all four entity tables (numeric ops, ranges, negation, OR groups, hint dropdowns); the roadmap sketch predated the implementation. Struck through in ROADMAP.md.
+
 ## v0.19.5.1 — Fix: departure edit modal crashed on open (`t` shadowing)
 Two locals named `t` shadowed the global `t()` translation function in [js/scheduling.js](js/scheduling.js):
 

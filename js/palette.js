@@ -13,7 +13,7 @@ const _palette = {
 };
 
 // Category priority — lower number = higher rank.
-const _PALETTE_CAT_ORDER = ['action', 'tab', 'line', 'service', 'station', 'node', 'segment'];
+const _PALETTE_CAT_ORDER = ['pinned', 'recent', 'action', 'tab', 'line', 'service', 'station', 'node', 'segment'];
 
 const _PALETTE_TABS = [
   { id: 'dashboard', icon: '◫', label: 'Dashboard' },
@@ -93,6 +93,19 @@ function _paletteScore(label, q) {
 
 function _paletteBuild(q) {
   const out = [];
+
+  // Pinned + recent entities — surfaced on empty query only
+  if ((!q || !q.trim()) && typeof pinList === 'function') {
+    const pins = pinList();
+    const recents = recentList().filter(r => !pins.some(p => p.kind === r.kind && p.id === r.id)).slice(0, 6);
+    const push = (r, cat, score) => {
+      const k = _ENTITY_KINDS[r.kind];
+      out.push({ cat, icon: k.icon, label: k.nameOf(r.id) || '?', secondary: '', score, hits: [],
+        run: () => gotoEntity(r.kind, r.id) });
+    };
+    pins.forEach((p, i) => push(p, 'pinned', 1000 - i));
+    recents.forEach((r, i) => push(r, 'recent', 1000 - i));
+  }
 
   // Actions
   for (const a of _paletteActions()) {
@@ -200,6 +213,7 @@ function _paletteBuild(q) {
 // ---- Render ----
 
 const _PALETTE_CAT_LABELS = {
+  pinned: 'Pinned', recent: 'Recent',
   action: 'Actions', tab: 'Go to', line: 'Lines',
   service: 'Services', station: 'Stations', node: 'Nodes', segment: 'Segments',
 };
