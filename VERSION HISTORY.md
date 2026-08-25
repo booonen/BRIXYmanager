@@ -1,5 +1,87 @@
 # BRIXYmanager — Version History
 
+## v0.19.11.0 — Phase 19 Session 11: Wrap-up — palette l10n, broken keys, shortcuts help. **Phase 19 complete.**
+The close-out session for Phase 19 (Light Tools & QoL).
+
+**Command palette fully localized.** All ~43 hardcoded strings now go through `t()` under a new `pal.*` namespace: action labels, "Go to" tab entries (labels resolve lazily from the `nav.*` keys, so a language switch is picked up), category headers (including the v0.19.6.0 Pinned/Recent), secondaries (service/platform counts with proper one/other plurals, segment kind labels), empty states, the search placeholder, and the footer hint chips (now `data-t` spans in the HTML).
+
+**Seven broken `t()` references fixed** — keys that were called but never defined, rendering as raw dot-paths: `dashboard.welcome_desc` (the first thing a new user reads!), `th.platform` (node detail schedule header), and the five route-builder tooltips (`tooltip.insert_waypoint`, `tooltip.clear_route`, `tooltip.remove_start`, `tooltip.remove_end`, `tooltip.mark_pass_through`). A full sweep confirms every `t()` call in every module now resolves against `lang/en.js` (1104 keys).
+
+**Keyboard shortcuts catalogued + two gaps filled.**
+- **`?`** opens a Keyboard Shortcuts help modal listing everything: Ctrl+K palette, ↑/↓ row nav, ↵ expand, Esc close, and the two new ones. No-ops while typing or while a modal/palette is open.
+- **`/`** focuses the active entity tab's search field — search-first workflows never need the mouse: `/` type ↓ ↓ ↵.
+- Generic `kbd` chip styling added for modal contexts (the palette footer had its own).
+
+**Still open from the wrap-up list (not phase-gating):** `lang/hs.js` catch-up (~390 keys behind now — translation content, not wiring) and "additional issue checks as discovered" (ongoing by nature; candidates are catalogued in the v0.19.5.x review).
+
+**Phase 19 (Light Tools & QoL) is complete:** legacy cleanup (S1), Ctrl+K palette (S2), detail accordion (S3), keyboard table nav (S4), lost-PR restoration (S5), recent + pinned (S6), bulk edit (S7), network reach (S8), occupancy Gantt (S9), timetable book (S10), wrap-up (S11). Search predicates turned out to be already shipped. Next up: Phase 20 — Undo/Redo.
+
+## v0.19.10.0 — Phase 19 Session 10: Timetable Book export
+Printable per-line timetable book, exported from a new **Timetable Book** card on the Import/Export tab.
+
+**Config modal.** Optional date (filters departures by each service's schedule pattern for that day; empty = everything), per-line include checkboxes, and an "include services without a line" toggle.
+
+**The book** opens as a standalone document in a new tab — white print-friendly styling (DM Sans + JetBrains Mono), a Print/Save-as-PDF button (hidden in print), `@page` margins, and one section per line with its color bar, page-broken for printing:
+
+- One classic timetable table per service: **rows = passenger stops** (junctions/waypoints excluded, original stop indexing preserved for time lookup), **columns = departures** sorted by start time. First stop shows departure time, last shows arrival, pass-through stops render "|".
+- Wide services chunk into blocks of 12 columns with a "(continued)" caption.
+- Cross-midnight times get a superscript ⁺ (footer legend: "= next day").
+- Services with no matching departures are skipped; a fully empty selection yields a friendly note instead of a blank book.
+
+PDF is deliberately delegated to the browser's print dialog — no libraries, consistent with the no-build architecture.
+
+## v0.19.9.0 — Phase 19 Session 9: Occupancy Gantt
+Gantt-style time-of-day occupancy charts inside detail views — the "who is using this infrastructure when" answer at a glance.
+
+- **Segment detail → "Track occupancy"** collapsible: one row per named track (plus an "(unassigned track)" row when multi-track segments have stops without a track assignment), X-axis 00:00–24:00 with hour gridlines and 3-hour labels. Each scheduled traversal renders as a bar colored by its service's line color. Uses the same track-resolution rules as conflict detection (`findSegByTrack`, single-track auto-resolve).
+- **Node detail → "Platform occupancy"** collapsible: one row per platform, bars = arrive→depart dwell per stop (1-minute visual minimum so brief calls stay visible), platform resolution via `depPlatId` (departure overrides honored).
+- **Conflict cue:** overlapping bars within a row get a red outline — a visual echo of the platform/track conflict checks.
+- **Cross-midnight handling:** occupations past 24:00 are split and wrapped to the start of the axis.
+- Bars are clickable (jump to the service via `gotoEntity`) with time-range tooltips. Charts scroll horizontally inside the collapsible; a footnote clarifies the chart covers **all** departures, ignoring schedule patterns — it's an infrastructure-load view, not a single-day timetable.
+- Implementation: `ganttForSegment` / `ganttForNode` / `renderGanttSVG` in [js/scheduling.js](js/scheduling.js) (pure SVG, no libraries), wired into both detail views behind `detailCollapsibleHTML` (closed by default).
+
+**Also fixed:** the v0.19.6.0 pin buttons in segment and service detail headers referenced an `id` variable that doesn't exist in those functions (`segId`/`svcId`) — opening either detail threw a `ReferenceError` and rendered nothing. Caught by this session's smoke test; both fixed and re-verified.
+
+## v0.19.8.0 — Phase 19 Session 8: Network reach
+The Journey Planner tab gets a second mode: **Network reach** — "everything I can get to from here within N minutes", riding the existing CSA machinery.
+
+**UI.** A Journey / Network reach tab switcher above the JP form. In reach mode the To picker and swap button hide and a "Within (min)" input (default 60, clamped 5–720) appears; From, Date, and Depart-after are shared with journey mode. Search dispatches by mode via `jpGo()`.
+
+**Algorithm.** `jpReachAll(originIds, startTime, maxMin, searchContext)` — a one-to-all variant of `jpCSASearch`: same `jpBuildConnections` array (so schedule-pattern filtering by the chosen date applies), same transfer semantics (5-min minimum, same-platform exempt, stay-on-trip via `tripReachable`), same ISI/OSI walk propagation, but no destination and a hard cutoff at `startTime + maxMin` (the connection scan also early-exits once departures pass the cutoff). Returns earliest arrival per node. Origin expands to its station group.
+
+**Results.** Aggregated per display name (station-group best arrival), split into four equal time bands (e.g. ≤15 / ≤30 / ≤45 / ≤60 for a 60-min window) with a green→red band palette:
+- Summary line ("X of Y stations reachable within N min from Origin") + band legend.
+- **Reach map** (Leaflet + OGF tiles): banded circle markers for reached stations with arrival tooltips, small grey dots for unreached stations, an accent-ringed origin marker, auto-fit bounds. Honors the `jpMapTiles` setting.
+- **Band sections** below the map: clickable station chips (arrival time + "+Nm") that jump to the node detail via `gotoEntity`.
+- Reached stations without coordinates are counted in a footnote and appear in the list only.
+
+Reachability is schedule-based by design — a connected segment with no service on it does not make a station reachable (verified in the smoke test).
+
+## v0.19.7.0 — Phase 19 Session 7: Bulk edit on services
+Multi-select + bulk operations on the Services table.
+
+- **Checkbox column** (new first column) on every service row; the header checkbox selects/deselects *the currently filtered list*, so search + select-all composes ("`mode:regional` → select all → set stock"). Selection lives in an in-memory `Set`, survives re-renders and searches, and silently drops ids that stop existing.
+- **Bulk bar** appears above the table whenever something is selected: "N selected", three apply-on-change dropdowns — **Set line** (incl. "— No line —"), **Set mode**, **Set stock** (incl. "— No stock —") — plus **Delete** and **Clear selection**. Field updates match single-edit semantics (departure times are not auto-recalculated on stock change — same as editing one service; use ↻ Recalculate as usual).
+- **Bulk delete** confirms once with both counts ("Delete N selected services? M departure(s) will be removed with them.") and cascades departures exactly like single delete.
+- Checkbox cells stop row-expansion clicks; the accordion, keyboard nav, and group-header rows all account for the new column (colspans bumped).
+- `renderServices`'s filter predicate was extracted to `_svcFilteredList()` so select-all and the table share one definition of "what's visible".
+
+Segments/nodes bulk edit deferred — the roadmap said "extends if scope allows"; services was the high-value one, and the pattern (checkbox column + `_bulkSel` + bar) is reusable if the need appears.
+
+## v0.19.6.0 — Phase 19 Session 6: Recent + Pinned entities
+**Recent tracking.** Expanding any entity detail row (nodes, segments, lines, services) records it as recently viewed — hooked once in `expandDetailRow`, so clicks, palette jumps, and keyboard nav all count; silent restores after re-render don't. Stored in `localStorage` per save slot (`railmanager:recent:<saveId>`, capped at 12) — deliberately *not* in the save blob: it's a UI convenience, shouldn't churn saves, and stays off the save→re-render path.
+
+**Pinning.** Every detail header gets a ☆ star next to the close button; recent-dropdown rows get one on hover. Pinned entities (`railmanager:pins:<saveId>`, capped 12) surface above recents everywhere and never age out.
+
+**Surfaces.**
+- **Topbar "☆ Recent" dropdown** next to Saves: ★ Pinned section on top, ◴ Recent below with relative timestamps (`relTime` — just now / Nm / Nh / Nd ago). Rows navigate via the new `gotoEntity(kind, id)`.
+- **Ctrl+K palette:** on an empty query, Pinned and Recent sections now lead the list (before Actions/Go to), in true recency order. Typing anything switches to normal search — recents don't pollute query results.
+- **Saves dropdown:** each slot now shows "opened Xh ago" (timestamps in a `railmanager:opened` localStorage map, kept out of the registry so `flushSave`'s registry writes can't clobber them; stamped on boot, slot load, and new-system).
+
+**`gotoEntity(kind, id)`** ([js/ui.js](js/ui.js)) is the new shared navigate-to-detail helper: clears the tab's search (so the row exists), switches tab, and — unlike calling `showXxxDetail` directly — never toggles an already-open row closed (it scrolls to it instead). Grown for recents but reusable by the palette and issue actions later.
+
+**Roadmap note.** The other Session 6 candidate — search predicates (`mode:`, `line:`, `stops:3+` etc.) — turned out to be **already fully implemented** across all four entity tables (numeric ops, ranges, negation, OR groups, hint dropdowns); the roadmap sketch predated the implementation. Struck through in ROADMAP.md.
+
 ## v0.19.5.1 — Fix: departure edit modal crashed on open (`t` shadowing)
 Two locals named `t` shadowed the global `t()` translation function in [js/scheduling.js](js/scheduling.js):
 

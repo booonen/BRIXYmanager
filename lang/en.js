@@ -201,6 +201,7 @@ registerLanguage('en', 'English', {
   },
   "btn": {
     "saves": "Saves",
+    "recent": "Recent",
     "update_coords": "Update Coords",
     "add_node": "+ Add Node",
     "add_segment": "+ Add Segment",
@@ -262,6 +263,7 @@ registerLanguage('en', 'English', {
     "replace_schedule": "Replace schedule"
   },
   "label": {
+    "reach_within": "Within (min)",
     "station": "Station",
     "time": "Time",
     "date": "Date",
@@ -326,6 +328,11 @@ registerLanguage('en', 'English', {
     "destination_station": "Destination station..."
   },
   "tooltip": {
+    "insert_waypoint": "Split this segment by inserting a junction or waypoint",
+    "clear_route": "Clear the route",
+    "remove_start": "Remove the first stop",
+    "remove_end": "Remove the last stop",
+    "mark_pass_through": "Convert this stop to a pass-through",
     "fetch_ogf": "Fetch coordinates from OGF for all nodes with OGF IDs",
     "set_current_time": "Set to current time",
     "fit_map": "Fit map to all nodes",
@@ -350,6 +357,7 @@ registerLanguage('en', 'English', {
     "active": "(active)",
     "storage": "Storage",
     "unnamed": "Unnamed System",
+    "opened": "opened",
     "confirm_delete": "Delete save \"{name}\"? This cannot be undone.",
     "confirm_new": "Create a new system? Your current system will remain in the save manager.",
     "prompt_rename": "New name:",
@@ -429,6 +437,7 @@ registerLanguage('en', 'English', {
     "theme_coming": "Light and system themes coming in a future update",
     "no_coords": "No nodes have coordinates",
     "select_origin_dest": "Select both origin and destination",
+    "select_origin": "Select an origin station",
     "origin_dest_differ": "Origin and destination must be different",
     "split_done": "Split into \"{name}\"",
     "merge_done": "Merged into \"{name}\"",
@@ -460,6 +469,7 @@ registerLanguage('en', 'English', {
     "delete_mode": "Remove mode \"{name}\"?",
     "delete_stock": "Remove stock type \"{name}\"?",
     "delete_service": "Remove service \"{name}\"?",
+    "bulk_delete_services": "Delete {n} selected services? {deps} departure(s) will be removed with them.",
     "delete_orphans": "Delete {n} orphaned departure(s)?",
     "recalc_all": "Recalculate all departures? Manual dwell overrides will be preserved, but all travel times will be re-derived from current segment and stock data.",
     "apply_schedule": "{action} for {name}: every {freq} min from {start} to {end}?"
@@ -468,6 +478,7 @@ registerLanguage('en', 'English', {
     "name": "Name",
     "ref": "Ref",
     "type": "Type",
+    "platform": "Platform",
     "platforms": "Platforms",
     "connections": "Conn.",
     "ogf": "OGF",
@@ -701,7 +712,13 @@ registerLanguage('en', 'English', {
     "later": "Later departures \u2192",
     "showing_results": "Showing {start}\u2013{end}",
     "terminus": "Terminus",
-    "searching": "Searching..."
+    "searching": "Searching...",
+    "mode_journey": "Journey",
+    "mode_reach": "Network reach",
+    "reach_summary": "{reached} of {total} stations reachable within {n} min from {origin}",
+    "reach_none": "Nothing reachable within {n} min — try a longer window or a different departure time.",
+    "reach_band": "≤ {n} min",
+    "reach_no_coords": "{n} reached station(s) have no coordinates and appear only in the list."
   },
   "issue": {
     "no_issues": "No issues detected",
@@ -869,6 +886,7 @@ registerLanguage('en', 'English', {
   },
   "dashboard": {
     "welcome": "Welcome to BRIXYmanager",
+    "welcome_desc": "Build your railway network: add stations and segments, group services into colored lines, and generate schedules. Everything is stored locally in your browser.",
     "no_lines": "No lines defined yet.",
     "get_started": "Get Started \u2192"
   },
@@ -1103,5 +1121,107 @@ registerLanguage('en', 'English', {
     "beckmap_desc": "{n} line-station placements will be migrated.",
     "abort_self_loop": "Merge would create a self-loop track segment. Delete the direct segment first.",
     "apply_btn": "Merge Nodes"
+  },
+  "recent": {
+    "pinned": "Pinned",
+    "recent": "Recent",
+    "empty": "Nothing here yet — open a station, line, service or segment and it will show up.",
+    "kind_node": "Node",
+    "kind_segment": "Segment",
+    "kind_line": "Line",
+    "kind_service": "Service"
+  },
+  "pin": {
+    "pin": "Pin",
+    "unpin": "Unpin"
+  },
+  "time": {
+    "just_now": "just now",
+    "min_ago": "{n}m ago",
+    "hour_ago": "{n}h ago",
+    "day_ago": "{n}d ago"
+  },
+  "pal": {
+    "placeholder": "Search actions, tabs, lines, services, stations…",
+    "no_results": "No results",
+    "empty_hint": "Type to search · ↑↓ Enter Esc",
+    "goto_prefix": "Go to ",
+    "new_node": "Create new node",
+    "new_segment": "Create new segment",
+    "new_service": "Create new service",
+    "new_line": "Create new line",
+    "new_mode": "Create new mode",
+    "new_stock": "Create new rolling stock",
+    "save": "Save current system",
+    "new_system": "New system",
+    "saved": "Saved",
+    "hint_navigate": "navigate",
+    "hint_open": "open",
+    "hint_toggle": "toggle",
+    "services_one": "1 service",
+    "services_other": "{n} services",
+    "platforms_one": "1 platform",
+    "platforms_other": "{n} platforms",
+    "kind_track": "track",
+    "kind_road": "road",
+    "kind_interchange": "interchange",
+    "cat_pinned": "Pinned",
+    "cat_recent": "Recent",
+    "cat_action": "Actions",
+    "cat_tab": "Go to",
+    "cat_line": "Lines",
+    "cat_service": "Services",
+    "cat_station": "Stations",
+    "cat_node": "Nodes",
+    "cat_segment": "Segments"
+  },
+  "kb": {
+    "title": "Keyboard Shortcuts",
+    "palette": "Open the command palette",
+    "rows": "Move through table rows (entity tabs)",
+    "expand": "Expand or collapse the highlighted row",
+    "close": "Close detail / clear highlight / close dialogs",
+    "search": "Focus the search field (entity tabs)",
+    "help": "This overview"
+  },
+  "tb": {
+    "card_title": "Timetable Book",
+    "card_desc": "Export a printable timetable book — per-line departure tables, ready for print-to-PDF.",
+    "card_btn": "Generate timetable book",
+    "title": "Timetable Book",
+    "desc": "Pick the lines to include. The book opens in a new tab — use your browser's Print for a PDF.",
+    "date_label": "Date (optional)",
+    "date_hint": "Filters departures by schedule pattern for that date. Leave empty to include everything.",
+    "ungrouped": "Include services without a line",
+    "ungrouped_section": "Other services",
+    "generate": "Generate",
+    "popup_blocked": "Popup blocked — allow popups for this page and try again.",
+    "doc_title": "Timetable Book",
+    "date_note": "Valid {date}",
+    "date_note_all": "All scheduled departures",
+    "no_deps": "No departures matched the selection.",
+    "continued": "(continued)",
+    "print_btn": "Print / Save as PDF",
+    "print_hint": "Use your browser's print dialog to save as PDF.",
+    "footer": "Generated by BRIXYmanager — {name}",
+    "next_day": "= next day"
+  },
+  "gantt": {
+    "title_segment": "Track occupancy",
+    "title_node": "Platform occupancy",
+    "unassigned": "(unassigned track)",
+    "note": "All scheduled departures, ignoring schedule patterns — red outline = overlapping occupation. Click a bar to open its service."
+  },
+  "bulk": {
+    "selected": "{n} selected",
+    "set_line": "Set line…",
+    "set_mode": "Set mode…",
+    "set_stock": "Set stock…",
+    "no_line": "— No line —",
+    "no_stock": "— No stock —",
+    "delete": "Delete",
+    "clear": "Clear selection",
+    "applied": "Updated {n} services",
+    "deleted": "Deleted {n} services"
   }
 });

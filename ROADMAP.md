@@ -79,36 +79,36 @@ Animated visualization of trains moving through the network over time. New "Anim
 
 ---
 
-### Phase 19 — Light Tools & QoL 🔨 In progress (v0.19.1.0 → )
+### Phase 19 — Light Tools & QoL ✅ Complete (v0.19.1.0 → v0.19.11.0)
 A grab-bag phase of small, high-value additions and tools. Sketched during the v0.17.3.1 / 0.17.3.2 polish work. Sessions are independent; can be reordered or trimmed freely.
 
-**Done so far:** Session 1 legacy cleanup (v0.19.1.0), Session 2 Ctrl+K command palette (v0.19.2.0), Session 3 detail-into-table accordion (v0.19.3.0), Session 4 keyboard nav in entity tables (v0.19.4.0), Session 5 restoration of the lost PR work (v0.19.5.0). Struck-through items below are done.
+**Sessions:** 1 legacy cleanup, 2 Ctrl+K palette, 3 detail-into-table accordion, 4 keyboard table nav, 5 lost-PR restoration, 6 recent + pinned, 7 bulk edit on services, 8 network reach, 9 occupancy Gantt, 10 timetable book, 11 wrap-up (palette l10n, broken keys, shortcuts help). Search predicates were already shipped pre-phase. Struck-through items below are done.
 
 **Top bar / navigation**
-- Recent + pinned entities, surfaced near the saves dropdown
-- Recent saves with last-opened time on the dropdown
+- ~~Recent + pinned entities, surfaced near the saves dropdown~~ ✅ v0.19.6.0
+- ~~Recent saves with last-opened time on the dropdown~~ ✅ v0.19.6.0
 
 **Search & navigation**
 - ~~Cmd+K command palette~~ ✅ v0.19.2.0
-- Broader keyboard shortcuts (catalogue current ones, fill gaps)
+- ~~Broader keyboard shortcuts~~ ✅ v0.19.11.0 (`?` shortcuts help overlay, `/` focus search; palette + table nav catalogued)
 - ~~Keyboard arrow nav in entity tables~~ ✅ v0.19.4.0
 - ~~Detail-view-into-table~~ ✅ v0.19.3.0
-- Search predicates: `category:`, `line:`, `stops:>N`, etc., applied across all searchable tables
+- ~~Search predicates~~ ✅ already shipped pre-Phase-19 (`mode:`, `line:`, `stops:3+`, ranges, negation, OR groups on all four entity tables) — this sketch predated the implementation
 
 **Bulk operations**
-- Multi-select + bulk-edit on services (one session). Extends to segments / nodes if scope allows.
+- ~~Multi-select + bulk-edit on services~~ ✅ v0.19.7.0 (segments/nodes deferred; pattern is reusable)
 
 **Visualization**
-- Network reach analysis — N-minute travel-time isochrone from a query station, leveraging existing CSA
-- Gantt-style time visualization for segment / node usage (one row per track or platform, X-axis = time of day)
-- Timetable book export (HTML / PDF per-line departure tables)
+- ~~Network reach analysis~~ ✅ v0.19.8.0 (Reach mode in the Journey Planner: one-to-all CSA, banded map + station chips)
+- ~~Gantt-style time visualization for segment / node usage~~ ✅ v0.19.9.0 (Track/Platform occupancy collapsibles in detail views)
+- ~~Timetable book export~~ ✅ v0.19.10.0 (printable per-line book from Import/Export, browser print-to-PDF)
 
-**Issue detection** *(deferred from v0.17.3.2 if not picked up earlier)*
-- Additional checks as discovered during use
+**Issue detection** *(ongoing by nature — not phase-gating)*
+- Additional checks as discovered during use; candidates catalogued in the v0.19.5.x code review
 
 **Legacy cleanup**
 - ~~Strip `data.lines` / audit `schemMigrateData()` / TODO-FIXME sweep~~ ✅ v0.19.1.0
-- Fix hardcoded strings + missing `t()` keys found in the v0.19.5.x review (palette l10n, ~7 broken key references, `lang/hs.js` catch-up)
+- ~~Palette l10n + 7 broken `t()` key references~~ ✅ v0.19.11.0 · `lang/hs.js` catch-up still open (~390 keys behind — translation content, Wib's call)
 
 Probably 6–8 sessions if all in scope. Trim freely.
 

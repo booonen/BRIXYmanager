@@ -15,6 +15,10 @@
   <header>
     <div class="logo"><div class="icon">⬡</div>BRIXYmanager <span id="system-name-header" style="font-weight:400;opacity:0.6;margin-left:4px"></span></div>
     <div class="actions">
+      <div class="saves-dropdown" id="recent-dropdown">
+        <button class="btn btn-sm" onclick="toggleRecentDropdown(event)">☆ <span data-t="btn.recent">Recent</span> <span style="font-size:10px;opacity:0.5">▾</span></button>
+        <div class="saves-dropdown-menu" id="recent-dropdown-menu"></div>
+      </div>
       <div class="saves-dropdown" id="saves-dropdown">
         <button class="btn btn-sm" onclick="toggleSavesDropdown(event)">💾 <span id="saves-dropdown-label" data-t="btn.saves">Saves</span> <span style="font-size:10px;opacity:0.5">▾</span></button>
         <div class="saves-dropdown-menu" id="saves-dropdown-menu"></div>
@@ -44,7 +48,7 @@
       <div class="nav-item" data-tab="settings" onclick="switchTab('settings')"><span class="nav-icon">⚙</span> <span data-t="nav.settings">Settings</span></div>
       <div class="nav-item" data-tab="import-export" onclick="switchTab('import-export')"><span class="nav-icon">⇅</span> <span data-t="nav.import_export">Import / Export</span></div>
       <div class="spacer"></div>
-      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.19.5.1</div>
+      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.19.11.0</div>
     </nav>
     <div class="content">
       <!-- DASHBOARD -->
@@ -241,16 +245,21 @@
       <div class="tab-panel" id="panel-journey">
         <div class="page-header"><div><h1 data-t="page.journey">Journey Planner</h1><div class="subtitle" data-t="subtitle.journey">Find routes between stations</div></div></div>
         <div style="max-width:700px">
+          <div class="htabs" style="margin-bottom:12px">
+            <div class="htab active" id="jp-mode-journey" onclick="jpSetMode('journey')" data-t="jp.mode_journey">Journey</div>
+            <div class="htab" id="jp-mode-reach" onclick="jpSetMode('reach')" data-t="jp.mode_reach">Network reach</div>
+          </div>
           <div style="display:flex;align-items:end;gap:8px;margin-bottom:12px">
             <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="label.from">From</label><div id="jp-origin-picker"></div></div>
-            <button class="btn btn-sm" onclick="jpSwapStations()" data-t-title="tooltip.swap_stations" title="Swap" style="padding:6px 10px;margin-bottom:2px">⇄</button>
-            <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="label.to">To</label><div id="jp-dest-picker"></div></div>
+            <button class="btn btn-sm" id="jp-swap-btn" onclick="jpSwapStations()" data-t-title="tooltip.swap_stations" title="Swap" style="padding:6px 10px;margin-bottom:2px">⇄</button>
+            <div class="form-group" id="jp-dest-group" style="flex:1;margin-bottom:0"><label data-t="label.to">To</label><div id="jp-dest-picker"></div></div>
+            <div class="form-group" id="jp-reach-group" style="margin-bottom:0;display:none"><label data-t="label.reach_within">Within (min)</label><input type="number" id="jp-reach-min" value="60" min="5" max="720" style="width:90px"></div>
           </div>
           <div style="display:flex;align-items:end;gap:12px">
             <div class="form-group" style="margin-bottom:0"><label data-t="label.date">Date</label><input type="date" id="jp-date" required style="width:150px"></div>
             <div class="form-group" style="margin-bottom:0"><label data-t="label.depart_after">Depart after</label><input type="time" id="jp-time" required></div>
             <button class="btn btn-sm" onclick="jpSetNow()" data-t="btn.now">Now</button>
-            <button class="btn btn-primary" onclick="jpSearch()" data-t="btn.search">Search</button>
+            <button class="btn btn-primary" onclick="jpGo()" data-t="btn.search">Search</button>
           </div>
         </div>
         <div id="jp-results"></div>
@@ -290,14 +299,14 @@
   <div class="palette-box">
     <div class="palette-search">
       <span class="palette-search-icon">⌕</span>
-      <input type="text" id="palette-input" placeholder="Search actions, tabs, lines, services, stations…" autocomplete="off" spellcheck="false">
+      <input type="text" id="palette-input" placeholder="Search actions, tabs, lines, services, stations…" data-t-placeholder="pal.placeholder" autocomplete="off" spellcheck="false">
       <span class="palette-hint"><kbd>Esc</kbd></span>
     </div>
     <div class="palette-results" id="palette-results"></div>
     <div class="palette-footer">
-      <span><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
-      <span><kbd>↵</kbd> open</span>
-      <span><kbd>Ctrl</kbd>+<kbd>K</kbd> toggle</span>
+      <span><kbd>↑</kbd><kbd>↓</kbd> <span data-t="pal.hint_navigate">navigate</span></span>
+      <span><kbd>↵</kbd> <span data-t="pal.hint_open">open</span></span>
+      <span><kbd>Ctrl</kbd>+<kbd>K</kbd> <span data-t="pal.hint_toggle">toggle</span></span>
     </div>
   </div>
 </div>

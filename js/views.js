@@ -2036,6 +2036,11 @@ function renderImportExport() {
         <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('ie.saves_desc')}</p>
         <button class="btn" onclick="openSaveManager()">${t('ie.manage_saves')}</button>
       </div>
+      <div class="ie-card">
+        <h3>${t('tb.card_title')}</h3>
+        <p class="text-dim" style="font-size:13px;margin:8px 0 16px">${t('tb.card_desc')}</p>
+        <button class="btn" onclick="openTimetableBookModal()">▤ ${t('tb.card_btn')}</button>
+      </div>
     </div>`;
 }
 
@@ -3483,4 +3488,142 @@ function renderDashboard() {
     else content += `<div class="text-dim" style="font-size:13px;">${t('dashboard.no_lines')}</div>`;
   }
   document.getElementById('dashboard-content').innerHTML = content;
+}
+
+// ============================================================
+// TIMETABLE BOOK EXPORT — printable per-line departure tables
+// ============================================================
+
+function openTimetableBookModal() {
+  const lines = [...data.serviceGroups].sort((a, b) => a.name.localeCompare(b.name));
+  const hasUngrouped = data.services.some(s => !s.groupId || !getGroup(s.groupId));
+  const linesHtml = lines.map(g => `<label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;font-weight:400;color:var(--text);margin-bottom:4px">
+    <input type="checkbox" class="tb-line" value="${g.id}" checked>
+    <span class="dot" style="background:${g.color || 'var(--text-muted)'}"></span>${esc(g.name)}
+    <span class="text-muted mono" style="font-size:11px">${data.services.filter(s => s.groupId === g.id).length}</span></label>`).join('');
+  openModal(t('tb.title'), `
+    <p class="text-dim" style="font-size:13px;margin-bottom:12px">${t('tb.desc')}</p>
+    <div class="form-group"><label>${t('tb.date_label')}</label>
+      <input type="date" id="tb-date" style="width:170px">
+      <p class="text-dim" style="font-size:11px;margin-top:2px">${t('tb.date_hint')}</p></div>
+    ${lines.length ? `<div class="form-group"><label>${t('nav.lines')}</label>${linesHtml}</div>` : ''}
+    ${hasUngrouped ? `<div class="form-group"><label style="display:flex;align-items:center;gap:8px;font-size:13px;text-transform:none;font-weight:400;color:var(--text)">
+      <input type="checkbox" id="tb-ungrouped" checked>${t('tb.ungrouped')}</label></div>` : ''}`,
+    `<button class="btn" onclick="closeModal()">${t('btn.cancel')}</button>
+     <button class="btn btn-primary" onclick="generateTimetableBook()">${t('tb.generate')}</button>`);
+}
+
+function generateTimetableBook() {
+  const dateStr = document.getElementById('tb-date')?.value || '';
+  const lineIds = [...document.querySelectorAll('.tb-line:checked')].map(c => c.value);
+  const inclUngrouped = document.getElementById('tb-ungrouped')?.checked ?? false;
+  closeModal();
+  const html = buildTimetableBookHTML(lineIds, inclUngrouped, dateStr);
+  const w = window.open('', '_blank');
+  if (!w) { toast(t('tb.popup_blocked'), 'error'); return; }
+  w.document.write(html);
+  w.document.close();
+}
+
+function _tbTime(m, isLast) {
+  if (m == null) return '—';
+  return toTime(m) + (m >= 1440 ? '⁺' : '');
+}
+
+function _tbServiceTables(svc, dateStr) {
+  let deps = data.departures.filter(d => d.serviceId === svc.id);
+  if (dateStr) deps = deps.filter(d => patternMatchesDate(svc.schedulePattern, dateStr));
+  deps.sort((a, b) => a.startTime - b.startTime);
+  if (!deps.length) return '';
+
+  // Rows: passenger stops only, keep original stop indices for time lookup
+  const rows = [];
+  for (let i = 0; i < svc.stops.length; i++) {
+    const node = getNode(svc.stops[i].nodeId);
+    if (!node || !isPassengerStop(node)) continue;
+    rows.push({ idx: i, name: nodeDisplayName(node.id), pass: !!svc.stops[i].passThrough });
+  }
+  if (rows.length < 2) return '';
+
+  const cat = getCat(svc.categoryId);
+  const origin = rows[0].name, dest = rows[rows.length - 1].name;
+  const CHUNK = 12;
+  let out = `<div class="tb-service"><h3>${esc(svc.name)} <span class="tb-route">${esc(origin)} → ${esc(dest)}</span>${cat ? `<span class="tb-cat">${esc(cat.abbreviation || cat.name)}</span>` : ''}</h3>`;
+
+  for (let c = 0; c < deps.length; c += CHUNK) {
+    const chunk = deps.slice(c, c + CHUNK);
+    out += `<table class="tb-table">${c > 0 ? `<caption>${t('tb.continued')}</caption>` : ''}<thead><tr><th></th>${chunk.map(() => `<th></th>`).join('')}</tr></thead><tbody>`;
+    rows.forEach((row, ri) => {
+      const isLast = ri === rows.length - 1;
+      out += `<tr><td class="tb-station">${esc(row.name)}${row.pass ? ' <span class="tb-passmark">·</span>' : ''}</td>`;
+      for (const dep of chunk) {
+        const tt = dep.times[row.idx];
+        if (!tt) { out += '<td>—</td>'; continue; }
+        if (row.pass) { out += '<td class="tb-pass">|</td>'; continue; }
+        const m = isLast ? (tt.arrive ?? tt.depart) : (tt.depart ?? tt.arrive);
+        out += `<td>${_tbTime(m, isLast)}</td>`;
+      }
+      out += '</tr>';
+    });
+    out += '</tbody></table>';
+  }
+  out += '</div>';
+  return out;
+}
+
+function buildTimetableBookHTML(lineIds, inclUngrouped, dateStr) {
+  const sysName = data.settings?.systemName || t('save_mgr.unnamed');
+  const lines = lineIds.map(getGroup).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name));
+  let body = '';
+
+  const sectionFor = (title, color, svcs) => {
+    const tables = svcs.sort((a, b) => a.name.localeCompare(b.name)).map(s => _tbServiceTables(s, dateStr)).filter(Boolean);
+    if (!tables.length) return '';
+    return `<section class="tb-line-section"><h2><span class="tb-linebar" style="background:${color}"></span>${esc(title)}</h2>${tables.join('')}</section>`;
+  };
+
+  for (const g of lines) {
+    body += sectionFor(g.name, g.color || '#888', data.services.filter(s => s.groupId === g.id));
+  }
+  if (inclUngrouped) {
+    body += sectionFor(t('tb.ungrouped_section'), '#888', data.services.filter(s => !s.groupId || !getGroup(s.groupId)));
+  }
+  if (!body) body = `<p class="tb-empty">${t('tb.no_deps')}</p>`;
+
+  const dateNote = dateStr ? t('tb.date_note', { date: dateStr }) : t('tb.date_note_all');
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(sysName)} — ${t('tb.doc_title')}</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  body { font-family: 'DM Sans', sans-serif; color: #16202a; background: #fff; margin: 32px 40px; }
+  .tb-head { border-bottom: 3px solid #16202a; padding-bottom: 12px; margin-bottom: 24px; }
+  .tb-head h1 { margin: 0 0 4px; font-size: 26px; }
+  .tb-head .tb-sub { color: #667; font-size: 13px; }
+  .no-print { margin: 16px 0; }
+  .no-print button { font-family: inherit; font-size: 14px; padding: 8px 16px; cursor: pointer; }
+  .tb-line-section { page-break-before: always; margin-top: 32px; }
+  .tb-line-section:first-of-type { page-break-before: avoid; }
+  .tb-line-section h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; border-bottom: 2px solid #ccc; padding-bottom: 6px; }
+  .tb-linebar { display: inline-block; width: 34px; height: 14px; border-radius: 7px; }
+  .tb-service { margin: 18px 0 26px; page-break-inside: avoid; }
+  .tb-service h3 { font-size: 14px; margin: 0 0 6px; }
+  .tb-route { color: #667; font-weight: 400; font-size: 12px; margin-left: 8px; }
+  .tb-cat { color: #667; font-weight: 400; font-size: 11px; margin-left: 8px; border: 1px solid #ccc; border-radius: 4px; padding: 1px 6px; }
+  .tb-table { border-collapse: collapse; font-family: 'JetBrains Mono', monospace; font-size: 11px; margin-bottom: 8px; }
+  .tb-table caption { caption-side: top; text-align: left; font-size: 10px; color: #889; font-family: 'DM Sans', sans-serif; }
+  .tb-table td, .tb-table th { border: 1px solid #d8dde3; padding: 3px 7px; text-align: right; white-space: nowrap; }
+  .tb-table thead tr { display: none; }
+  .tb-station { text-align: left !important; font-family: 'DM Sans', sans-serif; font-weight: 600; min-width: 160px; }
+  .tb-pass { color: #99a; text-align: center !important; }
+  .tb-passmark { color: #99a; }
+  .tb-table tr:nth-child(even) td { background: #f4f6f8; }
+  .tb-empty { color: #667; }
+  .tb-foot { margin-top: 30px; font-size: 10px; color: #889; border-top: 1px solid #ccc; padding-top: 8px; }
+  @media print { .no-print { display: none; } body { margin: 0; } }
+  @page { margin: 15mm; }
+</style></head><body>
+<div class="tb-head"><h1>${esc(sysName)}</h1><div class="tb-sub">${t('tb.doc_title')} · ${dateNote} · ${new Date().toISOString().slice(0, 10)}</div></div>
+<div class="no-print"><button onclick="window.print()">${t('tb.print_btn')}</button> <span style="font-size:12px;color:#667">${t('tb.print_hint')}</span></div>
+${body}
+<div class="tb-foot">${t('tb.footer', { name: esc(sysName) })} · ⁺ ${t('tb.next_day')}</div>
+</body></html>`;
 }

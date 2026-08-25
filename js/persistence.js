@@ -54,6 +54,20 @@ function dbGetAll(store) {
   });
 }
 
+// Last-opened timestamps per slot — localStorage map, kept out of the registry
+// so flushSave's registry writes can't clobber it.
+function _markSlotOpened(id) {
+  if (!id) return;
+  try {
+    const m = JSON.parse(localStorage.getItem('railmanager:opened') || '{}');
+    m[id] = Date.now();
+    localStorage.setItem('railmanager:opened', JSON.stringify(m));
+  } catch(e) {}
+}
+function _slotOpenedAt(id) {
+  try { return JSON.parse(localStorage.getItem('railmanager:opened') || '{}')[id] || null; } catch(e) { return null; }
+}
+
 function saveSlotStats() {
   return { nodes: data.nodes.length, segments: data.segments.length, services: data.services.length, departures: data.departures.length };
 }
@@ -87,6 +101,7 @@ async function load() {
     localStorage.setItem('railmanager:active', _activeSaveId);
     await flushSave();
   }
+  _markSlotOpened(_activeSaveId);
   if (typeof bumpTHIVersion === 'function') bumpTHIVersion();
   if (typeof animOnDataChange === 'function') animOnDataChange();
 }
@@ -96,6 +111,7 @@ async function loadSlot(id) {
   data = { nodes: [], segments: [], categories: [], services: [], serviceGroups: [], departures: [], rollingStock: [], stockModeMatrix: {}, settings: {} };
   _activeSaveId = id;
   localStorage.setItem('railmanager:active', id);
+  _markSlotOpened(id);
   const slot = await dbGet('saves', id);
   if (slot?.data) data = { ...data, ...slot.data };
   migrateSegmentTracks();
@@ -264,7 +280,7 @@ async function renderSavesDropdown() {
     const st = r.stats || {};
     html += `<div class="saves-dropdown-item${isActive ? ' active' : ''}" onclick="${isActive ? '' : `closeSavesDropdown();loadSlot('${r.id}')`}" ${isActive ? 'style="cursor:default"' : ''}>
       <div style="font-weight:${isActive ? '600' : '400'}">${isActive ? '● ' : ''}${esc(r.name)}</div>
-      <div style="font-size:11px;color:var(--text-muted)">${st.nodes||0}n · ${st.services||0}s · ${st.departures||0}d</div>
+      <div style="font-size:11px;color:var(--text-muted)">${st.nodes||0}n · ${st.services||0}s · ${st.departures||0}d${(() => { const op = _slotOpenedAt(r.id); return op && typeof relTime === 'function' ? ` · ${t('save_mgr.opened')} ${relTime(op)}` : ''; })()}</div>
     </div>`;
   }
   html += `<div class="saves-dropdown-divider"></div>`;
@@ -295,6 +311,7 @@ async function newSystem() {
     data = { nodes: [], segments: [], categories: [], services: [], serviceGroups: [], departures: [], rollingStock: [], stockModeMatrix: {}, settings: {} };
     _activeSaveId = uid();
     localStorage.setItem('railmanager:active', _activeSaveId);
+    _markSlotOpened(_activeSaveId);
     await flushSave();
     if (_map) { _map.remove(); _map = null; }
     updateSystemName();

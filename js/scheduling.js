@@ -931,3 +931,107 @@ function cleanOrphans() {
     save(); renderSchedule(); toast(t('toast.orphans_removed', { n: count }), 'success');
   });
 }
+
+// ============================================================
+// OCCUPANCY GANTT — per-track / per-platform time-of-day bars
+// ============================================================
+// Rows: one per track (segment detail) or platform (node detail).
+// Bars: every scheduled departure's occupation, colored by line.
+// Note: covers ALL departures regardless of schedule pattern — it's an
+// infrastructure-load view, not a single-day timetable.
+
+function ganttForSegment(segId) {
+  const seg = getSeg(segId);
+  if (!seg || isInterchange(seg)) return null;
+  const tracks = Array.isArray(seg.tracks) ? seg.tracks : [];
+  const rows = [], rowByTrack = {};
+  for (const tk of tracks) { const r = { name: platDisplayName(tk.name), bars: [] }; rows.push(r); rowByTrack[tk.id] = r; }
+  const unassigned = { name: t('gantt.unassigned'), bars: [] };
+
+  for (const dep of data.departures) {
+    const svc = getSvc(dep.serviceId);
+    if (!svc || dep.times.length < 2) continue;
+    const color = (typeof svcLineColor === 'function' ? svcLineColor(svc) : '#5b8af5');
+    for (let i = 0; i < dep.times.length - 1; i++) {
+      const from = dep.times[i], to = dep.times[i + 1];
+      if (from.depart == null || to.arrive == null) continue;
+      const stopTrackId = svc.stops[i + 1]?.trackId || null;
+      const s = findSegByTrack(from.nodeId, to.nodeId, stopTrackId);
+      if (!s || s.id !== segId) continue;
+      const trackId = stopTrackId || (tracks.length === 1 ? tracks[0].id : null);
+      const bar = { start: from.depart, end: to.arrive, svcId: svc.id, label: svc.name, color };
+      ((trackId && rowByTrack[trackId]) ? rowByTrack[trackId] : unassigned).bars.push(bar);
+    }
+  }
+  if (unassigned.bars.length) rows.push(unassigned);
+  return rows;
+}
+
+function ganttForNode(nodeId) {
+  const node = getNode(nodeId);
+  if (!node || !(node.platforms || []).length) return null;
+  const rows = [], byPlat = {};
+  for (const p of node.platforms) { const r = { name: platDisplayName(p.name), bars: [] }; rows.push(r); byPlat[p.id] = r; }
+
+  for (const dep of data.departures) {
+    const svc = getSvc(dep.serviceId); if (!svc) continue;
+    const color = (typeof svcLineColor === 'function' ? svcLineColor(svc) : '#5b8af5');
+    for (let i = 0; i < dep.times.length; i++) {
+      const tt = dep.times[i];
+      if (tt.nodeId !== nodeId) continue;
+      if (svc.stops[i]?.passThrough) continue;
+      const plat = depPlatId(dep, svc, i);
+      if (!plat || !byPlat[plat]) continue;
+      const arr = tt.arrive ?? tt.depart, dept = tt.depart ?? tt.arrive;
+      if (arr == null || dept == null) continue;
+      byPlat[plat].bars.push({ start: arr, end: Math.max(dept, arr + 1), svcId: svc.id, label: svc.name, color });
+    }
+  }
+  return rows;
+}
+
+function ganttBarCount(rows) { return rows ? rows.reduce((n, r) => n + r.bars.length, 0) : 0; }
+
+// Normalize a bar into same-day pieces (cross-midnight times exceed 1440)
+function _ganttPieces(bar) {
+  let { start, end } = bar;
+  while (start >= 1440) { start -= 1440; end -= 1440; }
+  if (end <= 1440) return [{ ...bar, start, end }];
+  return [{ ...bar, start, end: 1440 }, { ...bar, start: 0, end: end - 1440 }];
+}
+
+function renderGanttSVG(rows) {
+  const LABEL_W = 130, PX_PER_MIN = 0.8, CHART_W = 1440 * PX_PER_MIN;
+  const ROW_H = 24, TOP = 22;
+  const H = TOP + rows.length * ROW_H + 6;
+  const W = LABEL_W + CHART_W;
+  const x = m => LABEL_W + m * PX_PER_MIN;
+
+  let svg = `<svg class="gantt-svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+  for (let h = 0; h <= 24; h++) {
+    const gx = x(h * 60);
+    svg += `<line x1="${gx}" y1="${TOP - 4}" x2="${gx}" y2="${H - 4}" stroke="var(--border)" stroke-width="${h % 6 === 0 ? 1.2 : 0.5}"/>`;
+    if (h % 3 === 0 && h < 24) svg += `<text x="${gx + 3}" y="${TOP - 9}" font-size="9" fill="var(--text-muted)" style="font-family:var(--font-mono)">${String(h).padStart(2, '0')}:00</text>`;
+  }
+  rows.forEach((row, ri) => {
+    const y = TOP + ri * ROW_H;
+    if (ri % 2 === 1) svg += `<rect x="${LABEL_W}" y="${y}" width="${CHART_W}" height="${ROW_H}" fill="var(--bg-hover)" opacity="0.35"/>`;
+    const label = row.name.length > 22 ? row.name.slice(0, 21) + '…' : row.name;
+    svg += `<text x="${LABEL_W - 8}" y="${y + ROW_H / 2 + 3}" text-anchor="end" font-size="10" fill="var(--text-dim)">${esc(label)}</text>`;
+
+    const pieces = row.bars.flatMap(_ganttPieces).sort((a, b) => a.start - b.start);
+    // Flag overlapping occupations within the row (visual conflict cue)
+    for (let i = 0; i < pieces.length; i++) {
+      pieces[i]._conflict = pieces[i]._conflict || false;
+      for (let j = i + 1; j < pieces.length && pieces[j].start < pieces[i].end; j++) {
+        pieces[i]._conflict = pieces[j]._conflict = true;
+      }
+    }
+    for (const p of pieces) {
+      const bx = x(p.start), bw = Math.max((p.end - p.start) * PX_PER_MIN, 2.5);
+      svg += `<rect x="${bx.toFixed(1)}" y="${y + 4}" width="${bw.toFixed(1)}" height="${ROW_H - 8}" rx="2" fill="${p.color}" ${p._conflict ? 'stroke="var(--danger)" stroke-width="1.5"' : ''} style="cursor:pointer" onclick="gotoEntity('services','${p.svcId}')"><title>${esc(p.label)} · ${toTime(Math.round(p.start))}–${toTime(Math.round(p.end))}</title></rect>`;
+    }
+  });
+  svg += '</svg>';
+  return `<div style="overflow-x:auto">${svg}</div><p class="text-dim" style="font-size:11px;margin-top:4px">${t('gantt.note')}</p>`;
+}
