@@ -48,7 +48,7 @@
       <div class="nav-item" data-tab="settings" onclick="switchTab('settings')"><span class="nav-icon">⚙</span> <span data-t="nav.settings">Settings</span></div>
       <div class="nav-item" data-tab="import-export" onclick="switchTab('import-export')"><span class="nav-icon">⇅</span> <span data-t="nav.import_export">Import / Export</span></div>
       <div class="spacer"></div>
-      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.19.11.0</div>
+      <div style="padding:8px 16px;font-size:10px;color:var(--text-muted);font-family:var(--font-mono);opacity:0.6">v0.19.12.0</div>
     </nav>
     <div class="content">
       <!-- DASHBOARD -->
@@ -253,7 +253,9 @@
             <div class="form-group" style="flex:1;margin-bottom:0"><label data-t="label.from">From</label><div id="jp-origin-picker"></div></div>
             <button class="btn btn-sm" id="jp-swap-btn" onclick="jpSwapStations()" data-t-title="tooltip.swap_stations" title="Swap" style="padding:6px 10px;margin-bottom:2px">⇄</button>
             <div class="form-group" id="jp-dest-group" style="flex:1;margin-bottom:0"><label data-t="label.to">To</label><div id="jp-dest-picker"></div></div>
-            <div class="form-group" id="jp-reach-group" style="margin-bottom:0;display:none"><label data-t="label.reach_within">Within (min)</label><input type="number" id="jp-reach-min" value="60" min="5" max="720" style="width:90px"></div>
+            <div class="form-group" id="jp-reach-group" style="margin-bottom:0;display:none"><label data-t="label.reach_within">Within (min)</label>
+              <div style="display:flex;align-items:center;gap:12px"><input type="number" id="jp-reach-min" value="60" min="5" max="720" style="width:90px">
+              <label style="display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;font-weight:400;color:var(--text);cursor:pointer;white-space:nowrap"><input type="checkbox" id="jp-reach-best" onchange="document.getElementById('jp-time').disabled=this.checked"><span data-t="jp.reach_best_label">Best case (any departure)</span></label></div></div>
           </div>
           <div style="display:flex;align-items:end;gap:12px">
             <div class="form-group" style="margin-bottom:0"><label data-t="label.date">Date</label><input type="date" id="jp-date" required style="width:150px"></div>

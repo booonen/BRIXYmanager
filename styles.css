@@ -761,6 +761,9 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
 .recent-item .pin-btn { flex-shrink: 0; opacity: 0; }
 .recent-item:hover .pin-btn, .recent-item .pin-btn.pinned { opacity: 1; }
 
+/* Disabled buttons should look disabled (there was no :disabled style at all) */
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
 /* Generic kbd chips (shortcuts help modal etc.) */
 .modal kbd, #app-confirm-overlay kbd {
   display: inline-block; padding: 2px 7px; font-size: 11px;

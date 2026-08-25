@@ -1,5 +1,15 @@
 # BRIXYmanager — Version History
 
+## v0.19.12.0 — Testing feedback round (Wib's six notes)
+First test pass after the Phase 19 merge; all six notes addressed.
+
+1. **Split button no longer appears when splitting isn't possible.** It used to render `disabled` — but no `.btn:disabled` style existed anywhere, so it looked fully enabled and just ate clicks. Now it's hidden entirely when `nodeCanSplit` says no (matching how Merge already behaved), and a generic `.btn:disabled { opacity:.4 }` style exists for every future disabled button.
+2. **Custom frequency row reads like the preset rows.** The input now sits inside the localized "Every {n}m" pattern (no stray reminder placeholder, no floating "m"), and a value matching a preset (10/15/20/30/60) still evaluates in place instead of confusingly blanking the row.
+3. **Relation import: route ways with roles are used.** Way members are no longer dropped for having *any* role — only platform/stop-area roles are excluded; everything else (forward/backward, hail_and_ride, variant roles…) passes through to the existing `highway=*`/`railway=*` tag filter, with an extra guard against `highway=platform` / `railway=platform` / `public_transport=platform` geometries. Routes whose continuation ways carry roles (the Retten Altenkloster case) now import fully.
+4. **Network reach: "Best case (any departure)" checkbox.** Ignores the departure time and answers "how close is each station at its best": one cutoff-bounded CSA scan per distinct origin departure time (`jpReachBestCase` — scans share one prebuilt connection array and each only walks its own time window, so it stays fast), minimum elapsed per station wins. The time input disables while checked; chips show `+Nm · dep→arr` since each station may use a different departure.
+5. **Network reach on the Railmap.** When the beckmap has placements, the reach map gets Geomap/Railmap tabs (honoring the default-detail-map setting). The Railmap view is a `renderMiniBeck` clone zoomed to the reach area with band-colored circles overlaid on **every placed line-station** of each reached display name, origin ringed in accent blue, tooltips with +minutes.
+6. **Occupancy Gantt surfaces unassigned services.** Node charts gain a "(no platform assigned)" row collecting calls that previously vanished silently; it and the segment chart's "(unassigned track)" row are exempt from the red overlap cue (overlap is expected when nothing is assigned — the footnote says so).
+
 ## v0.19.11.0 — Phase 19 Session 11: Wrap-up — palette l10n, broken keys, shortcuts help. **Phase 19 complete.**
 The close-out session for Phase 19 (Light Tools & QoL).
 

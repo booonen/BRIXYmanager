@@ -610,7 +610,6 @@ registerLanguage('en', 'English', {
     "frequency": "Frequency",
     "explicit": "Explicit Times",
     "custom_freq": "Custom (min)",
-    "custom_freq_placeholder": "e.g. 7, 12",
     "suggested_schedules": "Suggested Schedules",
     "every_n_min": "Every {n}m",
     "free": "Free",
@@ -716,6 +715,9 @@ registerLanguage('en', 'English', {
     "mode_journey": "Journey",
     "mode_reach": "Network reach",
     "reach_summary": "{reached} of {total} stations reachable within {n} min from {origin}",
+    "reach_summary_best": "{reached} of {total} stations reachable within {n} min from {origin} — best case over all departures",
+    "reach_best_label": "Best case (any departure)",
+    "reach_best_note": "Times shown per station are its best departure → arrival; different stations may use different departures.",
     "reach_none": "Nothing reachable within {n} min — try a longer window or a different departure time.",
     "reach_band": "≤ {n} min",
     "reach_no_coords": "{n} reached station(s) have no coordinates and appear only in the list."
@@ -1210,7 +1212,8 @@ registerLanguage('en', 'English', {
     "title_segment": "Track occupancy",
     "title_node": "Platform occupancy",
     "unassigned": "(unassigned track)",
-    "note": "All scheduled departures, ignoring schedule patterns — red outline = overlapping occupation. Click a bar to open its service."
+    "no_platform": "(no platform assigned)",
+    "note": "All scheduled departures, ignoring schedule patterns — red outline = overlapping occupation (not flagged on unassigned rows). Click a bar to open its service."
   },
   "bulk": {
     "selected": "{n} selected",
