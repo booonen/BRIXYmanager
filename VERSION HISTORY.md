@@ -1,5 +1,19 @@
 # BRIXYmanager — Version History
 
+## v0.19.10.0 — Phase 19 Session 10: Timetable Book export
+Printable per-line timetable book, exported from a new **Timetable Book** card on the Import/Export tab.
+
+**Config modal.** Optional date (filters departures by each service's schedule pattern for that day; empty = everything), per-line include checkboxes, and an "include services without a line" toggle.
+
+**The book** opens as a standalone document in a new tab — white print-friendly styling (DM Sans + JetBrains Mono), a Print/Save-as-PDF button (hidden in print), `@page` margins, and one section per line with its color bar, page-broken for printing:
+
+- One classic timetable table per service: **rows = passenger stops** (junctions/waypoints excluded, original stop indexing preserved for time lookup), **columns = departures** sorted by start time. First stop shows departure time, last shows arrival, pass-through stops render "|".
+- Wide services chunk into blocks of 12 columns with a "(continued)" caption.
+- Cross-midnight times get a superscript ⁺ (footer legend: "= next day").
+- Services with no matching departures are skipped; a fully empty selection yields a friendly note instead of a blank book.
+
+PDF is deliberately delegated to the browser's print dialog — no libraries, consistent with the no-build architecture.
+
 ## v0.19.9.0 — Phase 19 Session 9: Occupancy Gantt
 Gantt-style time-of-day occupancy charts inside detail views — the "who is using this infrastructure when" answer at a glance.
 

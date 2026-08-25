@@ -101,7 +101,7 @@ A grab-bag phase of small, high-value additions and tools. Sketched during the v
 **Visualization**
 - ~~Network reach analysis~~ ✅ v0.19.8.0 (Reach mode in the Journey Planner: one-to-all CSA, banded map + station chips)
 - ~~Gantt-style time visualization for segment / node usage~~ ✅ v0.19.9.0 (Track/Platform occupancy collapsibles in detail views)
-- Timetable book export (HTML / PDF per-line departure tables)
+- ~~Timetable book export~~ ✅ v0.19.10.0 (printable per-line book from Import/Export, browser print-to-PDF)
 
 **Issue detection** *(deferred from v0.17.3.2 if not picked up earlier)*
 - Additional checks as discovered during use
