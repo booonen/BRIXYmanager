@@ -53,7 +53,6 @@ function bmcData() {
   if (!d.guides) d.guides = {};         // { edgeKey: [{gx,gy},...] }
   if (!d.lineOrder) d.lineOrder = {};   // { edgeKey: [groupId,...] }
   if (!d.labelDir) d.labelDir = {};     // { nodeId: 0..7 | 'auto' }
-  if (!d.lineBends) d.lineBends = {};   // { edgeKey: { groupId: [{gx,gy},...] } } — manual peels
   return d;
 }
 
@@ -234,7 +233,134 @@ function bmcComputeLayout() {
   }
 
   // Drop edges without two positioned endpoints
-  const live = edges.filter(e => nodes.get(e.a).pos && nodes.get(e.b).pos);
+  let live = edges.filter(e => nodes.get(e.a).pos && nodes.get(e.b).pos);
+
+  // ---- Routes: cells per edge (guides + bend-near-quiet-endpoint) ----
+  const srcCells = new Map();
+  for (const e of live) {
+    const pa = nodes.get(e.a).pos, pb = nodes.get(e.b).pos;
+    const guides = d.guides[e.key] || [];
+    // Bend near the quieter endpoint: if b is busier than a, route the
+    // leg REVERSED (diag-first from b) so the straight tail lands at b's
+    // side and the bend sits near a.
+    const degA = nodes.get(e.a).edges.length, degB = nodes.get(e.b).edges.length;
+    let cells = [];
+    let from = { gx: pa.gx, gy: pa.gy };
+    const targets = [...guides, { gx: pb.gx, gy: pb.gy }];
+    const lastIdx = targets.length - 1;
+    targets.forEach((tgt, ti) => {
+      let leg;
+      const flipBend = (ti === lastIdx && !guides.length && degB > degA);
+      if (flipBend) {
+        leg = bmcRouteLeg(tgt.gx, tgt.gy, from.gx, from.gy).reverse();
+      } else {
+        leg = bmcRouteLeg(from.gx, from.gy, tgt.gx, tgt.gy);
+      }
+      if (cells.length) leg.shift();
+      cells = cells.concat(leg);
+      from = tgt;
+    });
+    e.cells = cells;
+    e.srcKeys = [e.key];
+    srcCells.set(e.key, cells);
+  }
+
+  // ---- Corridor bundling ----
+  // Edges whose routes share a run of ≥2 consecutive cells travel the
+  // same visual corridor even when their endpoints differ. Cut every edge
+  // at its shared-run boundaries, then merge identical spans: the shared
+  // span becomes ONE edge with the union line set (fanned like any
+  // corridor) and the cut points become invisible virtual junctions.
+  // Peeling thus arrives naturally from wherever routes converge/diverge —
+  // bend one edge onto another's path and they bundle; bend it away and
+  // it peels.
+  {
+    const ck = (c) => c.gx + ',' + c.gy;
+    const cover = new Map();
+    for (const e of live) e.cells.forEach((c) => {
+      const k = ck(c);
+      if (!cover.has(k)) cover.set(k, []);
+      cover.get(k).push(e);
+    });
+    const cuts = new Map();
+    const addCut = (e, i) => {
+      if (i <= 0 || i >= e.cells.length - 1) return;
+      if (!cuts.has(e)) cuts.set(e, new Set());
+      cuts.get(e).add(i);
+    };
+    for (const e of live) {
+      const partners = new Map();
+      e.cells.forEach((c, i) => {
+        for (const oe of cover.get(ck(c))) {
+          if (oe === e) continue;
+          if (!partners.has(oe)) partners.set(oe, []);
+          partners.get(oe).push(i);
+        }
+      });
+      for (const idxs of partners.values()) {
+        let s = 0;
+        for (let j = 1; j <= idxs.length; j++) {
+          if (j === idxs.length || idxs[j] !== idxs[j - 1] + 1) {
+            if (j - s >= 2) { addCut(e, idxs[s]); addCut(e, idxs[j - 1]); }
+            s = j;
+          }
+        }
+      }
+    }
+    if (cuts.size) {
+      // a cut can land exactly on another edge's endpoint (peel at a
+      // station): anchor to that real node instead of a virtual one
+      const endCell = new Map();
+      for (const e of live) {
+        endCell.set(ck(e.cells[0]), e.a);
+        endCell.set(ck(e.cells[e.cells.length - 1]), e.b);
+      }
+      const pieces = [];
+      for (const e of live) {
+        const cs = [...(cuts.get(e) || [])].sort((x, y) => x - y);
+        if (!cs.length) { pieces.push(e); continue; }
+        let prev = 0, prevNode = e.a;
+        for (const bi of [...cs, e.cells.length - 1]) {
+          if (bi <= prev) continue;
+          const sub = e.cells.slice(prev, bi + 1);
+          const isLast = bi === e.cells.length - 1;
+          const cellK = ck(e.cells[bi]);
+          const endNode = isLast ? e.b : (endCell.get(cellK) || ('v@' + cellK));
+          const [a2, b2] = prevNode <= endNode ? [prevNode, endNode] : [endNode, prevNode];
+          pieces.push({
+            key: a2 + '~' + b2, a: a2, b: b2,
+            cells: prevNode <= endNode ? sub : [...sub].reverse(),
+            lines: new Set(e.lines), path: e.path, pathAll: e.pathAll || e.path,
+            srcKeys: [...e.srcKeys],
+            orderedLines: null, pts: null, strands: null,
+          });
+          prev = bi; prevNode = endNode;
+        }
+      }
+      // merge identical spans into fanned corridor edges
+      const byPair2 = new Map();
+      const bundled = [];
+      for (const p of pieces) {
+        if (p.a === p.b) { bundled.push(p); continue; }
+        const pk = p.a + '~' + p.b;
+        const prior = byPair2.get(pk);
+        if (!prior) { p.key = pk; byPair2.set(pk, p); bundled.push(p); continue; }
+        for (const g of p.lines) prior.lines.add(g);
+        prior.pathAll = [...new Set([...(prior.pathAll || prior.path), ...(p.pathAll || p.path)])];
+        prior.srcKeys = [...new Set([...(prior.srcKeys || []), ...(p.srcKeys || [])])];
+      }
+      for (const p of bundled) for (const nid of [p.a, p.b]) {
+        if (!nodes.has(nid)) {
+          const [vgx, vgy] = nid.slice(2).split(',').map(Number);
+          nodes.set(nid, { id: nid, node: null, placed: false, pos: { gx: vgx, gy: vgy }, edges: [] });
+        }
+      }
+      for (const n of nodes.values()) n.edges = [];
+      for (const e2 of bundled) { nodes.get(e2.a).edges.push(e2); nodes.get(e2.b).edges.push(e2); }
+      live = bundled;
+    }
+  }
+  for (const e of live) e.pts = _bmcCompressPts(e.cells.map(c => ({ x: c.gx * BMC_CELL, y: c.gy * BMC_CELL })));
 
   // ---- Ordered lines per edge: identity-stable base + orientation propagation ----
   const globalIdx = new Map(data.serviceGroups.map((g, i) => [g.id, i]));
@@ -365,11 +491,7 @@ function bmcComputeLayout() {
   // the node connector draws it as a natural turnout). Symmetric lanes
   // return at the next station, hidden under its mark.
   for (const e of live) e.laneShift = 0;
-  const hasOwnBend = (e, g) => { const ob = d.lineBends[e.key]; return !!(ob && ob[g] && ob[g].length); };
-  const laneOff = (e, g) => {
-    const fan = e.orderedLines.filter(x => !hasOwnBend(e, x));
-    return (fan.indexOf(g) - (fan.length - 1) / 2) * BMC_GAP + e.laneShift;
-  };
+  const laneOff = (e, g) => (e.orderedLines.indexOf(g) - (e.orderedLines.length - 1) / 2) * BMC_GAP + e.laneShift;
   const invisibleNodes = [...nodes.values()].filter(n => {
     if (!n.pos) return false;
     if (n.placed && n.node && isPassengerStop(n.node)) return false;
@@ -395,7 +517,7 @@ function bmcComputeLayout() {
       }
       for (const e of le) {
         if (e === parent) continue;
-        const shared = e.orderedLines.filter(g => parent.lines.has(g) && !hasOwnBend(e, g) && !hasOwnBend(parent, g));
+        const shared = e.orderedLines.filter(g => parent.lines.has(g));
         if (!shared.length) continue;
         if (shared.length < 2 && e !== straightest) continue;
         const fc = (e.a === n.id) ? 1 : -1;
@@ -408,55 +530,11 @@ function bmcComputeLayout() {
     if (!changed) break;
   }
 
-  // ---- Geometry: route cells, pixel paths, strand polylines ----
+  // ---- Strand polylines ----
   for (const e of live) {
-    const pa = nodes.get(e.a).pos, pb = nodes.get(e.b).pos;
-    const guides = d.guides[e.key] || [];
-    // Bend near the quieter endpoint: if b is busier than a, route the
-    // leg REVERSED (diag-first from b) so the straight tail lands at b's
-    // side and the bend sits near a.
-    const degA = nodes.get(e.a).edges.length, degB = nodes.get(e.b).edges.length;
-    let cells = [];
-    let from = { gx: pa.gx, gy: pa.gy };
-    const targets = [...guides, { gx: pb.gx, gy: pb.gy }];
-    const lastIdx = targets.length - 1;
-    targets.forEach((tgt, ti) => {
-      let leg;
-      const flipBend = (ti === lastIdx && !guides.length && degB > degA);
-      if (flipBend) {
-        leg = bmcRouteLeg(tgt.gx, tgt.gy, from.gx, from.gy).reverse();
-      } else {
-        leg = bmcRouteLeg(from.gx, from.gy, tgt.gx, tgt.gy);
-      }
-      if (cells.length) leg.shift();
-      cells = cells.concat(leg);
-      from = tgt;
-    });
-    // collapse collinear runs into bend-only points
-    e.cells = cells;
-    e.pts = _bmcCompressPts(cells.map(c => ({ x: c.gx * BMC_CELL, y: c.gy * BMC_CELL })));
-    // strands
-    // manual peels: a line with its own bend points on this edge leaves
-    // the corridor and follows its own route between the same endpoints;
-    // the remaining lines re-fan without it
-    const own = d.lineBends[e.key] || {};
-    const fan = e.orderedLines.filter(g => !(own[g] && own[g].length));
-    const k = fan.length;
+    const k = e.orderedLines.length;
     e.strands = {};
-    e.orderedLines.forEach((gid) => {
-      if (own[gid] && own[gid].length) {
-        let cells2 = [];
-        let from2 = { gx: pa.gx, gy: pa.gy };
-        for (const tgt of [...own[gid], { gx: pb.gx, gy: pb.gy }]) {
-          const leg = bmcRouteLeg(from2.gx, from2.gy, tgt.gx, tgt.gy);
-          if (cells2.length) leg.shift();
-          cells2 = cells2.concat(leg);
-          from2 = tgt;
-        }
-        e.strands[gid] = _bmcCompressPts(cells2.map(c => ({ x: c.gx * BMC_CELL, y: c.gy * BMC_CELL })));
-        return;
-      }
-      const i = fan.indexOf(gid);
+    e.orderedLines.forEach((gid, i) => {
       const off = (i - (k - 1) / 2) * BMC_GAP + (e.laneShift || 0);
       e.strands[gid] = _bmcOffsetPolyline(e.pts, off);
     });
@@ -517,7 +595,7 @@ function bmcComputeLayout() {
     }
   }
 
-  const layout = { edges: live, nodes, nodeInfos, stopMap };
+  const layout = { edges: live, nodes, nodeInfos, stopMap, _srcCells: srcCells };
   _bmcState.layout = layout;
   return layout;
 }
@@ -753,21 +831,15 @@ function bmcRender() {
     out += _bmcDrawMark(info, layout);
   }
 
-  // guide-point handles: draggable, right-click deletes. Corridor bends
-  // get the accent ring; per-line peel bends get the line's colour.
+  // guide-point handles: draggable, right-click deletes. Guides key off
+  // the pre-bundling source edges.
   if (!_bmcState.exporting) {
     const bd = bmcData();
-    for (const e of layout.edges) {
-      const gl = bd.guides[e.key];
+    for (const k of (layout._srcCells ? layout._srcCells.keys() : [])) {
+      const gl = bd.guides[k];
       if (gl) gl.forEach((g, i) => {
-        out += `<circle cx="${g.gx * BMC_CELL}" cy="${g.gy * BMC_CELL}" r="4.5" class="bmc-guidept" data-bmc-guide="${e.key}|${i}"/>`;
+        out += `<circle cx="${g.gx * BMC_CELL}" cy="${g.gy * BMC_CELL}" r="4.5" class="bmc-guidept" data-bmc-guide="${k}|${i}"/>`;
       });
-      const ob = bd.lineBends[e.key];
-      if (ob) for (const [gid, arr] of Object.entries(ob)) {
-        arr.forEach((g, i) => {
-          out += `<circle cx="${g.gx * BMC_CELL}" cy="${g.gy * BMC_CELL}" r="4.5" class="bmc-guidept" style="stroke:${groupColor(gid)}" data-bmc-lbend="${e.key}|${gid}|${i}"/>`;
-        });
-      }
     }
   }
 
@@ -776,6 +848,7 @@ function bmcRender() {
   if (!_bmcState.exporting) {
     for (const info of layout.nodeInfos.values()) {
       if (info.node && isPassengerStop(info.node) && info.placed) continue;
+      if (String(info.id).startsWith('v@')) continue; // bundling junctions are derived, not pinnable
       const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
       const attr = info.placed ? `data-bmc-node="${info.id}"` : `data-bmc-auto="${info.id}"`;
       out += `<circle class="bmc-autonode" cx="${c.x}" cy="${c.y}" r="6.5" fill="transparent" ${attr} style="cursor:grab"/>`;
@@ -1297,19 +1370,22 @@ function _bmcAttachEvents() {
   svg._bmcEvents = true;
 
   svg.addEventListener('pointerdown', (ev) => {
+    // v3 parity: a movement-free left click on a station or corridor opens
+    // its context window (handled on pointerup)
+    if (ev.button === 0) {
+      const pNode = ev.target.closest && ev.target.closest('[data-bmc-node]');
+      const pEdge = ev.target.closest && ev.target.closest('[data-bmc-edge]');
+      _bmcState.press = {
+        x: ev.clientX, y: ev.clientY,
+        node: pNode ? pNode.getAttribute('data-bmc-node') : null,
+        edge: (!pNode && pEdge) ? pEdge.getAttribute('data-bmc-edge') : null,
+      };
+    }
     const guideEl = ev.target.closest && ev.target.closest('[data-bmc-guide]');
     if (guideEl && ev.button === 0) {
       const attr = guideEl.getAttribute('data-bmc-guide');
       const p = attr.lastIndexOf('|');
       _bmcState.guideDrag = { key: attr.slice(0, p), idx: +attr.slice(p + 1) };
-      svg.setPointerCapture(ev.pointerId);
-      ev.preventDefault();
-      return;
-    }
-    const lbendEl = ev.target.closest && ev.target.closest('[data-bmc-lbend]');
-    if (lbendEl && ev.button === 0) {
-      const [key, gid, idx] = lbendEl.getAttribute('data-bmc-lbend').split('|');
-      _bmcState.lbendDrag = { key, gid, idx: +idx };
       svg.setPointerCapture(ev.pointerId);
       ev.preventDefault();
       return;
@@ -1354,16 +1430,6 @@ function _bmcAttachEvents() {
       }
       return;
     }
-    if (_bmcState.lbendDrag) {
-      const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
-      const ld = _bmcState.lbendDrag;
-      const arr = bmcData().lineBends[ld.key]?.[ld.gid];
-      if (arr && arr[ld.idx]) {
-        const gx = Math.round(w.x / BMC_CELL), gy = Math.round(w.y / BMC_CELL);
-        if (arr[ld.idx].gx !== gx || arr[ld.idx].gy !== gy) { arr[ld.idx] = { gx, gy }; bmcRender(); }
-      }
-      return;
-    }
     if (_bmcState.nodeDrag) {
       const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
       const gx = Math.round(w.x / BMC_CELL), gy = Math.round(w.y / BMC_CELL);
@@ -1386,8 +1452,18 @@ function _bmcAttachEvents() {
   const endDrag = (ev) => {
     if (_bmcState.nodeDrag) { save(); _bmcState.nodeDrag = null; bmcRender(); }
     if (_bmcState.guideDrag) { save(); _bmcState.guideDrag = null; bmcRender(); }
-    if (_bmcState.lbendDrag) { save(); _bmcState.lbendDrag = null; bmcRender(); }
     _bmcState.panning = null;
+    // movement-free left click → open the context window (v3 parity)
+    const pr = _bmcState.press;
+    _bmcState.press = null;
+    if (pr && ev && ev.type === 'pointerup' &&
+        Math.abs(ev.clientX - pr.x) < 5 && Math.abs(ev.clientY - pr.y) < 5) {
+      if (pr.node) { _bmcStationMenu(ev, pr.node); }
+      else if (pr.edge) {
+        const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
+        _bmcEdgeMenu(ev, pr.edge, { gx: Math.round(w.x / BMC_CELL), gy: Math.round(w.y / BMC_CELL) });
+      }
+    }
   };
   svg.addEventListener('pointerup', endDrag);
   svg.addEventListener('pointercancel', endDrag);
@@ -1418,19 +1494,6 @@ function _bmcAttachEvents() {
       if (arr) {
         arr.splice(idx, 1);
         if (!arr.length) delete bmcData().guides[key];
-        save(); bmcRender();
-      }
-      return;
-    }
-    const lbendEl = ev.target.closest && ev.target.closest('[data-bmc-lbend]');
-    if (lbendEl) {
-      const [key, gid, idx] = lbendEl.getAttribute('data-bmc-lbend').split('|');
-      const lb = bmcData().lineBends;
-      const arr = lb[key]?.[gid];
-      if (arr) {
-        arr.splice(+idx, 1);
-        if (!arr.length) delete lb[key][gid];
-        if (lb[key] && !Object.keys(lb[key]).length) delete lb[key];
         save(); bmcRender();
       }
       return;
@@ -1576,29 +1639,13 @@ function _bmcEdgeMenu(ev, key, cell) {
       toast(t('bmc.bend_added'), 'info');
     },
   });
-  // manual peel: give one line its own bend on this corridor
-  if (e.orderedLines.length >= 2) {
-    items.push({ sep: true });
-    for (const gid of e.orderedLines) {
-      const grp = getGroup(gid);
-      items.push({
-        text: t('bmc.menu_line_bend', { name: grp?.name || '?' }),
-        color: grp?.color || '#888',
-        fn: () => {
-          _bmcInsertLineBend(e, gid, cell);
-          save(); bmcRender();
-          toast(t('bmc.bend_added'), 'info');
-        },
-      });
-    }
-  }
-  if ((d.guides[e.key] || []).length || d.lineBends[e.key]) {
+  const srcKeys = e.srcKeys || [e.key];
+  if (srcKeys.some(k => (d.guides[k] || []).length)) {
     items.push({ sep: true });
     items.push({
       text: t('bmc.menu_clear_bends'),
       fn: () => {
-        delete d.guides[e.key];
-        delete d.lineBends[e.key];
+        for (const k of srcKeys) delete d.guides[k];
         save(); bmcRender();
         toast(t('bmc.bends_cleared'), 'info');
       },
@@ -1607,45 +1654,34 @@ function _bmcEdgeMenu(ev, key, cell) {
   _bmcShowMenu(ev.clientX, ev.clientY, items);
 }
 
-// give line gid its own bend point on edge e (manual peel); ordered along
-// the line's current strand on this edge
-function _bmcInsertLineBend(e, gid, cell) {
-  const d = bmcData();
-  if (!d.lineBends[e.key]) d.lineBends[e.key] = {};
-  const arr = d.lineBends[e.key][gid] || [];
-  const strand = e.strands[gid] || [];
-  const idxOf = (c) => {
-    let bi = 0, bd = Infinity;
-    strand.forEach((p, i) => {
-      const dd = Math.abs(p.x - c.gx * BMC_CELL) + Math.abs(p.y - c.gy * BMC_CELL);
-      if (dd < bd) { bd = dd; bi = i; }
-    });
-    return bi;
-  };
-  const target = idxOf(cell);
-  let ins = arr.length;
-  for (let i = 0; i < arr.length; i++) if (idxOf(arr[i]) > target) { ins = i; break; }
-  arr.splice(ins, 0, { gx: cell.gx, gy: cell.gy });
-  d.lineBends[e.key][gid] = arr;
-}
-
-// insert a guide point at its position along the edge's current route
+// insert a guide point at its position along an edge's current route.
+// A bundled edge came from one or more pre-bundling source edges — the
+// bend is applied to every source that actually routes near the cell, so
+// a corridor bend keeps its co-travelling lines together.
 function _bmcInsertGuide(e, cell) {
   const d = bmcData();
-  const idxOf = (c) => {
-    let bi = 0, bd = Infinity;
-    e.cells.forEach((cc, i) => {
-      const dd = Math.abs(cc.gx - c.gx) + Math.abs(cc.gy - c.gy);
-      if (dd < bd) { bd = dd; bi = i; }
-    });
-    return bi;
-  };
-  const g = d.guides[e.key] || [];
-  const target = idxOf(cell);
-  let ins = g.length;
-  for (let i = 0; i < g.length; i++) if (idxOf(g[i]) > target) { ins = i; break; }
-  g.splice(ins, 0, { gx: cell.gx, gy: cell.gy });
-  d.guides[e.key] = g;
+  const layout = _bmcState.layout;
+  const srcKeys = e.srcKeys || [e.key];
+  for (const sk of srcKeys) {
+    const cells = (layout && layout._srcCells && layout._srcCells.get(sk)) || e.cells;
+    const idxOf = (c) => {
+      let bi = 0, bd = Infinity;
+      cells.forEach((cc, i) => {
+        const dd = Math.abs(cc.gx - c.gx) + Math.abs(cc.gy - c.gy);
+        if (dd < bd) { bd = dd; bi = i; }
+      });
+      return bi;
+    };
+    // only bend sources that pass close to the click
+    const near = cells.some(cc => Math.abs(cc.gx - cell.gx) + Math.abs(cc.gy - cell.gy) <= 2);
+    if (!near) continue;
+    const g = d.guides[sk] || [];
+    const target = idxOf(cell);
+    let ins = g.length;
+    for (let i = 0; i < g.length; i++) if (idxOf(g[i]) > target) { ins = i; break; }
+    g.splice(ins, 0, { gx: cell.gx, gy: cell.gy });
+    d.guides[sk] = g;
+  }
 }
 
 function _bmcSidebarDragStart(ev, nodeId) {
@@ -1657,6 +1693,16 @@ function _bmcSidebarDragStart(ev, nodeId) {
   ghost.style.top = (ev.clientY + 6) + 'px';
   document.body.appendChild(ghost);
   _bmcState.sidebarDrag = { nodeId, ghostEl: ghost };
+}
+
+function bmcResetLayout() {
+  appConfirm(t('bmc.reset_confirm'), () => {
+    data.beckmapClassic = {};
+    bmcData();
+    save();
+    bmcRender();
+    toast(t('bmc.reset_done'), 'info');
+  });
 }
 
 function bmcFitAll() {
@@ -1714,6 +1760,7 @@ function bmcEnsureDom() {
     <button class="schem-btn" onclick="bmcFitAll()" title="${t('bmc.fit')}">⊞</button>
     <button class="schem-btn" onclick="_bmcState.debug=!_bmcState.debug;bmcRender()" title="${t('bmc.debug')}" style="font-size:9px">DBG</button>
     <button class="schem-btn" onclick="bmcExportSVG()" title="${t('bmc.export')}" style="font-size:9px">SVG</button>
+    <button class="schem-btn" onclick="bmcResetLayout()" title="${t('bmc.reset')}">↺</button>
     <button class="schem-btn" onclick="bmcToggleStyle()" title="${t('bmc.toggle_to_v3')}" style="font-size:8px">V3</button>`;
   wrap.appendChild(hud);
   // toggle button in the v3 HUD
