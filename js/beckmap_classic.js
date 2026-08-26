@@ -53,6 +53,7 @@ function bmcData() {
   if (!d.guides) d.guides = {};         // { edgeKey: [{gx,gy},...] }
   if (!d.lineOrder) d.lineOrder = {};   // { edgeKey: [groupId,...] }
   if (!d.labelDir) d.labelDir = {};     // { nodeId: 0..7 | 'auto' }
+  if (!d.lineBends) d.lineBends = {};   // { edgeKey: { groupId: [{gx,gy},...] } } — manual peels
   return d;
 }
 
@@ -190,12 +191,16 @@ function bmcComputeLayout() {
   }
   for (const e of edges) { nodes.get(e.a).edges.push(e); nodes.get(e.b).edges.push(e); }
 
-  // Auto-position unplaced layout nodes (forks, diverging unplaced stops):
+  // Auto-position unplaced layout JUNCTIONS (forks, waypoint splits):
   // relax toward the mean of positioned neighbours, then grid-snap.
+  // Unplaced passenger stops are NEVER auto-positioned — an unplaced
+  // station is not on the map, so its edges simply don't render (placing
+  // one station must not drag the whole network's termini along).
   for (let iter = 0; iter < 24; iter++) {
     let moved = false;
     for (const n of nodes.values()) {
       if (n.placed || n.pos) continue;
+      if (n.node && isPassengerStop(n.node)) continue;
       const neigh = n.edges.map(e => nodes.get(e.a === n.id ? e.b : e.a)).filter(m => m.pos);
       if (neigh.length < 1) continue;
       const mx = neigh.reduce((s, m) => s + m.pos.gx, 0) / neigh.length;
@@ -207,12 +212,12 @@ function bmcComputeLayout() {
   }
   for (const n of nodes.values()) {
     if (n.pos && n.pos.auto) {
-      // a pass-through auto node (set change between two stations) sits ON
-      // the natural route between its neighbours — the snapped mean can
-      // land beside the 45° path and put a wiggle in every line through it
-      const neigh = n.edges.map(e => nodes.get(e.a === n.id ? e.b : e.a));
-      if (n.edges.length === 2 && neigh.every(m => m.pos && !m.pos.auto)) {
-        const leg = bmcRouteLeg(neigh[0].pos.gx, neigh[0].pos.gy, neigh[1].pos.gx, neigh[1].pos.gy);
+      // an auto node with exactly two firmly positioned neighbours sits ON
+      // the natural route between them — the snapped mean can land beside
+      // the 45° path and put a wiggle in every line through it
+      const posNeigh = n.edges.map(e => nodes.get(e.a === n.id ? e.b : e.a)).filter(m => m && m.pos && !m.pos.auto);
+      if (posNeigh.length === 2) {
+        const leg = bmcRouteLeg(posNeigh[0].pos.gx, posNeigh[0].pos.gy, posNeigh[1].pos.gx, posNeigh[1].pos.gy);
         const mid = leg[Math.floor(leg.length / 2)];
         n.pos.gx = mid.gx; n.pos.gy = mid.gy;
         continue;
@@ -256,20 +261,52 @@ function bmcComputeLayout() {
     return { x: dx / l, y: dy / l };
   };
 
-  // Fork angular seeding: at nodes where an edge's lines fan out to
-  // different continuation edges, order the lines by the angle of their
-  // continuation so the fan never self-crosses.
+  // BFS orientation propagation (defined first — each seed propagates
+  // IMMEDIATELY, so the first seed claims a whole corridor end-to-end and
+  // a later fork at the corridor's far end is skipped. Two forks seeding
+  // the same corridor independently used to meet mid-corridor and put the
+  // unavoidable crossing at a tick station; now it lands under the second
+  // junction, where the node zone hides it.)
+  // orderedLines is expressed in the edge's canonical travel frame
+  // (a → b, left-to-right). An edge whose line set is a SUBSET of a
+  // neighbouring edge's set is a continuation of that corridor (identical
+  // sets are through-stations, strict subsets are what remains after a
+  // mid-corridor peel) and inherits the shared lines' relative order.
   const visited = new Set();
-  const seedQueue = [];
+  const propagate = (root) => {
+    const queue = [root];
+    while (queue.length) {
+      const e1 = queue.shift();
+      for (const endNode of [e1.a, e1.b]) {
+        const n = nodes.get(endNode);
+        for (const e2 of n.edges) {
+          if (!live.includes(e2) || e2.key === e1.key || visited.has(e2.key)) continue;
+          let subset = true;
+          for (const g of e2.lines) if (!e1.lines.has(g)) { subset = false; break; }
+          if (!subset) continue;
+          const arrOrder = (e1.b === endNode) ? e1.orderedLines : [...e1.orderedLines].reverse();
+          e2.orderedLines = (e2.a === endNode) ? arrOrder.filter(g => e2.lines.has(g))
+                                               : [...arrOrder].reverse().filter(g => e2.lines.has(g));
+          visited.add(e2.key);
+          queue.push(e2);
+        }
+      }
+    }
+  };
+
   // user line-order overrides are authoritative: seed them first so they
   // win propagation over automatic fork ordering
   for (const e of live) {
     if (d.lineOrder[e.key] && e.lines.size >= 2) {
       e.orderedLines = baseOrder(e);
       visited.add(e.key);
-      seedQueue.push(e);
+      propagate(e);
     }
   }
+
+  // Fork angular seeding: at nodes where an edge's lines fan out to
+  // different continuation edges, order the lines by the angle of their
+  // continuation so the fan never self-crosses.
   for (const n of nodes.values()) {
     const nodeEdges = n.edges.filter(e => live.includes(e));
     if (nodeEdges.length < 3) continue;
@@ -305,37 +342,10 @@ function bmcComputeLayout() {
       // Convert to the edge's canonical a→b frame:
       e.orderedLines = (e.b === n.id) ? arr : [...arr].reverse();
       visited.add(e.key);
-      seedQueue.push(e);
+      propagate(e);
     }
   }
 
-  // BFS orientation propagation from the seeds (then any unvisited edges).
-  // orderedLines is expressed in the edge's canonical travel frame
-  // (a → b, left-to-right). An edge whose line set is a SUBSET of a
-  // neighbouring edge's set is a continuation of that corridor (identical
-  // sets are through-stations, strict subsets are what remains after a
-  // mid-corridor peel) and inherits the shared lines' relative order.
-  const propagate = (root) => {
-    const queue = [root];
-    while (queue.length) {
-      const e1 = queue.shift();
-      for (const endNode of [e1.a, e1.b]) {
-        const n = nodes.get(endNode);
-        for (const e2 of n.edges) {
-          if (!live.includes(e2) || e2.key === e1.key || visited.has(e2.key)) continue;
-          let subset = true;
-          for (const g of e2.lines) if (!e1.lines.has(g)) { subset = false; break; }
-          if (!subset) continue;
-          const arrOrder = (e1.b === endNode) ? e1.orderedLines : [...e1.orderedLines].reverse();
-          e2.orderedLines = (e2.a === endNode) ? arrOrder.filter(g => e2.lines.has(g))
-                                               : [...arrOrder].reverse().filter(g => e2.lines.has(g));
-          visited.add(e2.key);
-          queue.push(e2);
-        }
-      }
-    }
-  };
-  for (const s of seedQueue) propagate(s);
   for (const root of live) {
     if (visited.has(root.key)) continue;
     root.orderedLines = baseOrder(root);
@@ -355,7 +365,11 @@ function bmcComputeLayout() {
   // the node connector draws it as a natural turnout). Symmetric lanes
   // return at the next station, hidden under its mark.
   for (const e of live) e.laneShift = 0;
-  const laneOff = (e, g) => (e.orderedLines.indexOf(g) - (e.orderedLines.length - 1) / 2) * BMC_GAP + e.laneShift;
+  const hasOwnBend = (e, g) => { const ob = d.lineBends[e.key]; return !!(ob && ob[g] && ob[g].length); };
+  const laneOff = (e, g) => {
+    const fan = e.orderedLines.filter(x => !hasOwnBend(e, x));
+    return (fan.indexOf(g) - (fan.length - 1) / 2) * BMC_GAP + e.laneShift;
+  };
   const invisibleNodes = [...nodes.values()].filter(n => {
     if (!n.pos) return false;
     if (n.placed && n.node && isPassengerStop(n.node)) return false;
@@ -381,7 +395,7 @@ function bmcComputeLayout() {
       }
       for (const e of le) {
         if (e === parent) continue;
-        const shared = e.orderedLines.filter(g => parent.lines.has(g));
+        const shared = e.orderedLines.filter(g => parent.lines.has(g) && !hasOwnBend(e, g) && !hasOwnBend(parent, g));
         if (!shared.length) continue;
         if (shared.length < 2 && e !== straightest) continue;
         const fc = (e.a === n.id) ? 1 : -1;
@@ -422,9 +436,27 @@ function bmcComputeLayout() {
     e.cells = cells;
     e.pts = _bmcCompressPts(cells.map(c => ({ x: c.gx * BMC_CELL, y: c.gy * BMC_CELL })));
     // strands
-    const k = e.orderedLines.length;
+    // manual peels: a line with its own bend points on this edge leaves
+    // the corridor and follows its own route between the same endpoints;
+    // the remaining lines re-fan without it
+    const own = d.lineBends[e.key] || {};
+    const fan = e.orderedLines.filter(g => !(own[g] && own[g].length));
+    const k = fan.length;
     e.strands = {};
-    e.orderedLines.forEach((gid, i) => {
+    e.orderedLines.forEach((gid) => {
+      if (own[gid] && own[gid].length) {
+        let cells2 = [];
+        let from2 = { gx: pa.gx, gy: pa.gy };
+        for (const tgt of [...own[gid], { gx: pb.gx, gy: pb.gy }]) {
+          const leg = bmcRouteLeg(from2.gx, from2.gy, tgt.gx, tgt.gy);
+          if (cells2.length) leg.shift();
+          cells2 = cells2.concat(leg);
+          from2 = tgt;
+        }
+        e.strands[gid] = _bmcCompressPts(cells2.map(c => ({ x: c.gx * BMC_CELL, y: c.gy * BMC_CELL })));
+        return;
+      }
+      const i = fan.indexOf(gid);
       const off = (i - (k - 1) / 2) * BMC_GAP + (e.laneShift || 0);
       e.strands[gid] = _bmcOffsetPolyline(e.pts, off);
     });
@@ -435,7 +467,9 @@ function bmcComputeLayout() {
   for (const n of nodes.values()) {
     if (!n.pos) continue;
     const liveEdges = n.edges.filter(e => live.includes(e));
-    if (!liveEdges.length) continue;
+    // a placed station stays visible even with no drawable edges — a lone
+    // mark and label, so placing it never looks like a no-op
+    if (!liveEdges.length && !(n.placed && n.node && isPassengerStop(n.node))) continue;
     const info = { id: n.id, node: n.node, pos: n.pos, placed: n.placed, edges: liveEdges, ends: new Map(), connectors: [] };
     // strand endpoints at this node, per edge per line
     for (const e of liveEdges) {
@@ -448,6 +482,14 @@ function bmcComputeLayout() {
       }
     }
     nodeInfos.set(n.id, info);
+  }
+  // placed stations with no line-carrying segments at all (not in the
+  // edge graph) also render as lone marks
+  for (const [nid, st] of Object.entries(d.stations)) {
+    if (nodeInfos.has(nid) || nodes.has(nid)) continue;
+    const node = getNode(nid);
+    if (!node || !isPassengerStop(node)) continue;
+    nodeInfos.set(nid, { id: nid, node, pos: { gx: st.gx, gy: st.gy }, placed: true, edges: [], ends: new Map(), connectors: [] });
   }
 
   // connectors: for each line at each node, join its strand endpoints
@@ -711,15 +753,21 @@ function bmcRender() {
     out += _bmcDrawMark(info, layout);
   }
 
-  // guide-point handles: draggable, right-click deletes
+  // guide-point handles: draggable, right-click deletes. Corridor bends
+  // get the accent ring; per-line peel bends get the line's colour.
   if (!_bmcState.exporting) {
-    const dg = bmcData().guides;
+    const bd = bmcData();
     for (const e of layout.edges) {
-      const gl = dg[e.key];
-      if (!gl) continue;
-      gl.forEach((g, i) => {
+      const gl = bd.guides[e.key];
+      if (gl) gl.forEach((g, i) => {
         out += `<circle cx="${g.gx * BMC_CELL}" cy="${g.gy * BMC_CELL}" r="4.5" class="bmc-guidept" data-bmc-guide="${e.key}|${i}"/>`;
       });
+      const ob = bd.lineBends[e.key];
+      if (ob) for (const [gid, arr] of Object.entries(ob)) {
+        arr.forEach((g, i) => {
+          out += `<circle cx="${g.gx * BMC_CELL}" cy="${g.gy * BMC_CELL}" r="4.5" class="bmc-guidept" style="stroke:${groupColor(gid)}" data-bmc-lbend="${e.key}|${gid}|${i}"/>`;
+        });
+      }
     }
   }
 
@@ -1139,7 +1187,7 @@ function _bmcDrawLabel(info, kind, layout) {
   }
 
   // distance: mark size + font margin (+ corridor spread for line marks)
-  const kmax = Math.max(...info.edges.map(e => e.orderedLines.length));
+  const kmax = info.edges.length ? Math.max(...info.edges.map(e => e.orderedLines.length)) : 1;
   const spread = ((kmax - 1) / 2) * BMC_GAP;
   let baseX = c.x + (info._tickOffset ? info._tickOffset.x : 0);
   let baseY = c.y + (info._tickOffset ? info._tickOffset.y : 0);
@@ -1258,6 +1306,14 @@ function _bmcAttachEvents() {
       ev.preventDefault();
       return;
     }
+    const lbendEl = ev.target.closest && ev.target.closest('[data-bmc-lbend]');
+    if (lbendEl && ev.button === 0) {
+      const [key, gid, idx] = lbendEl.getAttribute('data-bmc-lbend').split('|');
+      _bmcState.lbendDrag = { key, gid, idx: +idx };
+      svg.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      return;
+    }
     const nodeEl = ev.target.closest && ev.target.closest('[data-bmc-node]');
     if (nodeEl && ev.button === 0) {
       const nid = nodeEl.getAttribute('data-bmc-node');
@@ -1298,6 +1354,16 @@ function _bmcAttachEvents() {
       }
       return;
     }
+    if (_bmcState.lbendDrag) {
+      const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
+      const ld = _bmcState.lbendDrag;
+      const arr = bmcData().lineBends[ld.key]?.[ld.gid];
+      if (arr && arr[ld.idx]) {
+        const gx = Math.round(w.x / BMC_CELL), gy = Math.round(w.y / BMC_CELL);
+        if (arr[ld.idx].gx !== gx || arr[ld.idx].gy !== gy) { arr[ld.idx] = { gx, gy }; bmcRender(); }
+      }
+      return;
+    }
     if (_bmcState.nodeDrag) {
       const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
       const gx = Math.round(w.x / BMC_CELL), gy = Math.round(w.y / BMC_CELL);
@@ -1320,6 +1386,7 @@ function _bmcAttachEvents() {
   const endDrag = (ev) => {
     if (_bmcState.nodeDrag) { save(); _bmcState.nodeDrag = null; bmcRender(); }
     if (_bmcState.guideDrag) { save(); _bmcState.guideDrag = null; bmcRender(); }
+    if (_bmcState.lbendDrag) { save(); _bmcState.lbendDrag = null; bmcRender(); }
     _bmcState.panning = null;
   };
   svg.addEventListener('pointerup', endDrag);
@@ -1351,6 +1418,19 @@ function _bmcAttachEvents() {
       if (arr) {
         arr.splice(idx, 1);
         if (!arr.length) delete bmcData().guides[key];
+        save(); bmcRender();
+      }
+      return;
+    }
+    const lbendEl = ev.target.closest && ev.target.closest('[data-bmc-lbend]');
+    if (lbendEl) {
+      const [key, gid, idx] = lbendEl.getAttribute('data-bmc-lbend').split('|');
+      const lb = bmcData().lineBends;
+      const arr = lb[key]?.[gid];
+      if (arr) {
+        arr.splice(+idx, 1);
+        if (!arr.length) delete lb[key][gid];
+        if (lb[key] && !Object.keys(lb[key]).length) delete lb[key];
         save(); bmcRender();
       }
       return;
@@ -1414,7 +1494,13 @@ function _bmcShowMenu(x, y, items) {
     if (it.label) { const s = document.createElement('div'); s.className = 'bmc-menu-label'; s.textContent = it.label; m.appendChild(s); continue; }
     const b = document.createElement('button');
     b.type = 'button';
-    b.textContent = it.text;
+    if (it.color) {
+      const dot = document.createElement('span');
+      dot.className = 'bmc-menu-dot';
+      dot.style.background = it.color;
+      b.appendChild(dot);
+    }
+    b.appendChild(document.createTextNode(it.text));
     b.addEventListener('click', () => { _bmcCloseMenu(); it.fn(); });
     m.appendChild(b);
   }
@@ -1490,17 +1576,57 @@ function _bmcEdgeMenu(ev, key, cell) {
       toast(t('bmc.bend_added'), 'info');
     },
   });
-  if ((d.guides[e.key] || []).length) {
+  // manual peel: give one line its own bend on this corridor
+  if (e.orderedLines.length >= 2) {
+    items.push({ sep: true });
+    for (const gid of e.orderedLines) {
+      const grp = getGroup(gid);
+      items.push({
+        text: t('bmc.menu_line_bend', { name: grp?.name || '?' }),
+        color: grp?.color || '#888',
+        fn: () => {
+          _bmcInsertLineBend(e, gid, cell);
+          save(); bmcRender();
+          toast(t('bmc.bend_added'), 'info');
+        },
+      });
+    }
+  }
+  if ((d.guides[e.key] || []).length || d.lineBends[e.key]) {
+    items.push({ sep: true });
     items.push({
       text: t('bmc.menu_clear_bends'),
       fn: () => {
         delete d.guides[e.key];
+        delete d.lineBends[e.key];
         save(); bmcRender();
         toast(t('bmc.bends_cleared'), 'info');
       },
     });
   }
   _bmcShowMenu(ev.clientX, ev.clientY, items);
+}
+
+// give line gid its own bend point on edge e (manual peel); ordered along
+// the line's current strand on this edge
+function _bmcInsertLineBend(e, gid, cell) {
+  const d = bmcData();
+  if (!d.lineBends[e.key]) d.lineBends[e.key] = {};
+  const arr = d.lineBends[e.key][gid] || [];
+  const strand = e.strands[gid] || [];
+  const idxOf = (c) => {
+    let bi = 0, bd = Infinity;
+    strand.forEach((p, i) => {
+      const dd = Math.abs(p.x - c.gx * BMC_CELL) + Math.abs(p.y - c.gy * BMC_CELL);
+      if (dd < bd) { bd = dd; bi = i; }
+    });
+    return bi;
+  };
+  const target = idxOf(cell);
+  let ins = arr.length;
+  for (let i = 0; i < arr.length; i++) if (idxOf(arr[i]) > target) { ins = i; break; }
+  arr.splice(ins, 0, { gx: cell.gx, gy: cell.gy });
+  d.lineBends[e.key][gid] = arr;
 }
 
 // insert a guide point at its position along the edge's current route

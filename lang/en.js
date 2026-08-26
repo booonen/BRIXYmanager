@@ -1163,6 +1163,7 @@ registerLanguage('en', 'English', {
     "menu_unpin": "Unpin junction",
     "menu_reverse_order": "Reverse line order",
     "menu_add_bend": "Add bend point here",
+    "menu_line_bend": "Peel {name} off here",
     "menu_clear_bends": "Straighten (clear bend points)",
     "order_reversed": "Line order reversed",
     "bend_added": "Bend point added — drag it to shape the corridor",

@@ -983,6 +983,7 @@ tr.issue-highlight { animation: issueFlash 1.5s ease; }
 }
 .bmc-menu button:hover { background: var(--bg-hover, rgba(91, 138, 245, 0.15)); }
 .bmc-menu-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+.bmc-menu-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; }
 .bmc-menu-label { padding: 4px 10px 2px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-dim, #8a93a5); }
 .bmc-menu-grid { display: grid; grid-template-columns: repeat(3, 28px); gap: 2px; padding: 2px 8px 4px; }
 .bmc-menu-grid button {
