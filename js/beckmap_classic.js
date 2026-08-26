@@ -207,23 +207,6 @@ function bmcComputeLayout() {
     return arr;
   };
 
-  // Through-pairs: at ANY node, two incident edges carrying the identical
-  // line set act as a continuing corridor — pair them for propagation.
-  // (Covers plain through-stations AND corridors passing through
-  // interchanges, which is what caused v1's crossings at big stations.)
-  const throughPairs = (n) => {
-    const groups = new Map();
-    const nodeEdges = n.edges.filter(e => live.includes(e));
-    for (const e of nodeEdges) {
-      const k = _bmcSetKey(e.lines);
-      if (!groups.has(k)) groups.set(k, []);
-      groups.get(k).push(e);
-    }
-    const pairs = [];
-    for (const arr of groups.values()) if (arr.length === 2) pairs.push(arr);
-    return pairs;
-  };
-
   // Direction of an edge's first route step away from a node (for fork ordering)
   const posOf = (nid) => nodes.get(nid).pos;
   const edgeDirFrom = (e, nid) => {
@@ -281,17 +264,21 @@ function bmcComputeLayout() {
 
   // BFS orientation propagation from the seeds (then any unvisited edges).
   // orderedLines is expressed in the edge's canonical travel frame
-  // (a → b, left-to-right).
+  // (a → b, left-to-right). An edge whose line set is a SUBSET of a
+  // neighbouring edge's set is a continuation of that corridor (identical
+  // sets are through-stations, strict subsets are what remains after a
+  // mid-corridor peel) and inherits the shared lines' relative order.
   const propagate = (root) => {
     const queue = [root];
     while (queue.length) {
       const e1 = queue.shift();
       for (const endNode of [e1.a, e1.b]) {
         const n = nodes.get(endNode);
-        for (const pair of throughPairs(n)) {
-          if (pair[0].key !== e1.key && pair[1].key !== e1.key) continue;
-          const e2 = pair[0].key === e1.key ? pair[1] : pair[0];
-          if (!e2 || visited.has(e2.key)) continue;
+        for (const e2 of n.edges) {
+          if (!live.includes(e2) || e2.key === e1.key || visited.has(e2.key)) continue;
+          let subset = true;
+          for (const g of e2.lines) if (!e1.lines.has(g)) { subset = false; break; }
+          if (!subset) continue;
           const arrOrder = (e1.b === endNode) ? e1.orderedLines : [...e1.orderedLines].reverse();
           e2.orderedLines = (e2.a === endNode) ? arrOrder.filter(g => e2.lines.has(g))
                                                : [...arrOrder].reverse().filter(g => e2.lines.has(g));
@@ -309,6 +296,56 @@ function bmcComputeLayout() {
     propagate(root);
   }
   for (const e of live) if (!e.orderedLines) e.orderedLines = baseOrder(e);
+
+  // ---- Lane inheritance at invisible nodes (mid-corridor peels) ----
+  // A junction or unplaced stop has no mark to hide a lane change, so
+  // continuing lines must keep their absolute lateral lanes through it —
+  // v1's "peeling" bug was exactly this jog. Each edge carries a constant
+  // laneShift; at every invisible node, continuations inherit a shift from
+  // the dominant (most-lines) edge so shared lines align exactly. Multi-
+  // line continuations always inherit; of single-line neighbours only the
+  // straight-through one does (a diverging peel is ALLOWED its curve —
+  // the node connector draws it as a natural turnout). Symmetric lanes
+  // return at the next station, hidden under its mark.
+  for (const e of live) e.laneShift = 0;
+  const laneOff = (e, g) => (e.orderedLines.indexOf(g) - (e.orderedLines.length - 1) / 2) * BMC_GAP + e.laneShift;
+  const invisibleNodes = [...nodes.values()].filter(n => {
+    if (!n.pos) return false;
+    if (n.placed && n.node && isPassengerStop(n.node)) return false;
+    return n.edges.filter(e => live.includes(e)).length >= 2;
+  });
+  for (let pass = 0; pass < 8; pass++) {
+    let changed = false;
+    for (const n of invisibleNodes) {
+      const le = n.edges.filter(e => live.includes(e));
+      let parent = le[0];
+      for (const e of le) if (e.lines.size > parent.lines.size) parent = e;
+      const uP = edgeDirFrom(parent, n.id);
+      const fp = (parent.b === n.id) ? 1 : -1; // a→b frame vs through-travel frame at n
+      // straightest single-line neighbour (the through line of a 2→1 peel)
+      let straightest = null, bestDot = -0.85;
+      for (const e of le) {
+        if (e === parent) continue;
+        if (![...e.lines].some(g => parent.lines.has(g))) continue;
+        const uC = edgeDirFrom(e, n.id);
+        if (!uP || !uC) continue;
+        const dot = uP.x * uC.x + uP.y * uC.y;
+        if (dot < bestDot) { bestDot = dot; straightest = e; }
+      }
+      for (const e of le) {
+        if (e === parent) continue;
+        const shared = e.orderedLines.filter(g => parent.lines.has(g));
+        if (!shared.length) continue;
+        if (shared.length < 2 && e !== straightest) continue;
+        const fc = (e.a === n.id) ? 1 : -1;
+        let sum = 0;
+        for (const g of shared) sum += fc * fp * laneOff(parent, g) - (laneOff(e, g) - e.laneShift);
+        const shift = sum / shared.length;
+        if (Math.abs(shift - e.laneShift) > 0.01) { e.laneShift = shift; changed = true; }
+      }
+    }
+    if (!changed) break;
+  }
 
   // ---- Geometry: route cells, pixel paths, strand polylines ----
   for (const e of live) {
@@ -341,7 +378,7 @@ function bmcComputeLayout() {
     const k = e.orderedLines.length;
     e.strands = {};
     e.orderedLines.forEach((gid, i) => {
-      const off = (i - (k - 1) / 2) * BMC_GAP;
+      const off = (i - (k - 1) / 2) * BMC_GAP + (e.laneShift || 0);
       e.strands[gid] = _bmcOffsetPolyline(e.pts, off);
     });
   }
@@ -525,18 +562,70 @@ function bmcRender() {
     }
   }
 
-  // strands
-  for (const e of layout.edges) {
-    for (const gid of e.orderedLines) {
-      out += `<path d="${_bmcRoundedPath(e.strands[gid], BMC_CORNER)}" fill="none" stroke="${groupColor(gid)}" stroke-width="${BMC_LINEW}" stroke-linecap="round" data-bmc-edge="${e.key}"/>`;
+  // strands — stitched: at an invisible node (junction, unplaced stop) a
+  // line with exactly two strand ends continues through, so its per-edge
+  // strands merge into one polyline. Corners and peel turnout curves then
+  // render as first-class rounded bends instead of overdrawn connectors,
+  // with no cap-nubs poking out of the turn.
+  const joinMap = new Map(); // nodeId|gid -> [edgeA, edgeB]
+  for (const info of layout.nodeInfos.values()) {
+    if (info.placed && info.node && isPassengerStop(info.node)) continue;
+    const byLine = new Map();
+    for (const end of info.ends.values()) {
+      if (!byLine.has(end.gid)) byLine.set(end.gid, []);
+      byLine.get(end.gid).push(end);
+    }
+    for (const [gid, ends] of byLine) {
+      if (ends.length !== 2 || ends[0].edge.key === ends[1].edge.key) continue;
+      joinMap.set(info.id + '|' + gid, [ends[0].edge, ends[1].edge]);
+    }
+  }
+  const nextAcross = (nid, gid, eKey) => {
+    const j = joinMap.get(nid + '|' + gid);
+    if (!j) return null;
+    return j[0].key === eKey ? j[1] : (j[1].key === eKey ? j[0] : null);
+  };
+  const drawnStrand = new Set();
+  for (const e0 of layout.edges) {
+    for (const gid of e0.orderedLines) {
+      if (drawnStrand.has(e0.key + '|' + gid)) continue;
+      // walk backwards to the chain's start
+      let cur = e0, curFrom = e0.a;
+      const seenB = new Set([e0.key]);
+      while (true) {
+        const prev = nextAcross(curFrom, gid, cur.key);
+        if (!prev || seenB.has(prev.key)) break;
+        seenB.add(prev.key);
+        cur = prev;
+        curFrom = (prev.a === curFrom) ? prev.b : prev.a;
+      }
+      // collect forward
+      const chain = [];
+      let node = curFrom, e = cur;
+      const seenF = new Set();
+      while (e && !seenF.has(e.key)) {
+        seenF.add(e.key);
+        drawnStrand.add(e.key + '|' + gid);
+        const pts = (node === e.a) ? e.strands[gid] : [...e.strands[gid]].reverse();
+        if (!chain.length) chain.push(...pts);
+        else {
+          const last = chain[chain.length - 1];
+          const dedupe = Math.abs(last.x - pts[0].x) + Math.abs(last.y - pts[0].y) < 0.5;
+          chain.push(...pts.slice(dedupe ? 1 : 0));
+        }
+        node = (node === e.a) ? e.b : e.a;
+        e = nextAcross(node, gid, e.key);
+      }
+      out += `<path d="${_bmcRoundedPath(chain, BMC_CORNER)}" fill="none" stroke="${groupColor(gid)}" stroke-width="${BMC_LINEW}" stroke-linecap="round" data-bmc-edge="${e0.key}"/>`;
     }
   }
 
-  // connectors
+  // connectors (stitched joins are already part of the strand chains)
   for (const info of layout.nodeInfos.values()) {
     const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
     for (const conn of info.connectors) {
       const { from, to, gid } = conn;
+      if (joinMap.has(info.id + '|' + gid)) continue;
       const d1 = { x: from.P.x - from.Q.x, y: from.P.y - from.Q.y };
       const d2 = { x: to.P.x - to.Q.x, y: to.P.y - to.Q.y };
       const X = _bmcLineIntersect(from.P, d1, to.P, d2);
@@ -696,12 +785,16 @@ function _bmcDrawMark(info, layout) {
     const bar = { x: -stem.y, y: stem.x };
     const barLen = BMC_BLOB_R * 1.2;
     const stemPx = BMC_BLOB_R * 1.0;
+    // anchor on the actual strand end — a lane-shifted line does not pass
+    // exactly through the node cell centre
+    const end = info.ends.get(e.key + '|' + gid);
+    const tc = end ? end.P : c;
     // white mask erases the strand overshoot behind the bar (original)
-    out += `<line x1="${c.x}" y1="${c.y}" x2="${(c.x - stem.x * BMC_LINEW * 0.8).toFixed(1)}" y2="${(c.y - stem.y * BMC_LINEW * 0.8).toFixed(1)}" stroke="#fff" stroke-width="${BMC_LINEW + 2}" stroke-linecap="butt"/>`;
+    out += `<line x1="${tc.x.toFixed(1)}" y1="${tc.y.toFixed(1)}" x2="${(tc.x - stem.x * BMC_LINEW * 0.8).toFixed(1)}" y2="${(tc.y - stem.y * BMC_LINEW * 0.8).toFixed(1)}" stroke="#fff" stroke-width="${BMC_LINEW + 2}" stroke-linecap="butt"/>`;
     out += `<g data-bmc-node="${info.id}" style="cursor:grab">`;
-    out += `<rect x="${c.x - BMC_BLOB_R * 2}" y="${c.y - BMC_BLOB_R * 2}" width="${BMC_BLOB_R * 4}" height="${BMC_BLOB_R * 4}" fill="transparent"/>`;
-    out += `<line x1="${(c.x - bar.x * barLen).toFixed(1)}" y1="${(c.y - bar.y * barLen).toFixed(1)}" x2="${(c.x + bar.x * barLen).toFixed(1)}" y2="${(c.y + bar.y * barLen).toFixed(1)}" stroke="${color}" stroke-width="${tickSW}" stroke-linecap="butt"/>`;
-    out += `<line x1="${c.x}" y1="${c.y}" x2="${(c.x + stem.x * stemPx).toFixed(1)}" y2="${(c.y + stem.y * stemPx).toFixed(1)}" stroke="${color}" stroke-width="${tickSW}" stroke-linecap="butt"/>`;
+    out += `<rect x="${tc.x - BMC_BLOB_R * 2}" y="${tc.y - BMC_BLOB_R * 2}" width="${BMC_BLOB_R * 4}" height="${BMC_BLOB_R * 4}" fill="transparent"/>`;
+    out += `<line x1="${(tc.x - bar.x * barLen).toFixed(1)}" y1="${(tc.y - bar.y * barLen).toFixed(1)}" x2="${(tc.x + bar.x * barLen).toFixed(1)}" y2="${(tc.y + bar.y * barLen).toFixed(1)}" stroke="${color}" stroke-width="${tickSW}" stroke-linecap="butt"/>`;
+    out += `<line x1="${tc.x.toFixed(1)}" y1="${tc.y.toFixed(1)}" x2="${(tc.x + stem.x * stemPx).toFixed(1)}" y2="${(tc.y + stem.y * stemPx).toFixed(1)}" stroke="${color}" stroke-width="${tickSW}" stroke-linecap="butt"/>`;
     out += `</g>`;
     info._labelDir = { x: bar.x * sgn, y: bar.y * sgn };
   } else if (kind === 'tick') {
@@ -898,9 +991,15 @@ function _bmcDrawCapsule(bg) {
       const dd = _bmcDist(sc(i), sc(j));
       if (dd < bdd) { bdd = dd; bi = i; bj = j; }
     }
-    necks.push({ a: sc(bi), b: sc(bj), w: BMC_BLOB_R * 0.85 });
+    necks.push({ a: sc(bi), b: sc(bj), w: BMC_BLOB_R * 0.85, i: bi, j: bj });
     inTree.add(bj);
   }
+  // hub circles: where 3+ necks converge, the openings would erase most of
+  // the ring — grow the circle so it stays readable (TfL branch hubs)
+  const neckDeg = new Array(shapes.length).fill(0);
+  for (const nk of necks) { neckDeg[nk.i]++; neckDeg[nk.j]++; }
+  for (let i = 0; i < shapes.length; i++)
+    if (shapes[i].type === 'circle' && neckDeg[i] >= 3) shapes[i].r += 3;
 
   // two-pass union outline: fat strokes first, then white interiors erase
   // the seams so circles + necks read as one pinched shape
