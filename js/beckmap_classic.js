@@ -147,6 +147,34 @@ function bmcComputeLayout() {
     }
   }
 
+  // Merge edges connecting the same pair of layout nodes (parallel
+  // segments, express/local trackage, per-track routing): one visual
+  // corridor with fanned strands, never stacked copies z-fighting on the
+  // same centreline. Loops (a === b) stay distinct. The merged key is the
+  // plain node pair, which is also the stable key for guide/order
+  // overrides.
+  {
+    const byPair = new Map();
+    const mergedEdges = [];
+    for (const e of edges) {
+      if (e.a === e.b) { mergedEdges.push(e); continue; }
+      const pk = e.a + '~' + e.b;
+      const prior = byPair.get(pk);
+      if (!prior) {
+        e.key = pk;
+        e.pathAll = [...e.path];
+        byPair.set(pk, e);
+        mergedEdges.push(e);
+        continue;
+      }
+      for (const g of e.lines) prior.lines.add(g);
+      prior.pathAll.push(...e.path);
+      if (e.path.length < prior.path.length) prior.path = e.path; // prefer the direct routing
+    }
+    edges.length = 0;
+    edges.push(...mergedEdges);
+  }
+
   // Node index
   const nodeIds = new Set();
   for (const e of edges) { nodeIds.add(e.a); nodeIds.add(e.b); }
@@ -179,6 +207,16 @@ function bmcComputeLayout() {
   }
   for (const n of nodes.values()) {
     if (n.pos && n.pos.auto) {
+      // a pass-through auto node (set change between two stations) sits ON
+      // the natural route between its neighbours — the snapped mean can
+      // land beside the 45° path and put a wiggle in every line through it
+      const neigh = n.edges.map(e => nodes.get(e.a === n.id ? e.b : e.a));
+      if (n.edges.length === 2 && neigh.every(m => m.pos && !m.pos.auto)) {
+        const leg = bmcRouteLeg(neigh[0].pos.gx, neigh[0].pos.gy, neigh[1].pos.gx, neigh[1].pos.gy);
+        const mid = leg[Math.floor(leg.length / 2)];
+        n.pos.gx = mid.gx; n.pos.gy = mid.gy;
+        continue;
+      }
       n.pos.gx = Math.round(n.pos.gx); n.pos.gy = Math.round(n.pos.gy);
       // avoid landing exactly on a neighbour
       const clash = () => n.edges.some(e => {
@@ -223,6 +261,15 @@ function bmcComputeLayout() {
   // continuation so the fan never self-crosses.
   const visited = new Set();
   const seedQueue = [];
+  // user line-order overrides are authoritative: seed them first so they
+  // win propagation over automatic fork ordering
+  for (const e of live) {
+    if (d.lineOrder[e.key] && e.lines.size >= 2) {
+      e.orderedLines = baseOrder(e);
+      visited.add(e.key);
+      seedQueue.push(e);
+    }
+  }
   for (const n of nodes.values()) {
     const nodeEdges = n.edges.filter(e => live.includes(e));
     if (nodeEdges.length < 3) continue;
@@ -554,7 +601,7 @@ function bmcRender() {
       if (isInterchange(seg)) continue;
       const sa = d.stations[seg.nodeA], sb = d.stations[seg.nodeB];
       if (!sa || !sb) continue;
-      const carried = layout.edges.some(e => e.path.includes(seg.id));
+      const carried = layout.edges.some(e => (e.pathAll || e.path).includes(seg.id));
       if (carried) continue;
       const cells = bmcRouteLeg(sa.gx, sa.gy, sb.gx, sb.gy);
       const pts = _bmcCompressPts(cells.map(c => ({ x: c.gx * BMC_CELL, y: c.gy * BMC_CELL })));
@@ -620,6 +667,15 @@ function bmcRender() {
     }
   }
 
+  // invisible fat hit targets, one per edge, so right-click resolves to
+  // the specific corridor segment under the cursor
+  if (!_bmcState.exporting) {
+    for (const e of layout.edges) {
+      const w = (e.orderedLines.length - 1) * BMC_GAP + BMC_LINEW + 8;
+      out += `<path d="${_bmcRoundedPath(_bmcOffsetPolyline(e.pts, e.laneShift || 0), BMC_CORNER)}" fill="none" stroke="rgba(0,0,0,0)" stroke-width="${w.toFixed(1)}" data-bmc-edge="${e.key}"/>`;
+    }
+  }
+
   // connectors (stitched joins are already part of the strand chains)
   for (const info of layout.nodeInfos.values()) {
     const c = { x: info.pos.gx * BMC_CELL, y: info.pos.gy * BMC_CELL };
@@ -653,6 +709,18 @@ function bmcRender() {
   for (const info of layout.nodeInfos.values()) {
     if (!info.placed || inBlobGroup.has(info.id)) continue;
     out += _bmcDrawMark(info, layout);
+  }
+
+  // guide-point handles: draggable, right-click deletes
+  if (!_bmcState.exporting) {
+    const dg = bmcData().guides;
+    for (const e of layout.edges) {
+      const gl = dg[e.key];
+      if (!gl) continue;
+      gl.forEach((g, i) => {
+        out += `<circle cx="${g.gx * BMC_CELL}" cy="${g.gy * BMC_CELL}" r="4.5" class="bmc-guidept" data-bmc-guide="${e.key}|${i}"/>`;
+      });
+    }
   }
 
   // fork-node handles: junctions and unplaced diverging stops are invisible
@@ -1181,6 +1249,15 @@ function _bmcAttachEvents() {
   svg._bmcEvents = true;
 
   svg.addEventListener('pointerdown', (ev) => {
+    const guideEl = ev.target.closest && ev.target.closest('[data-bmc-guide]');
+    if (guideEl && ev.button === 0) {
+      const attr = guideEl.getAttribute('data-bmc-guide');
+      const p = attr.lastIndexOf('|');
+      _bmcState.guideDrag = { key: attr.slice(0, p), idx: +attr.slice(p + 1) };
+      svg.setPointerCapture(ev.pointerId);
+      ev.preventDefault();
+      return;
+    }
     const nodeEl = ev.target.closest && ev.target.closest('[data-bmc-node]');
     if (nodeEl && ev.button === 0) {
       const nid = nodeEl.getAttribute('data-bmc-node');
@@ -1211,6 +1288,16 @@ function _bmcAttachEvents() {
   });
 
   svg.addEventListener('pointermove', (ev) => {
+    if (_bmcState.guideDrag) {
+      const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
+      const gd = _bmcState.guideDrag;
+      const arr = bmcData().guides[gd.key];
+      if (arr && arr[gd.idx]) {
+        const gx = Math.round(w.x / BMC_CELL), gy = Math.round(w.y / BMC_CELL);
+        if (arr[gd.idx].gx !== gx || arr[gd.idx].gy !== gy) { arr[gd.idx] = { gx, gy }; bmcRender(); }
+      }
+      return;
+    }
     if (_bmcState.nodeDrag) {
       const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
       const gx = Math.round(w.x / BMC_CELL), gy = Math.round(w.y / BMC_CELL);
@@ -1232,6 +1319,7 @@ function _bmcAttachEvents() {
 
   const endDrag = (ev) => {
     if (_bmcState.nodeDrag) { save(); _bmcState.nodeDrag = null; bmcRender(); }
+    if (_bmcState.guideDrag) { save(); _bmcState.guideDrag = null; bmcRender(); }
     _bmcState.panning = null;
   };
   svg.addEventListener('pointerup', endDrag);
@@ -1249,15 +1337,31 @@ function _bmcAttachEvents() {
     bmcRender();
   }, { passive: false });
 
-  // right-click a station: unplace
+  // right-click: guide point → delete; station/junction → menu;
+  // corridor → menu (line order, bend points)
   svg.addEventListener('contextmenu', (ev) => {
+    ev.preventDefault();
+    _bmcCloseMenu();
+    const guideEl = ev.target.closest && ev.target.closest('[data-bmc-guide]');
+    if (guideEl) {
+      const attr = guideEl.getAttribute('data-bmc-guide');
+      const p = attr.lastIndexOf('|');
+      const key = attr.slice(0, p), idx = +attr.slice(p + 1);
+      const arr = bmcData().guides[key];
+      if (arr) {
+        arr.splice(idx, 1);
+        if (!arr.length) delete bmcData().guides[key];
+        save(); bmcRender();
+      }
+      return;
+    }
     const nodeEl = ev.target.closest && ev.target.closest('[data-bmc-node]');
-    if (nodeEl) {
-      ev.preventDefault();
-      const nid = nodeEl.getAttribute('data-bmc-node');
-      delete bmcData().stations[nid];
-      save(); bmcRender();
-      toast(t('bmc.unplaced_toast', { name: nodeDisplayName(nid) }), 'info');
+    if (nodeEl) { _bmcStationMenu(ev, nodeEl.getAttribute('data-bmc-node')); return; }
+    const edgeEl = ev.target.closest && ev.target.closest('[data-bmc-edge]');
+    if (edgeEl) {
+      const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
+      const cell = { gx: Math.round(w.x / BMC_CELL), gy: Math.round(w.y / BMC_CELL) };
+      _bmcEdgeMenu(ev, edgeEl.getAttribute('data-bmc-edge'), cell);
     }
   });
 
@@ -1281,6 +1385,141 @@ function _bmcAttachEvents() {
       save(); bmcRender();
     }
   });
+}
+
+// ---- context menus ----
+
+function _bmcCloseMenu() {
+  const m = document.getElementById('bmc-menu');
+  if (m) m.remove();
+}
+
+function _bmcMenuAway(ev) {
+  const m = document.getElementById('bmc-menu');
+  if (!m) return;
+  if (m.contains(ev.target)) { document.addEventListener('pointerdown', _bmcMenuAway, { once: true }); return; }
+  m.remove();
+}
+
+function _bmcShowMenu(x, y, items) {
+  _bmcCloseMenu();
+  const m = document.createElement('div');
+  m.id = 'bmc-menu';
+  m.className = 'bmc-menu';
+  m.style.left = x + 'px';
+  m.style.top = y + 'px';
+  for (const it of items) {
+    if (it.grid) { m.appendChild(it.grid); continue; }
+    if (it.sep) { const s = document.createElement('div'); s.className = 'bmc-menu-sep'; m.appendChild(s); continue; }
+    if (it.label) { const s = document.createElement('div'); s.className = 'bmc-menu-label'; s.textContent = it.label; m.appendChild(s); continue; }
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = it.text;
+    b.addEventListener('click', () => { _bmcCloseMenu(); it.fn(); });
+    m.appendChild(b);
+  }
+  document.body.appendChild(m);
+  const r = m.getBoundingClientRect();
+  if (r.right > window.innerWidth) m.style.left = Math.max(0, x - r.width) + 'px';
+  if (r.bottom > window.innerHeight) m.style.top = Math.max(0, y - r.height) + 'px';
+  setTimeout(() => document.addEventListener('pointerdown', _bmcMenuAway, { once: true }), 0);
+}
+
+// 3×3 compass grid mapping onto _BMC_LABEL_DIRS indices, centre = auto
+function _bmcLabelDirGrid(nid) {
+  const d = bmcData();
+  const cur = d.labelDir[nid];
+  const g = document.createElement('div');
+  g.className = 'bmc-menu-grid';
+  const cells = [[5, '↖'], [6, '↑'], [7, '↗'], [4, '←'], ['auto', 'A'], [0, '→'], [3, '↙'], [2, '↓'], [1, '↘']];
+  for (const [val, sym] of cells) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = sym;
+    if (val === cur || (val === 'auto' && (cur == null || cur === 'auto'))) b.classList.add('active');
+    b.addEventListener('click', () => {
+      if (val === 'auto') delete d.labelDir[nid]; else d.labelDir[nid] = val;
+      _bmcCloseMenu(); save(); bmcRender();
+    });
+    g.appendChild(b);
+  }
+  return g;
+}
+
+function _bmcStationMenu(ev, nid) {
+  const node = getNode(nid);
+  const isStop = node && isPassengerStop(node);
+  const items = [];
+  if (isStop) {
+    items.push({ label: t('bmc.menu_label_dir') });
+    items.push({ grid: _bmcLabelDirGrid(nid) });
+    items.push({ sep: true });
+  }
+  items.push({
+    text: t(isStop ? 'bmc.menu_unplace' : 'bmc.menu_unpin'),
+    fn: () => {
+      delete bmcData().stations[nid];
+      save(); bmcRender();
+      toast(t('bmc.unplaced_toast', { name: nodeDisplayName(nid) }), 'info');
+    },
+  });
+  _bmcShowMenu(ev.clientX, ev.clientY, items);
+}
+
+function _bmcEdgeMenu(ev, key, cell) {
+  const layout = _bmcState.layout;
+  const e = layout && layout.edges.find(x => x.key === key);
+  if (!e) return;
+  const d = bmcData();
+  const items = [];
+  if (e.orderedLines.length >= 2) {
+    items.push({
+      text: t('bmc.menu_reverse_order'),
+      fn: () => {
+        d.lineOrder[e.key] = [...e.orderedLines].reverse();
+        save(); bmcRender();
+        toast(t('bmc.order_reversed'), 'info');
+      },
+    });
+  }
+  items.push({
+    text: t('bmc.menu_add_bend'),
+    fn: () => {
+      _bmcInsertGuide(e, cell);
+      save(); bmcRender();
+      toast(t('bmc.bend_added'), 'info');
+    },
+  });
+  if ((d.guides[e.key] || []).length) {
+    items.push({
+      text: t('bmc.menu_clear_bends'),
+      fn: () => {
+        delete d.guides[e.key];
+        save(); bmcRender();
+        toast(t('bmc.bends_cleared'), 'info');
+      },
+    });
+  }
+  _bmcShowMenu(ev.clientX, ev.clientY, items);
+}
+
+// insert a guide point at its position along the edge's current route
+function _bmcInsertGuide(e, cell) {
+  const d = bmcData();
+  const idxOf = (c) => {
+    let bi = 0, bd = Infinity;
+    e.cells.forEach((cc, i) => {
+      const dd = Math.abs(cc.gx - c.gx) + Math.abs(cc.gy - c.gy);
+      if (dd < bd) { bd = dd; bi = i; }
+    });
+    return bi;
+  };
+  const g = d.guides[e.key] || [];
+  const target = idxOf(cell);
+  let ins = g.length;
+  for (let i = 0; i < g.length; i++) if (idxOf(g[i]) > target) { ins = i; break; }
+  g.splice(ins, 0, { gx: cell.gx, gy: cell.gy });
+  d.guides[e.key] = g;
 }
 
 function _bmcSidebarDragStart(ev, nodeId) {

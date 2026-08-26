@@ -1157,7 +1157,16 @@ registerLanguage('en', 'English', {
     "unplaced_toast": "{name} unplaced",
     "export": "Export SVG",
     "export_done": "Railmap exported",
-    "export_empty": "Nothing to export — place some stations first"
+    "export_empty": "Nothing to export — place some stations first",
+    "menu_label_dir": "Label direction",
+    "menu_unplace": "Unplace station",
+    "menu_unpin": "Unpin junction",
+    "menu_reverse_order": "Reverse line order",
+    "menu_add_bend": "Add bend point here",
+    "menu_clear_bends": "Straighten (clear bend points)",
+    "order_reversed": "Line order reversed",
+    "bend_added": "Bend point added — drag it to shape the corridor",
+    "bends_cleared": "Bend points cleared"
   },
   "pal": {
     "placeholder": "Search actions, tabs, lines, services, stations…",
