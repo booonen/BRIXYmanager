@@ -752,6 +752,16 @@ function bmcRender() {
     if (!j) return null;
     return j[0].key === eKey ? j[1] : (j[1].key === eKey ? j[0] : null);
   };
+
+  // selection halo under the strands (v3 parity)
+  const selEdge = (_bmcState.selected && _bmcState.selected.type === 'edge')
+    ? layout.edges.find(x => x.key === _bmcState.selected.key) : null;
+  if (_bmcState.selected && _bmcState.selected.type === 'edge' && !selEdge) _bmcState.selected = null;
+  if (selEdge && !_bmcState.exporting) {
+    const w = (selEdge.orderedLines.length - 1) * BMC_GAP + BMC_LINEW + 10;
+    out += `<path d="${_bmcRoundedPath(_bmcOffsetPolyline(selEdge.pts, selEdge.laneShift || 0), BMC_CORNER)}" fill="none" stroke="rgba(91,138,245,0.30)" stroke-width="${w.toFixed(1)}" stroke-linecap="round"/>`;
+  }
+
   const drawnStrand = new Set();
   for (const e0 of layout.edges) {
     for (const gid of e0.orderedLines) {
@@ -777,8 +787,15 @@ function bmcRender() {
         if (!chain.length) chain.push(...pts);
         else {
           const last = chain[chain.length - 1];
-          const dedupe = Math.abs(last.x - pts[0].x) + Math.abs(last.y - pts[0].y) < 0.5;
-          chain.push(...pts.slice(dedupe ? 1 : 0));
+          const gap = Math.abs(last.x - pts[0].x) + Math.abs(last.y - pts[0].y);
+          if (gap < 0.5) chain.push(...pts.slice(1));
+          else if (gap < 6) {
+            // near-aligned joint (a corner at a bundle boundary, or a small
+            // lane transition): merge into one point so it rounds like any
+            // bend instead of leaving a square micro-jog
+            chain[chain.length - 1] = { x: (last.x + pts[0].x) / 2, y: (last.y + pts[0].y) / 2 };
+            chain.push(...pts.slice(1));
+          } else chain.push(...pts);
         }
         node = (node === e.a) ? e.b : e.a;
         e = nextAcross(node, gid, e.key);
@@ -831,11 +848,12 @@ function bmcRender() {
     out += _bmcDrawMark(info, layout);
   }
 
-  // guide-point handles: draggable, right-click deletes. Guides key off
+  // guide-point handles: visible only while path-editing the selected
+  // segment (v3 parity) — draggable, right-click deletes. Guides key off
   // the pre-bundling source edges.
-  if (!_bmcState.exporting) {
+  if (!_bmcState.exporting && _bmcState.bendEditing && selEdge) {
     const bd = bmcData();
-    for (const k of (layout._srcCells ? layout._srcCells.keys() : [])) {
+    for (const k of (selEdge.srcKeys || [selEdge.key])) {
       const gl = bd.guides[k];
       if (gl) gl.forEach((g, i) => {
         out += `<circle cx="${g.gx * BMC_CELL}" cy="${g.gy * BMC_CELL}" r="4.5" class="bmc-guidept" data-bmc-guide="${k}|${i}"/>`;
@@ -868,6 +886,16 @@ function bmcRender() {
       if (bg && bg.members.length > 1 && bg.sharedName) labelledNames.add(dn);
     }
     out += _bmcDrawLabel(info, kind, layout);
+  }
+
+  // selected station ring (v3 parity)
+  if (!_bmcState.exporting && _bmcState.selected && _bmcState.selected.type === 'node') {
+    const inf = layout.nodeInfos.get(_bmcState.selected.id);
+    if (inf) {
+      out += `<circle cx="${inf.pos.gx * BMC_CELL}" cy="${inf.pos.gy * BMC_CELL}" r="${(BMC_BLOB_R * 2.2).toFixed(1)}" fill="none" stroke="rgba(91,138,245,0.6)" stroke-width="2.5"/>`;
+    } else {
+      _bmcState.selected = null;
+    }
   }
 
   if (_bmcState.debug && !_bmcState.exporting) out += _bmcDebugOverlay(layout);
@@ -1326,6 +1354,13 @@ function _bmcRenderSidebar() {
   if (!_bmcState.active) return;
   const el = document.getElementById('schem-sidebar-list');
   if (!el) return;
+  // selection context panel takes priority over the station list (v3 parity)
+  const sel = _bmcState.selected;
+  if (sel) {
+    if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'SELECT') document.activeElement.blur();
+    if (sel.type === 'edge') { _bmcRenderEdgePanel(el); return; }
+    if (sel.type === 'node') { _bmcRenderNodePanel(el); return; }
+  }
   const d = bmcData();
   const q = (document.getElementById('schem-sidebar-search')?.value || '').toLowerCase();
   const placedSet = new Set(Object.keys(d.stations));
@@ -1453,15 +1488,52 @@ function _bmcAttachEvents() {
     if (_bmcState.nodeDrag) { save(); _bmcState.nodeDrag = null; bmcRender(); }
     if (_bmcState.guideDrag) { save(); _bmcState.guideDrag = null; bmcRender(); }
     _bmcState.panning = null;
-    // movement-free left click → open the context window (v3 parity)
+    // movement-free left click → select; options render in the sidebar
+    // (v3 parity). In bend-edit mode, clicking the selected segment adds
+    // a bend point at that cell instead.
     const pr = _bmcState.press;
     _bmcState.press = null;
     if (pr && ev && ev.type === 'pointerup' &&
         Math.abs(ev.clientX - pr.x) < 5 && Math.abs(ev.clientY - pr.y) < 5) {
-      if (pr.node) { _bmcStationMenu(ev, pr.node); }
-      else if (pr.edge) {
-        const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
-        _bmcEdgeMenu(ev, pr.edge, { gx: Math.round(w.x / BMC_CELL), gy: Math.round(w.y / BMC_CELL) });
+      if (pr.node) {
+        _bmcState.selected = { type: 'node', id: pr.node };
+        _bmcState.bendEditing = false;
+        bmcRender();
+      } else if (pr.edge) {
+        const selKey = _bmcState.selected?.type === 'edge' ? _bmcState.selected.key : null;
+        if (_bmcState.bendEditing && selKey === pr.edge) {
+          const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
+          const cell = { gx: Math.round(w.x / BMC_CELL), gy: Math.round(w.y / BMC_CELL) };
+          const e = _bmcState.layout && _bmcState.layout.edges.find(x => x.key === pr.edge);
+          if (e) {
+            const srcs = e.srcKeys || [e.key];
+            _bmcInsertGuide(e, cell);
+            save(); bmcRender();
+            // bundling may have re-keyed the edge — re-select the piece
+            // that carries one of the same sources, nearest the click
+            const L = _bmcState.layout;
+            if (!L.edges.some(x => x.key === pr.edge)) {
+              let best = null, bd = Infinity;
+              for (const x of L.edges) {
+                if (!(x.srcKeys || [x.key]).some(k => srcs.includes(k))) continue;
+                for (const c of x.cells) {
+                  const dd = Math.abs(c.gx - cell.gx) + Math.abs(c.gy - cell.gy);
+                  if (dd < bd) { bd = dd; best = x; }
+                }
+              }
+              _bmcState.selected = best ? { type: 'edge', key: best.key } : null;
+              bmcRender();
+            }
+          }
+        } else {
+          _bmcState.selected = { type: 'edge', key: pr.edge };
+          _bmcState.bendEditing = false;
+          bmcRender();
+        }
+      } else if (_bmcState.selected || _bmcState.bendEditing) {
+        _bmcState.selected = null;
+        _bmcState.bendEditing = false;
+        bmcRender();
       }
     }
   };
@@ -1480,40 +1552,67 @@ function _bmcAttachEvents() {
     bmcRender();
   }, { passive: false });
 
-  // right-click: guide point → delete; station/junction → menu;
-  // corridor → menu (line order, bend points)
+  // right-click a bend handle (path-edit mode): delete it — v3 parity
   svg.addEventListener('contextmenu', (ev) => {
-    ev.preventDefault();
-    _bmcCloseMenu();
     const guideEl = ev.target.closest && ev.target.closest('[data-bmc-guide]');
-    if (guideEl) {
-      const attr = guideEl.getAttribute('data-bmc-guide');
-      const p = attr.lastIndexOf('|');
-      const key = attr.slice(0, p), idx = +attr.slice(p + 1);
-      const arr = bmcData().guides[key];
-      if (arr) {
-        arr.splice(idx, 1);
-        if (!arr.length) delete bmcData().guides[key];
-        save(); bmcRender();
-      }
-      return;
-    }
-    const nodeEl = ev.target.closest && ev.target.closest('[data-bmc-node]');
-    if (nodeEl) { _bmcStationMenu(ev, nodeEl.getAttribute('data-bmc-node')); return; }
-    const edgeEl = ev.target.closest && ev.target.closest('[data-bmc-edge]');
-    if (edgeEl) {
-      const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
-      const cell = { gx: Math.round(w.x / BMC_CELL), gy: Math.round(w.y / BMC_CELL) };
-      _bmcEdgeMenu(ev, edgeEl.getAttribute('data-bmc-edge'), cell);
+    if (!guideEl) { ev.preventDefault(); return; }
+    ev.preventDefault();
+    const attr = guideEl.getAttribute('data-bmc-guide');
+    const p = attr.lastIndexOf('|');
+    const key = attr.slice(0, p), idx = +attr.slice(p + 1);
+    const arr = bmcData().guides[key];
+    if (arr) {
+      arr.splice(idx, 1);
+      if (!arr.length) delete bmcData().guides[key];
+      save(); bmcRender();
     }
   });
 
-  // drop from sidebar
+  // keyboard: Escape backs out of edit mode / selection; E toggles path
+  // editing on the selected segment — v3 parity
+  document.addEventListener('keydown', (e) => {
+    if (!_bmcState.active) return;
+    const panel = document.getElementById('panel-schematic');
+    if (!panel || !panel.classList.contains('active')) return;
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+    if (e.key === 'Escape') {
+      if (_bmcState.bendEditing) _bmcState.bendEditing = false;
+      else if (_bmcState.selected) _bmcState.selected = null;
+      else return;
+      bmcRender();
+    }
+    if ((e.key === 'e' || e.key === 'E') && _bmcState.selected && _bmcState.selected.type === 'edge') {
+      _bmcState.bendEditing = !_bmcState.bendEditing;
+      bmcRender();
+    }
+  });
+
+  // drop from sidebar — with a live placement preview while over the map
   document.addEventListener('pointermove', (ev) => {
     const sd = _bmcState.sidebarDrag;
     if (!sd) return;
     sd.ghostEl.style.left = (ev.clientX + 10) + 'px';
     sd.ghostEl.style.top = (ev.clientY + 6) + 'px';
+    const svgEl = document.getElementById('bmc-svg');
+    if (!svgEl) return;
+    const rect = svgEl.getBoundingClientRect();
+    const inside = ev.clientX >= rect.left && ev.clientX <= rect.right && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+    const st = bmcData().stations;
+    if (inside) {
+      const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
+      const gx = Math.round(w.x / BMC_CELL), gy = Math.round(w.y / BMC_CELL);
+      if (!sd.preview || sd.preview.gx !== gx || sd.preview.gy !== gy) {
+        sd.preview = { gx, gy };
+        st[sd.nodeId] = { gx, gy };
+        bmcRender();
+      }
+      sd.ghostEl.style.display = 'none'; // the live map preview replaces the name ghost
+    } else if (sd.preview) {
+      delete st[sd.nodeId];
+      sd.preview = null;
+      sd.ghostEl.style.display = '';
+      bmcRender();
+    }
   });
   document.addEventListener('pointerup', (ev) => {
     const sd = _bmcState.sidebarDrag;
@@ -1526,132 +1625,116 @@ function _bmcAttachEvents() {
       const w = _bmcScreenToWorld(ev.clientX, ev.clientY);
       bmcData().stations[sd.nodeId] = { gx: Math.round(w.x / BMC_CELL), gy: Math.round(w.y / BMC_CELL) };
       save(); bmcRender();
+    } else if (sd.preview) {
+      delete bmcData().stations[sd.nodeId];
+      bmcRender();
     }
   });
 }
 
-// ---- context menus ----
+// ---- selection context panels (sidebar, v3 parity) ----
 
-function _bmcCloseMenu() {
-  const m = document.getElementById('bmc-menu');
-  if (m) m.remove();
+function bmcSelReverseOrder() {
+  const sel = _bmcState.selected;
+  const e = sel && sel.type === 'edge' && _bmcState.layout && _bmcState.layout.edges.find(x => x.key === sel.key);
+  if (!e) return;
+  bmcData().lineOrder[e.key] = [...e.orderedLines].reverse();
+  save(); bmcRender();
+  toast(t('bmc.order_reversed'), 'info');
 }
 
-function _bmcMenuAway(ev) {
-  const m = document.getElementById('bmc-menu');
-  if (!m) return;
-  if (m.contains(ev.target)) { document.addEventListener('pointerdown', _bmcMenuAway, { once: true }); return; }
-  m.remove();
-}
-
-function _bmcShowMenu(x, y, items) {
-  _bmcCloseMenu();
-  const m = document.createElement('div');
-  m.id = 'bmc-menu';
-  m.className = 'bmc-menu';
-  m.style.left = x + 'px';
-  m.style.top = y + 'px';
-  for (const it of items) {
-    if (it.grid) { m.appendChild(it.grid); continue; }
-    if (it.sep) { const s = document.createElement('div'); s.className = 'bmc-menu-sep'; m.appendChild(s); continue; }
-    if (it.label) { const s = document.createElement('div'); s.className = 'bmc-menu-label'; s.textContent = it.label; m.appendChild(s); continue; }
-    const b = document.createElement('button');
-    b.type = 'button';
-    if (it.color) {
-      const dot = document.createElement('span');
-      dot.className = 'bmc-menu-dot';
-      dot.style.background = it.color;
-      b.appendChild(dot);
-    }
-    b.appendChild(document.createTextNode(it.text));
-    b.addEventListener('click', () => { _bmcCloseMenu(); it.fn(); });
-    m.appendChild(b);
-  }
-  document.body.appendChild(m);
-  const r = m.getBoundingClientRect();
-  if (r.right > window.innerWidth) m.style.left = Math.max(0, x - r.width) + 'px';
-  if (r.bottom > window.innerHeight) m.style.top = Math.max(0, y - r.height) + 'px';
-  setTimeout(() => document.addEventListener('pointerdown', _bmcMenuAway, { once: true }), 0);
-}
-
-// 3×3 compass grid mapping onto _BMC_LABEL_DIRS indices, centre = auto
-function _bmcLabelDirGrid(nid) {
-  const d = bmcData();
-  const cur = d.labelDir[nid];
-  const g = document.createElement('div');
-  g.className = 'bmc-menu-grid';
-  const cells = [[5, '↖'], [6, '↑'], [7, '↗'], [4, '←'], ['auto', 'A'], [0, '→'], [3, '↙'], [2, '↓'], [1, '↘']];
-  for (const [val, sym] of cells) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = sym;
-    if (val === cur || (val === 'auto' && (cur == null || cur === 'auto'))) b.classList.add('active');
-    b.addEventListener('click', () => {
-      if (val === 'auto') delete d.labelDir[nid]; else d.labelDir[nid] = val;
-      _bmcCloseMenu(); save(); bmcRender();
-    });
-    g.appendChild(b);
-  }
-  return g;
-}
-
-function _bmcStationMenu(ev, nid) {
-  const node = getNode(nid);
-  const isStop = node && isPassengerStop(node);
-  const items = [];
-  if (isStop) {
-    items.push({ label: t('bmc.menu_label_dir') });
-    items.push({ grid: _bmcLabelDirGrid(nid) });
-    items.push({ sep: true });
-  }
-  items.push({
-    text: t(isStop ? 'bmc.menu_unplace' : 'bmc.menu_unpin'),
-    fn: () => {
-      delete bmcData().stations[nid];
-      save(); bmcRender();
-      toast(t('bmc.unplaced_toast', { name: nodeDisplayName(nid) }), 'info');
-    },
-  });
-  _bmcShowMenu(ev.clientX, ev.clientY, items);
-}
-
-function _bmcEdgeMenu(ev, key, cell) {
-  const layout = _bmcState.layout;
-  const e = layout && layout.edges.find(x => x.key === key);
+function bmcSelStraighten() {
+  const sel = _bmcState.selected;
+  const e = sel && sel.type === 'edge' && _bmcState.layout && _bmcState.layout.edges.find(x => x.key === sel.key);
   if (!e) return;
   const d = bmcData();
-  const items = [];
+  for (const k of (e.srcKeys || [e.key])) delete d.guides[k];
+  save(); bmcRender();
+  toast(t('bmc.bends_cleared'), 'info');
+}
+
+function bmcSelToggleEdit() {
+  _bmcState.bendEditing = !_bmcState.bendEditing;
+  bmcRender();
+}
+
+function bmcSelClose() {
+  _bmcState.selected = null;
+  _bmcState.bendEditing = false;
+  bmcRender();
+}
+
+function bmcSelUnplace() {
+  const sel = _bmcState.selected;
+  if (!sel || sel.type !== 'node') return;
+  delete bmcData().stations[sel.id];
+  _bmcState.selected = null;
+  save(); bmcRender();
+  toast(t('bmc.unplaced_toast', { name: nodeDisplayName(sel.id) }), 'info');
+}
+
+function bmcSelLabelDir(val) {
+  const sel = _bmcState.selected;
+  if (!sel || sel.type !== 'node') return;
+  const d = bmcData();
+  if (val === 'auto') delete d.labelDir[sel.id]; else d.labelDir[sel.id] = +val;
+  save(); bmcRender();
+}
+
+function _bmcRenderEdgePanel(el) {
+  const sel = _bmcState.selected;
+  const e = _bmcState.layout && _bmcState.layout.edges.find(x => x.key === sel.key);
+  if (!e) { _bmcState.selected = null; el.innerHTML = ''; return; }
+  const d = bmcData();
+  const endName = (nid) => String(nid).startsWith('v@') ? '\u00b7' : esc(nodeDisplayName(nid));
+  let html = `<div style="padding:10px 12px">`;
+  html += `<div style="font-size:13px;font-weight:700;margin-bottom:4px">${endName(e.a)} \u2194 ${endName(e.b)}</div>`;
+  html += `<div style="margin-bottom:10px">`;
+  for (const gid of e.orderedLines) {
+    const g = getGroup(gid);
+    const col = g?.color || '#888';
+    html += `<span style="font-size:10px;padding:2px 8px;border-radius:8px;margin-right:4px;background:${col};color:${contrastText(col)}">${esc(g?.name || '?')}</span>`;
+  }
+  html += `</div>`;
   if (e.orderedLines.length >= 2) {
-    items.push({
-      text: t('bmc.menu_reverse_order'),
-      fn: () => {
-        d.lineOrder[e.key] = [...e.orderedLines].reverse();
-        save(); bmcRender();
-        toast(t('bmc.order_reversed'), 'info');
-      },
-    });
+    html += `<button class="schem-ctx-btn" onclick="bmcSelReverseOrder()">\u21c5 ${t('bmc.menu_reverse_order')}</button>`;
   }
-  items.push({
-    text: t('bmc.menu_add_bend'),
-    fn: () => {
-      _bmcInsertGuide(e, cell);
-      save(); bmcRender();
-      toast(t('bmc.bend_added'), 'info');
-    },
-  });
-  const srcKeys = e.srcKeys || [e.key];
-  if (srcKeys.some(k => (d.guides[k] || []).length)) {
-    items.push({ sep: true });
-    items.push({
-      text: t('bmc.menu_clear_bends'),
-      fn: () => {
-        for (const k of srcKeys) delete d.guides[k];
-        save(); bmcRender();
-        toast(t('bmc.bends_cleared'), 'info');
-      },
-    });
+  html += `<button class="schem-ctx-btn${_bmcState.bendEditing ? ' active' : ''}" onclick="bmcSelToggleEdit()">`;
+  html += `${_bmcState.bendEditing ? '\u25c9' : '\u25cb'} ${t('bmc.bend_points')}${_bmcState.bendEditing ? ' ' + t('bmc.editing') : ''} <span style="float:right;opacity:0.5;font-size:10px">E</span></button>`;
+  if (_bmcState.bendEditing) html += `<div style="padding:4px 8px;font-size:10px;color:var(--text-muted)">${t('bmc.path_hint')}</div>`;
+  if ((e.srcKeys || [e.key]).some(k => (d.guides[k] || []).length)) {
+    html += `<button class="schem-ctx-btn" onclick="bmcSelStraighten()">${t('bmc.menu_clear_bends')}</button>`;
   }
-  _bmcShowMenu(ev.clientX, ev.clientY, items);
+  html += `<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px">`;
+  html += `<button class="schem-ctx-btn" onclick="bmcSelClose()" style="color:var(--text-muted)">\u2715 ${t('bmc.close')}</button>`;
+  html += `</div></div>`;
+  el.innerHTML = html;
+}
+
+function _bmcRenderNodePanel(el) {
+  const sel = _bmcState.selected;
+  const nid = sel.id;
+  const node = getNode(nid);
+  const isStop = node && isPassengerStop(node);
+  const d = bmcData();
+  let html = `<div style="padding:10px 12px">`;
+  html += `<div style="font-size:13px;font-weight:700;margin-bottom:10px">${esc(node ? node.name : nid)}</div>`;
+  if (isStop) {
+    html += `<div class="schem-ctx-section">${t('bmc.menu_label_dir')}</div>`;
+    const cur = d.labelDir[nid];
+    const cells = [[5, '\u2196'], [6, '\u2191'], [7, '\u2197'], [4, '\u2190'], ['auto', '\u25c9'], [0, '\u2192'], [3, '\u2199'], [2, '\u2193'], [1, '\u2198']];
+    html += `<div style="display:inline-grid;grid-template-columns:repeat(3,28px);gap:2px;margin:2px 8px 8px">`;
+    for (const [val, sym] of cells) {
+      const active = (val === cur || (val === 'auto' && (cur == null || cur === 'auto'))) ? ' active' : '';
+      html += `<span class="schem-ctx-style${active}" style="text-align:center;padding:4px 0" onclick="bmcSelLabelDir('${val}')">${sym}</span>`;
+    }
+    html += `</div>`;
+  }
+  html += `<button class="schem-ctx-btn" onclick="bmcSelUnplace()">${t(isStop ? 'bmc.menu_unplace' : 'bmc.menu_unpin')}</button>`;
+  html += `<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px">`;
+  html += `<button class="schem-ctx-btn" onclick="bmcSelClose()" style="color:var(--text-muted)">\u2715 ${t('bmc.close')}</button>`;
+  html += `</div></div>`;
+  el.innerHTML = html;
 }
 
 // insert a guide point at its position along an edge's current route.
