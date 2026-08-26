@@ -736,10 +736,13 @@ function _bmcDrawMark(info, layout) {
 
 // ---- Euston engine: capsule blobs over strand extents, mergeable ----
 
-// Group blob stations that belong together visually: connected by ISI/OSI
-// or sharing a display name, both placed, within reach of each other.
+// Group stations that belong together visually: connected by ISI/OSI or
+// sharing a display name, both placed, within reach of each other. Any
+// placed stop can be promoted into a complex this way — a single-line
+// terminus linked to a neighbour still gets its chain circle (TfL style).
+// Standalone stations only count when their own mark kind is blob.
 function _bmcBlobGroups(layout) {
-  const blobs = [...layout.nodeInfos.values()].filter(i => i.placed && _bmcMarkKind(i, layout) === 'blob');
+  const blobs = [...layout.nodeInfos.values()].filter(i => i.placed && _bmcMarkKind(i, layout) !== 'none');
   const byId = new Map(blobs.map(b => [b.id, b]));
   const parent = new Map(blobs.map(b => [b.id, b.id]));
   const find = (x) => { while (parent.get(x) !== x) { parent.set(x, parent.get(parent.get(x))); x = parent.get(x); } return x; };
@@ -769,60 +772,146 @@ function _bmcBlobGroups(layout) {
     if (!groups.has(r)) groups.set(r, []);
     groups.get(r).push(b);
   }
-  return [...groups.values()].map(members => ({
-    members,
-    sharedName: members.length > 1 && members.every(m => nodeDisplayName(m.id) === nodeDisplayName(members[0].id)),
-  }));
+  return [...groups.values()]
+    .filter(members => members.length > 1 || _bmcMarkKind(members[0], layout) === 'blob')
+    .map(members => ({
+      members,
+      sharedName: members.length > 1 && members.every(m => nodeDisplayName(m.id) === nodeDisplayName(members[0].id)),
+    }));
 }
 
-// Fit a stadium (rounded-rect capsule) over all strand endpoints + centres
-// of the group's members. Single-strand nodes degrade to the classic circle.
-function _bmcDrawCapsule(bg) {
-  const pts = [];
-  for (const m of bg.members) {
-    pts.push({ x: m.pos.gx * BMC_CELL, y: m.pos.gy * BMC_CELL });
-    for (const end of m.ends.values()) pts.push({ x: end.P.x, y: end.P.y });
-  }
-  if (!pts.length) return '';
-  const hit = bg.members.map(m => `data-bmc-node="${m.id}"`);
-
-  // dominant axis: the farthest pair, snapped to 45°
+// Fit one visual shape over a point set: circle when compact (up to a
+// ~3-strand cross-section), else a 45°-snapped stadium along the farthest pair.
+function _bmcFitShape(pts) {
+  const pad = BMC_LINEW * 0.9 + 1.5;
   let best = [pts[0], pts[0]], bd = 0;
   for (let i = 0; i < pts.length; i++)
     for (let j = i + 1; j < pts.length; j++) {
       const dd = _bmcDist(pts[i], pts[j]);
       if (dd > bd) { bd = dd; best = [pts[i], pts[j]]; }
     }
-  const pad = BMC_LINEW * 0.9 + 1.5;
+  const cxm = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+  const cym = pts.reduce((s, p) => s + p.y, 0) / pts.length;
   if (bd <= BMC_GAP * 2.3) {
-    // compact (up to a ~3-strand cross-section): classic circle
-    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    const r = Math.max(BMC_BLOB_R, bd / 2 + pad * 0.7);
-    for (const m of bg.members) m._blobShape = { type: 'circle', cx, cy, r };
-    return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${r.toFixed(1)}" fill="#fff" stroke="#000" stroke-width="${BMC_MARK_SW}" ${hit[0]} style="cursor:grab"/>`;
+    return { type: 'circle', cx: cxm, cy: cym, r: Math.max(BMC_BLOB_R, bd / 2 + pad * 0.7) };
   }
   let ang = Math.atan2(best[1].y - best[0].y, best[1].x - best[0].x);
   ang = Math.round(ang / (Math.PI / 4)) * (Math.PI / 4);
   const u = { x: Math.cos(ang), y: Math.sin(ang) };
   const v = { x: -u.y, y: u.x };
-  const c0 = { x: pts.reduce((s, p) => s + p.x, 0) / pts.length, y: pts.reduce((s, p) => s + p.y, 0) / pts.length };
   let sMin = Infinity, sMax = -Infinity, tMin = Infinity, tMax = -Infinity;
   for (const p of pts) {
-    const s = (p.x - c0.x) * u.x + (p.y - c0.y) * u.y;
-    const t = (p.x - c0.x) * v.x + (p.y - c0.y) * v.y;
+    const s = (p.x - cxm) * u.x + (p.y - cym) * u.y;
+    const t = (p.x - cxm) * v.x + (p.y - cym) * v.y;
     if (s < sMin) sMin = s; if (s > sMax) sMax = s;
     if (t < tMin) tMin = t; if (t > tMax) tMax = t;
   }
   const len = (sMax - sMin) + pad * 2;
   const wid = Math.max((tMax - tMin) + pad * 2, BMC_BLOB_R * 2);
-  const cx = c0.x + u.x * (sMax + sMin) / 2 + v.x * (tMax + tMin) / 2;
-  const cy = c0.y + u.y * (sMax + sMin) / 2 + v.y * (tMax + tMin) / 2;
-  const deg = (ang * 180 / Math.PI).toFixed(1);
-  for (const m of bg.members) m._blobShape = { type: 'pill', cx, cy, u, len, wid };
-  return `<g transform="translate(${cx.toFixed(1)},${cy.toFixed(1)}) rotate(${deg})">
-    <rect x="${(-len / 2).toFixed(1)}" y="${(-wid / 2).toFixed(1)}" width="${len.toFixed(1)}" height="${wid.toFixed(1)}" rx="${(wid / 2).toFixed(1)}" fill="#fff" stroke="#000" stroke-width="${BMC_MARK_SW}" ${hit[0]} style="cursor:grab"/>
-  </g>`;
+  return {
+    type: 'pill', u, len, wid, deg: ang * 180 / Math.PI,
+    cx: cxm + u.x * (sMax + sMin) / 2 + v.x * (tMax + tMin) / 2,
+    cy: cym + u.y * (sMax + sMin) / 2 + v.y * (tMax + tMin) / 2,
+  };
+}
+
+function _bmcShapeSVG(sh, attrs) {
+  if (sh.type === 'circle')
+    return `<circle cx="${sh.cx.toFixed(1)}" cy="${sh.cy.toFixed(1)}" r="${sh.r.toFixed(1)}" ${attrs}/>`;
+  return `<g transform="translate(${sh.cx.toFixed(1)},${sh.cy.toFixed(1)}) rotate(${sh.deg.toFixed(1)})"><rect x="${(-sh.len / 2).toFixed(1)}" y="${(-sh.wid / 2).toFixed(1)}" width="${sh.len.toFixed(1)}" height="${sh.wid.toFixed(1)}" rx="${(sh.wid / 2).toFixed(1)}" ${attrs}/></g>`;
+}
+
+// Neck bar between two cluster centres (ends hide under the cluster shapes)
+function _bmcNeckSVG(a, b, w, attrs) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const L = Math.sqrt(dx * dx + dy * dy) || 1;
+  const deg = Math.atan2(dy, dx) * 180 / Math.PI;
+  return `<g transform="translate(${a.x.toFixed(1)},${a.y.toFixed(1)}) rotate(${deg.toFixed(1)})"><rect x="0" y="${(-w / 2).toFixed(1)}" width="${L.toFixed(1)}" height="${w.toFixed(1)}" ${attrs}/></g>`;
+}
+
+// Blob renderer with pinching (TfL dumbbell style). Connection points
+// (member centres + strand endpoints) are single-link clustered: points
+// closer than ~1.5 cells chain together, and clusters bridged by an actual
+// corridor (their cells hold line connections) merge into one solid shape.
+// Only spans whose cells hold NO line connection stay split — those
+// clusters are joined by narrow pinched necks instead.
+function _bmcDrawCapsule(bg) {
+  const pts = [];
+  const firstIdx = new Map();
+  for (const m of bg.members) {
+    firstIdx.set(m.id, pts.length);
+    pts.push({ x: m.pos.gx * BMC_CELL, y: m.pos.gy * BMC_CELL, m });
+    for (const end of m.ends.values()) pts.push({ x: end.P.x, y: end.P.y, m });
+  }
+  if (!pts.length) return '';
+
+  const CL = BMC_CELL * 1.5;
+  const cid = pts.map((_, i) => i);
+  const find = (x) => { while (cid[x] !== x) { cid[x] = cid[cid[x]]; x = cid[x]; } return x; };
+  for (let i = 0; i < pts.length; i++)
+    for (let j = i + 1; j < pts.length; j++)
+      if (_bmcDist(pts[i], pts[j]) <= CL) { const a = find(i), b = find(j); if (a !== b) cid[a] = b; }
+  const seenE = new Set();
+  for (const m of bg.members) for (const e of m.edges) {
+    if (seenE.has(e.key)) continue;
+    seenE.add(e.key);
+    if (firstIdx.has(e.a) && firstIdx.has(e.b)) {
+      const a = find(firstIdx.get(e.a)), b = find(firstIdx.get(e.b));
+      if (a !== b) cid[a] = b;
+    }
+  }
+  const clMap = new Map();
+  pts.forEach((p, i) => { const r = find(i); if (!clMap.has(r)) clMap.set(r, []); clMap.get(r).push(p); });
+  const clusters = [...clMap.values()];
+
+  // labels key off the overall extent, pinched or not; distinct-name
+  // members label their own part instead (set below)
+  const overall = _bmcFitShape(pts);
+  for (const m of bg.members) { m._blobShape = overall; m._blobOwnLabel = !bg.sharedName; }
+
+  if (clusters.length === 1) {
+    const grab = `data-bmc-node="${bg.members[0].id}" style="cursor:grab"`;
+    return _bmcShapeSVG(overall, `fill="#fff" stroke="#000" stroke-width="${BMC_MARK_SW}" ${grab}`);
+  }
+
+  const shapes = clusters.map(cl => _bmcFitShape(cl));
+  // uniform chain circles (TfL): every circle takes the largest radius
+  let rMax = 0;
+  for (const sh of shapes) if (sh.type === 'circle' && sh.r > rMax) rMax = sh.r;
+  for (const sh of shapes) if (sh.type === 'circle') sh.r = rMax;
+  const owner = clusters.map(cl => { // member with most points in the cluster gets the drag
+    const cnt = new Map();
+    for (const p of cl) cnt.set(p.m, (cnt.get(p.m) || 0) + 1);
+    return [...cnt.entries()].sort((a, b) => b[1] - a[1])[0][0];
+  });
+  // distinct-name complexes: each member's label hugs its own cluster shape
+  if (!bg.sharedName) clusters.forEach((cl, i) => { for (const p of cl) p.m._blobShape = shapes[i]; });
+  // necks along an MST between cluster centres (Prim); corridor-bridged
+  // clusters were already merged, so necks only ever cross empty cells
+  const sc = (i) => ({ x: shapes[i].cx, y: shapes[i].cy });
+  const inTree = new Set([0]);
+  const necks = [];
+  while (inTree.size < clusters.length) {
+    let bi = -1, bj = -1, bdd = Infinity;
+    for (const i of inTree) for (let j = 0; j < clusters.length; j++) {
+      if (inTree.has(j)) continue;
+      const dd = _bmcDist(sc(i), sc(j));
+      if (dd < bdd) { bdd = dd; bi = i; bj = j; }
+    }
+    necks.push({ a: sc(bi), b: sc(bj), w: BMC_BLOB_R * 0.85 });
+    inTree.add(bj);
+  }
+
+  // two-pass union outline: fat strokes first, then white interiors erase
+  // the seams so circles + necks read as one pinched shape
+  const OUT = `fill="#fff" stroke="#000" stroke-width="${BMC_MARK_SW * 2}"`;
+  let out = '<g>';
+  for (const nk of necks) out += _bmcNeckSVG(nk.a, nk.b, nk.w, OUT);
+  for (const sh of shapes) out += _bmcShapeSVG(sh, OUT);
+  for (const nk of necks) out += _bmcNeckSVG(nk.a, nk.b, nk.w, `fill="#fff" data-bmc-node="${bg.members[0].id}" style="cursor:grab"`);
+  for (let i = 0; i < shapes.length; i++) out += _bmcShapeSVG(shapes[i], `fill="#fff" data-bmc-node="${owner[i].id}" style="cursor:grab"`);
+  out += '</g>';
+  return out;
 }
 
 const _BMC_LABEL_DIRS = [
@@ -845,13 +934,20 @@ function _bmcDrawLabel(info, kind, layout) {
     const l = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
     ld = { x: o.dx / l, y: o.dy / l };
   } else if (!ld) {
+    // shared-name complexes: judge congestion from the shape centre and
+    // prefer directions perpendicular to a pill's long axis (label off the
+    // chain side). Members labelling their own part judge from their node.
+    const sh = (kind === 'blob') ? info._blobShape : null;
+    const useCentre = sh && !info._blobOwnLabel;
+    const from = useCentre ? { pos: { gx: sh.cx / BMC_CELL, gy: sh.cy / BMC_CELL } } : info;
     let bi = 0, bs = Infinity;
     const prefs = [0, 4, 6, 2, 7, 5, 1, 3];
     for (const i of prefs) {
       const o = _BMC_LABEL_DIRS[i];
       const l = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
-      const s = _bmcDirCongestion(layout, info, o.dx / l, o.dy / l, 1);
-      if (s < bs) { bs = s; bi = i; if (s === 0) break; }
+      let s = _bmcDirCongestion(layout, from, o.dx / l, o.dy / l, 1) * 10;
+      if (useCentre && sh.type === 'pill') s += Math.abs((o.dx / l) * sh.u.x + (o.dy / l) * sh.u.y) * 8;
+      if (s < bs) { bs = s; bi = i; }
     }
     const o = _BMC_LABEL_DIRS[bi];
     const l = Math.sqrt(o.dx * o.dx + o.dy * o.dy);
