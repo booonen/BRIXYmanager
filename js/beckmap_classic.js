@@ -791,9 +791,21 @@ function bmcRender() {
           if (gap < 0.5) chain.push(...pts.slice(1));
           else if (gap < 6) {
             // near-aligned joint (a corner at a bundle boundary, or a small
-            // lane transition): merge into one point so it rounds like any
-            // bend instead of leaving a square micro-jog
-            chain[chain.length - 1] = { x: (last.x + pts[0].x) / 2, y: (last.y + pts[0].y) / 2 };
+            // lane transition): merge into ONE corner point so it rounds
+            // like any bend. The point must be the MITER intersection of
+            // the incoming and outgoing strand directions — a midpoint
+            // undershoots toward the centreline on turns, collapsing the
+            // fan spacing and making parallel lines overlap at corners.
+            const prev = chain[chain.length - 2];
+            const next = pts[1];
+            const mid = { x: (last.x + pts[0].x) / 2, y: (last.y + pts[0].y) / 2 };
+            let corner = mid;
+            if (prev && next) {
+              const X = _bmcLineIntersect(last, { x: last.x - prev.x, y: last.y - prev.y },
+                                          pts[0], { x: next.x - pts[0].x, y: next.y - pts[0].y });
+              if (X && _bmcDist(X, mid) < BMC_CELL * 1.2) corner = X;
+            }
+            chain[chain.length - 1] = corner;
             chain.push(...pts.slice(1));
           } else chain.push(...pts);
         }
