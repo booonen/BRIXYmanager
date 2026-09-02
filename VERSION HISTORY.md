@@ -1,5 +1,8 @@
 # BRIXYmanager — Version History
 
+## v0.19.13.1 — Way pool: the search chooses the track, not the snap
+Wib's first real-data test found routes doubling back: each endpoint was committed to its single nearest way, so on double-track lines mapped as two parallel ways one station could land on the northbound way and the other on the southbound, and the only graph connection between them was a crossover or the terminus. Snapping now yields a *candidate per way* within a tolerance of the nearest (3× its distance, 60 m floor, up to 8), every candidate hangs off a virtual source/target with its snap gap as the edge cost, and Dijkstra picks the candidate pair minimising snap gap + path length — a few metres of extra snap always beats a kilometres-long detour. Reported `snapA`/`snapB` are the chosen candidates; distance is the path length between them.
+
 ## v0.19.13.0 — System way pool: fetch once, derive every segment's route from it
 Replaces the "paste the whole system's way list into every segment" workflow. Previously each segment triggered a full Overpass fetch of every pasted way, greedily chained the *entire* network into one polyline (a branching network isn't a path, so the slice between two stations could wander through unrelated branches), and recorded the whole list in every segment's `ogfWayIds`.
 

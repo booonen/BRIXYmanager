@@ -145,27 +145,39 @@ function _wayPoolGetGraph() {
   return _wayPoolGraph;
 }
 
-// nearest position on any pool way: { way, edgeIdx, t, point, dist }
-function _wayPoolSnap(pt) {
-  let best = null;
+// Snap candidates for a point: the best projection on EACH pool way,
+// keeping every way within a tolerance of the nearest. On double-track
+// lines mapped as two parallel ways, a station is a few metres from both
+// tracks; committing to the single nearest one would let the two ends of
+// a segment land on different tracks and force the route round through
+// a crossover or the terminus. The search chooses instead (see below).
+function _wayPoolSnapCandidates(pt) {
+  const perWay = [];
   for (const [wid, w] of Object.entries(_wayPool.ways)) {
+    let best = null;
     for (let i = 0; i < w.coords.length - 1; i++) {
       const pr = _projectToEdge(pt, w.coords[i], w.coords[i + 1]);
       if (!best || pr.dist < best.dist) best = { way: wid, edgeIdx: i, t: pr.t, point: pr.point, dist: pr.dist };
     }
+    if (best) perWay.push(best);
   }
-  return best;
+  perWay.sort((a, b) => a.dist - b.dist);
+  if (!perWay.length) return [];
+  const tol = Math.max(perWay[0].dist * 3, 0.06); // 60 m floor, or 3× the nearest
+  return perWay.filter(c => c.dist <= tol).slice(0, 8);
 }
 
 // Shortest path through the pool between two [lat,lon] points. Returns
 // { coords, wayIds, distKm, maxSpeed, speedsConflict, snapA, snapB } or null.
+// Multi-source / multi-target: every snap candidate of A hangs off a
+// virtual source with the snap gap as its cost (same for B), so the
+// search itself picks which track each end uses.
 function wayPoolRoute(ptA, ptB) {
   if (!wayPoolReady()) return null;
   const g = _wayPoolGetGraph();
-  const sA = _wayPoolSnap(ptA), sB = _wayPoolSnap(ptB);
-  if (!sA || !sB) return null;
+  const candA = _wayPoolSnapCandidates(ptA), candB = _wayPoolSnapCandidates(ptB);
+  if (!candA.length || !candB.length) return null;
 
-  // virtual endpoint vertices spliced into their snapped way edges
   const extra = new Map();
   const addX = (a, b, len, way) => { if (!extra.has(a)) extra.set(a, []); extra.get(a).push({ to: b, len, way }); };
   const splice = (name, s) => {
@@ -175,12 +187,16 @@ function wayPoolRoute(ptA, ptB) {
     addX(name, n0, l0, s.way); addX(n0, name, l0, s.way);
     addX(name, n1, l1, s.way); addX(n1, name, l1, s.way);
   };
-  splice('@A', sA);
-  splice('@B', sB);
-  if (sA.way === sB.way && sA.edgeIdx === sB.edgeIdx) {
-    const l = _ptDist(sA.point, sB.point);
-    addX('@A', '@B', l, sA.way); addX('@B', '@A', l, sA.way);
-  }
+  const candPoint = new Map();
+  candA.forEach((s, i) => { const v = '@A' + i; candPoint.set(v, s); splice(v, s); addX('@A', v, s.dist, null); });
+  candB.forEach((s, i) => { const v = '@B' + i; candPoint.set(v, s); splice(v, s); addX(v, '@B', s.dist, null); });
+  // both ends on the same way edge: direct hop along that edge
+  candA.forEach((sa, i) => candB.forEach((sb, j) => {
+    if (sa.way === sb.way && sa.edgeIdx === sb.edgeIdx) {
+      const l = _ptDist(sa.point, sb.point);
+      addX('@A' + i, '@B' + j, l, sa.way); addX('@B' + j, '@A' + i, l, sa.way);
+    }
+  }));
   const neighbors = (v) => [...(g.adj.get(v) || []), ...(extra.get(v) || [])];
 
   // Dijkstra (binary heap)
@@ -219,18 +235,23 @@ function wayPoolRoute(ptA, ptB) {
   }
   if (!dist.has('@B')) return null;
 
+  // reconstruct: drop the virtual source/target, keep the chosen candidates
   const verts = [], waysUsed = [];
   let cur = '@B';
-  while (cur !== '@A') { const p = prev.get(cur); verts.push(cur); waysUsed.push(p.way); cur = p.from; }
-  verts.push('@A');
+  while (cur !== '@A') { const p = prev.get(cur); verts.push(cur); if (p.way) waysUsed.push(p.way); cur = p.from; }
   verts.reverse(); waysUsed.reverse();
-  const coords = verts.map(v => v === '@A' ? sA.point : v === '@B' ? sB.point : g.coordOf.get(v));
+  const path = verts.filter(v => v !== '@B');
+  const sA = candPoint.get(path[0]), sB = candPoint.get(path[path.length - 1]);
+  const coords = path.map(v => candPoint.has(v) ? candPoint.get(v).point : g.coordOf.get(v));
   const wayIds = [...new Set(waysUsed)].map(Number);
   const speeds = [...new Set(wayIds.map(id => parseInt(_wayPool.ways[String(id)]?.tags?.maxspeed)).filter(s => s > 0))];
+  const simplified = _simplifyCoords(coords, 0.00005);
+  let distKm = 0;
+  for (let i = 1; i < coords.length; i++) distKm += _ptDist(coords[i - 1], coords[i]);
   return {
-    coords: _simplifyCoords(coords, 0.00005),
+    coords: simplified,
     wayIds,
-    distKm: dist.get('@B'),
+    distKm,
     maxSpeed: speeds.length === 1 ? speeds[0] : null,
     speedsConflict: speeds.length > 1,
     snapA: sA, snapB: sB,
