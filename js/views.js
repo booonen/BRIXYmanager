@@ -49,6 +49,7 @@ function renderSettings() {
       <button class="btn btn-sm settings-tab active" data-stab="general" onclick="switchSettingsTab('general')">${t('settings.tab_general')}</button>
       <button class="btn btn-sm settings-tab" data-stab="defaults" onclick="switchSettingsTab('defaults')">${t('settings.tab_defaults')}</button>
       <button class="btn btn-sm settings-tab" data-stab="issues" onclick="switchSettingsTab('issues')">${t('settings.tab_issues')}</button>
+      <button class="btn btn-sm settings-tab" data-stab="ogf" onclick="switchSettingsTab('ogf')">${t('settings.tab_ogf')}</button>
     </div>
 
     <div id="stab-general" class="settings-section">
@@ -149,7 +150,8 @@ function renderSettings() {
           }).join('\n          ')}
         </div>
       </div>
-    </div>`;
+    </div>
+    ${renderWayPoolSettings(s)}`;
 }
 
 function switchSettingsTab(tab) {

@@ -7,11 +7,13 @@ let _saveDebounce = null;
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open('railmanager', 1);
+    const req = indexedDB.open('railmanager', 2);
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains('registry')) db.createObjectStore('registry', { keyPath: 'id' });
       if (!db.objectStoreNames.contains('saves')) db.createObjectStore('saves', { keyPath: 'id' });
+      // cached OGF way-pool geometry, one record per save slot (derivable, so never exported)
+      if (!db.objectStoreNames.contains('waypool')) db.createObjectStore('waypool', { keyPath: 'id' });
     };
     req.onsuccess = () => { _db = req.result; resolve(_db); };
     req.onerror = () => reject(req.error);
@@ -102,6 +104,7 @@ async function load() {
     await flushSave();
   }
   _markSlotOpened(_activeSaveId);
+  if (typeof wayPoolLoad === 'function') await wayPoolLoad();
   if (typeof bumpTHIVersion === 'function') bumpTHIVersion();
   if (typeof animOnDataChange === 'function') animOnDataChange();
 }
@@ -116,6 +119,7 @@ async function loadSlot(id) {
   if (slot?.data) data = { ...data, ...slot.data };
   migrateSegmentTracks();
   if (_map) { _map.remove(); _map = null; }
+  if (typeof wayPoolLoad === 'function') await wayPoolLoad();
   if (typeof bumpTHIVersion === 'function') bumpTHIVersion();
   if (typeof animOnDataChange === 'function') animOnDataChange();
   refreshAll(); renderDashboard(); updateSystemName();
@@ -129,6 +133,7 @@ async function deleteSlot(id) {
   appConfirm(t('save_mgr.confirm_delete', { name: entry.name }), async () => {
     await dbDelete('saves', id);
     await dbDelete('registry', id);
+    try { await dbDelete('waypool', id); } catch (e) {}
     if (_activeSaveId === id) {
       const remaining = reg.filter(r => r.id !== id);
       if (remaining.length > 0) {
@@ -152,6 +157,7 @@ async function duplicateSlot(id) {
   const newId = uid();
   await dbPut('saves', { id: newId, data: slot.data });
   await dbPut('registry', { id: newId, name: regEntry.name + ' (copy)', modified: new Date().toISOString(), stats: regEntry.stats });
+  try { const pool = await dbGet('waypool', id); if (pool) await dbPut('waypool', { ...pool, id: newId }); } catch (e) {}
   toast(t('toast.duplicated', { name: regEntry.name }), 'success');
   openSaveManager();
 }

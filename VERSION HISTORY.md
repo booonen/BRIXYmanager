@@ -1,5 +1,12 @@
 # BRIXYmanager — Version History
 
+## v0.19.13.0 — System way pool: fetch once, derive every segment's route from it
+Replaces the "paste the whole system's way list into every segment" workflow. Previously each segment triggered a full Overpass fetch of every pasted way, greedily chained the *entire* network into one polyline (a branching network isn't a path, so the slice between two stations could wander through unrelated branches), and recorded the whole list in every segment's `ogfWayIds`.
+
+- **Settings › OGF tab — System way pool.** Enter the system's OGF way IDs and/or relation IDs (`r4321` pulls in all of a route relation's `railway=*`/`highway=*` ways, platforms excluded). *Fetch & cache* pulls the geometry in chunked Overpass queries and stores it per save slot in a new `waypool` IndexedDB store (DB version 2). The pool is derivable, so it is never written into the exported JSON; the ID list itself lives in `settings.wayPoolIds` and travels with the save. Deleting or duplicating a slot deletes/copies its pool.
+- **Real routing instead of chaining.** The pool becomes a graph (Overpass `out geom` provides each way's node refs, so connectivity is exact). A segment's endpoints snap to the nearest pool way — splitting the way virtually when a station sits mid-way — and a Dijkstra shortest path by geometric length yields exactly the ways and sub-polyline between them, through junctions and branches. The segment records only the ways actually traversed. Same >50 m snap warnings as the manual fetch; maxspeed resolved from the traversed ways.
+- **Hooks.** Segment form: a *From pool* button next to *Fetch* (shown when a pool is cached); leaving the way-ID field empty and saving derives from the pool automatically (setting *Derive geometry for new segments from the pool automatically*, default on; silent when an endpoint has no OGF coordinates). Settings: *Apply to segments without geometry* and *Re-derive all segments* (confirmed) with a results dialog listing snap and no-route warnings; distances are only filled when empty.
+
 ## v0.19.12.0 — Testing feedback round (Wib's six notes)
 First test pass after the Phase 19 merge; all six notes addressed.
 

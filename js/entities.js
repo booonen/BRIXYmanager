@@ -1490,6 +1490,7 @@ function openSegmentModal(id, hField) {
         <div style="display:flex;gap:8px;align-items:center">
           <input type="text" id="f-sOgfWays" value="${esc(s?.ogfWayIds?.length ? s.ogfWayIds.join(', ') : '')}" placeholder="${t('placeholder.eg_ogf_ways')}" style="flex:1" oninput="this.value=this.value.replace(/\\bway\\s*/gi,'')">
           <button type="button" class="btn btn-sm" onclick="fetchSegWayGeometry()">Fetch</button>
+          ${(typeof wayPoolReady === 'function' && wayPoolReady()) ? `<button type="button" class="btn btn-sm" onclick="fetchSegWayGeometry(true)" title="${t('settings.waypool_auto_desc')}">${t('btn.from_pool')}</button>` : ''}
         </div>
         <p class="text-dim" style="font-size:11px;margin-top:4px" id="seg-way-status">${s?.wayGeometry?.length ? t('seg_detail.ogf_ways', { n: s.ogfWayIds?.length || '?', pts: s.wayGeometry.length }) : ''}</p>
         <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text);margin-top:6px;cursor:pointer;text-transform:none;font-weight:400">
@@ -1564,9 +1565,41 @@ function openSegmentModal(id, hField) {
       filterFn: getFilter(typeSelect.value), onEnterSelect: segEnterB });
   });
 }
-async function fetchSegWayGeometry() {
+// Derive the segment's route from the cached system way pool (no network).
+// quiet: suppress the "no coordinates" complaint (used by the auto-hook on save)
+function segGeometryFromPool(quiet) {
+  const nAId = nodePickerGetValue('np-segA'), nBId = nodePickerGetValue('np-segB');
+  const nA = nAId ? getNode(nAId) : null, nB = nBId ? getNode(nBId) : null;
+  if (!nA || !nB) { if (!quiet) toast(t('toast.select_both_nodes'), 'error'); return false; }
+  const r = wayPoolRouteForNodes(nA, nB);
+  if (r.error === 'nolatlon') { if (!quiet) toast(t('toast.waypool_need_latlon'), 'error'); return false; }
+  if (r.error) { toast(t('toast.waypool_route_fail', { a: nA.name, b: nB.name }), 'error'); return false; }
+  if (r.snapA.dist > 0.05) toast(t('toast.snap_warn', { name: nA.name, m: Math.round(r.snapA.dist * 1000) }), 'error');
+  if (r.snapB.dist > 0.05) toast(t('toast.snap_warn', { name: nB.name, m: Math.round(r.snapB.dist * 1000) }), 'error');
+  window._segWayGeometry = r.coords;
+  const waysInput = document.getElementById('f-sOgfWays');
+  if (waysInput) waysInput.value = r.wayIds.join(', ');
+  const km = haversineDistance(r.coords);
+  const distInput = document.getElementById('f-sDi');
+  if (distInput && !parseFloat(distInput.value)) distInput.value = km;
+  if (r.maxSpeed) {
+    const speedInput = document.getElementById('f-sSp');
+    if (speedInput && !parseInt(speedInput.value)) speedInput.value = r.maxSpeed;
+  }
+  if (r.speedsConflict) toast(t('toast.way_speed_conflict'), 'error');
+  const status = document.getElementById('seg-way-status');
+  if (status) status.textContent = t('toast.waypool_from_pool', { n: r.wayIds.length, km });
+  toast(t('toast.waypool_from_pool', { n: r.wayIds.length, km }), 'success');
+  return true;
+}
+
+async function fetchSegWayGeometry(fromPool) {
   const raw = (document.getElementById('f-sOgfWays')?.value || '').replace(/\bway\s+/gi, '');
   const ids = raw.split(/[,\n\s]+/).map(s => parseInt(s.trim())).filter(n => n > 0);
+  // explicit "From pool", or an empty way field with a pool available
+  if ((fromPool || !ids.length) && typeof wayPoolReady === 'function' && wayPoolReady()) {
+    return segGeometryFromPool(fromPool === 'quiet');
+  }
   if (!ids.length) { toast(t('toast.way_fetch_none'), 'error'); return false; }
   toast(t('toast.way_fetching'), 'success');
   try {
@@ -1630,6 +1663,10 @@ async function saveSegment() {
     const hasWayIds = wayRaw.split(/[,\n\s]+/).some(s => parseInt(s.trim()) > 0);
     if (hasWayIds && !window._segWayGeometry) {
       await fetchSegWayGeometry();
+    } else if (!hasWayIds && !window._segWayGeometry && getSetting('wayPoolAuto', true) &&
+               typeof wayPoolReady === 'function' && wayPoolReady()) {
+      // no way IDs of its own: derive the route from the system way pool
+      fetchSegWayGeometry('quiet');
     }
   }
 

@@ -30,7 +30,7 @@ The app is split across `railmanager.html`, `styles.css`, 14 JS modules in `js/`
 1. Update the version string in the sidebar footer of `railmanager.html` (search for `<div style="padding:8px 16px;font-size:10px;` near the `</nav>` tag)
 2. Prepend a new entry to `VERSION HISTORY.md` (newest entries at top)
 
-**Current version:** 0.19.12.0
+**Current version:** 0.19.13.0
 
 ## Validation workflow
 
@@ -85,6 +85,7 @@ The app is split across these files, loaded by `railmanager.html` via plain `<sc
 | `js/journey.js` | Journey planner (CSA algorithm) + JP map |
 | `js/node_ops.js` | Node split & merge (sticky segment groups, per-side platform editing, optional ISI creation, merge chooser/preview, beckmap + station group migration) |
 | `js/import.js` | CSV parsing, OGF relation import engine, fuzzy node matching, polyline similarity/overlap detection, divergence point detection, overlap auto-resolution |
+| `js/waypool.js` | System way pool: OGF way/relation IDs from `settings.wayPoolIds`, geometry fetched once and cached per save slot in the `waypool` IndexedDB store (never exported), way graph built from OSM node refs, snap + Dijkstra routing (`wayPoolRoute`), segment-form "From pool" + auto-derive on save, bulk apply, Settings › OGF tab |
 | `js/views.js` | Settings panel, issue detection (~35 issue types), geomap (Leaflet + OGF tiles), dashboard, Import/Export tab + CSV/relation import wizards |
 | `js/beckmap.js` | Railmap SVG schematic |
 | `js/animate.js` | Animated tab — sim clock, geo + schem views, vehicle interaction, busyness heatmap, route highlight |
