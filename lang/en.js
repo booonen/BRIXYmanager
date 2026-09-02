@@ -925,7 +925,7 @@ registerLanguage('en', 'English', {
     "waypool_auto_desc": "When a segment is saved with no OGF way IDs of its own, its route is taken from the pool (if both endpoints have OGF coordinates). You can also press \"From pool\" in the segment form at any time.",
     "waypool_apply": "Apply to segments without geometry",
     "waypool_apply_all": "Re-derive all segments",
-    "waypool_apply_desc": "Bulk-derive routes from the pool. Interchange segments are skipped; a segment's distance is only filled in when it is still empty.",
+    "waypool_apply_desc": "Bulk-derive routes from the pool. Interchange segments are skipped. Each derived segment's distance is recalculated from its route; max speed is left as you set it.",
     "waypool_result_title": "Way pool applied",
     "waypool_result": "{n} segment(s) received geometry, {skipped} skipped.",
     "waypool_warnings": "Warnings",

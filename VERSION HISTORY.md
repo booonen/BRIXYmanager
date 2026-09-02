@@ -1,5 +1,8 @@
 # BRIXYmanager — Version History
 
+## v0.19.13.2 — Way pool: bulk derive recalculates segment length
+Bulk apply only filled a distance when the segment had none, protecting hand-typed values — wrong for a re-derive, where the routed geometry is the better number. Both bulk actions now set each derived segment's distance from its route (max speed is still left alone). The segment form keeps filling distance only when the field is empty, since there you are editing it by hand.
+
 ## v0.19.13.1 — Way pool: the search chooses the track, not the snap
 Wib's first real-data test found routes doubling back: each endpoint was committed to its single nearest way, so on double-track lines mapped as two parallel ways one station could land on the northbound way and the other on the southbound, and the only graph connection between them was a crossover or the terminus. Snapping now yields a *candidate per way* within a tolerance of the nearest (3× its distance, 60 m floor, up to 8), every candidate hangs off a virtual source/target with its snap gap as the edge cost, and Dijkstra picks the candidate pair minimising snap gap + path length — a few metres of extra snap always beats a kilometres-long detour. Reported `snapA`/`snapB` are the chosen candidates; distance is the path length between them.
 

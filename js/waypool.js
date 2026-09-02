@@ -287,7 +287,7 @@ function wayPoolApplyToSegments(overwrite) {
       if (r.snapB.dist > WAYPOOL_SNAP_WARN_KM) warnings.push(t('toast.snap_warn', { name: nB.name, m: Math.round(r.snapB.dist * 1000) }));
       seg.wayGeometry = r.coords;
       seg.ogfWayIds = r.wayIds;
-      if (!(seg.distance > 0)) seg.distance = haversineDistance(r.coords);
+      seg.distance = haversineDistance(r.coords); // the derived route IS the length
       applied++;
     }
     save();
